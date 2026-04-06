@@ -42,6 +42,10 @@ export default function UploadZone({ onUpload }: UploadZoneProps) {
       'image/png': ['.png'],
       'image/jpeg': ['.jpg', '.jpeg'],
       'image/webp': ['.webp'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'text/csv': ['.csv'],
     },
     maxSize: 10 * 1024 * 1024,
   });
@@ -63,8 +67,8 @@ export default function UploadZone({ onUpload }: UploadZoneProps) {
           <p className="text-accent-400">Drop files here</p>
         ) : (
           <div>
-            <p className="text-gray-300 mb-1">Drag & drop files here, or click to select</p>
-            <p className="text-gray-500 text-sm">PDF, PNG, JPG, WEBP up to 10MB</p>
+            <p className="text-gray-300 mb-1">Drop files here or click to browse</p>
+            <p className="text-gray-500 text-sm">PDF, Word, Excel, images — any format</p>
           </div>
         )}
       </div>

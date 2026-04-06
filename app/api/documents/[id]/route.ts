@@ -22,6 +22,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   return Response.json({ ...doc, signed_url: signedUrl?.signedUrl ?? null });
 }
 
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { userId } = await auth();
+  if (!userId) return new Response('Unauthorized', { status: 401 });
+  const { id } = await params;
+
+  const { folder } = await req.json();
+  if (!folder) return Response.json({ error: 'Folder required' }, { status: 400 });
+
+  const { error } = await supabaseAdmin
+    .from('documents')
+    .update({ folder })
+    .eq('id', id)
+    .eq('user_id', userId);
+
+  if (error) return Response.json({ error: error.message }, { status: 500 });
+  return Response.json({ ok: true });
+}
+
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
