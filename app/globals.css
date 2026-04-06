@@ -33,6 +33,68 @@
   color: #f1f5f9;
 }
 
+/* react-grid-layout styles */
+.react-grid-layout {
+  position: relative;
+  transition: height 200ms ease;
+}
+
+.react-grid-item {
+  transition: all 200ms ease;
+  transition-property: left, top, width, height;
+}
+
+.react-grid-item.cssTransforms {
+  transition-property: transform, width, height;
+}
+
+.react-grid-item.resizing {
+  transition: none;
+  z-index: 1;
+  will-change: width, height;
+}
+
+.react-grid-item.react-draggable-dragging {
+  transition: none;
+  z-index: 3;
+  will-change: transform;
+  opacity: 0.9;
+}
+
+.react-grid-item > .react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+  z-index: 2;
+}
+
+.react-grid-item > .react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(255, 255, 255, 0.3);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0 0 2px 0;
+}
+
+.react-grid-item > .react-resizable-handle:hover::after {
+  border-color: rgba(234, 88, 12, 0.8);
+}
+
+.react-grid-placeholder {
+  background: rgba(234, 88, 12, 0.15);
+  border: 2px dashed rgba(234, 88, 12, 0.4);
+  border-radius: 8px;
+  opacity: 1;
+  transition: all 150ms ease;
+}
+
 @theme {
   /* Primary — Night Ride dark navy */
   --color-gray-950: #070d15;
