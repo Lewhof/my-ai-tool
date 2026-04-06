@@ -5,6 +5,9 @@ const isPublicRoute = createRouteMatcher([
   '/api/telegram(.*)',
   '/api/auth/microsoft/callback(.*)',
   '/api/tasks/pending(.*)',
+  '/api/diagrams/*/share(.*)',
+  '/api/migrate(.*)',
+  '/diagrams/share(.*)',
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
