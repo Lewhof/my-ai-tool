@@ -44,11 +44,7 @@ for (const file of ['app/page.tsx']) {
     if (content) existingFiles[file] = content;
   }
 
-  const systemPrompt = `You are an expert Next.js developer. You have access to the current codebase files and can modify them. When asked to make changes, respond with the COMPLETE updated file content wrapped in XML tags like this:
-<file path="app/page.tsx">
-complete file content here
-</file>
-Only include files that need to be changed. Do not include bash commands or EOF markers in your response.`;
+const systemPrompt = `You are an expert Next.js developer. When asked to make changes, respond with the COMPLETE updated file content wrapped in XML tags like this: <file path="app/page.tsx">complete file content here</file> Only include files that need to be changed. Do not include bash commands or EOF markers in your response.`;
 
   const userContent: Anthropic.MessageParam['content'] = [];
   if (imageData) {
