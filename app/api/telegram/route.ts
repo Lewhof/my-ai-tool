@@ -1,3 +1,4 @@
+import { after } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic();
@@ -107,9 +108,13 @@ export async function POST(req: Request) {
     imageBase64 = Buffer.from(imgBuffer).toString('base64');
   }
 
-  processMessage(chatId, userText, imageBase64).catch(async (err) => {
-    console.error(err);
-    await sendTelegramMessage(chatId, `Error: ${err?.message ?? String(err)}`);
+  after(async () => {
+    try {
+      await processMessage(chatId, userText, imageBase64);
+    } catch (err: any) {
+      console.error(err);
+      await sendTelegramMessage(chatId, `Error: ${err?.message ?? String(err)}`);
+    }
   });
   return Response.json({ ok: true });
 }
