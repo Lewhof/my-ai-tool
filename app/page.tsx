@@ -22,18 +22,29 @@ export default function Dashboard() {
     { label: 'Conversion Rate', value: '3.2%', change: '+2.4%', positive: true },
   ];
 
-  const handleSendMessage = () => {
-    if (!chatInput.trim()) return;
-    
-    setChatMessages([...chatMessages, { role: 'user', content: chatInput }]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSendMessage = async () => {
+    if (!chatInput.trim() || isLoading) return;
+
+    const userMsg = chatInput;
+    setChatMessages((prev) => [...prev, { role: 'user', content: userMsg }]);
     setChatInput('');
-    
-    setTimeout(() => {
-      setChatMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: 'This is a simulated Claude AI response. In production, this would connect to the Claude API.' 
-      }]);
-    }, 1000);
+    setIsLoading(true);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMsg }),
+      });
+      const data = await res.json();
+      setChatMessages((prev) => [...prev, { role: 'assistant', content: data.reply ?? 'No response.' }]);
+    } catch {
+      setChatMessages((prev) => [...prev, { role: 'assistant', content: 'Something went wrong. Please try again.' }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -113,15 +124,16 @@ export default function Dashboard() {
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                 placeholder="Ask Claude anything..."
                 className="flex-1 bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600"
               />
               <button
                 onClick={handleSendMessage}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                disabled={isLoading}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
-                Send
+                {isLoading ? 'Thinking...' : 'Send'}
               </button>
             </div>
           </div>
