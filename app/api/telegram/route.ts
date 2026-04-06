@@ -1,4 +1,3 @@
-cat > ~/my-ai-tool/app/api/telegram/route.ts << 'ENDOFFILE'
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 
