@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { MessageSquare, FileText, Zap, Lock, Unlock, RotateCcw, Plus } from 'lucide-react';
 import { formatRelativeDate, truncate } from '@/lib/utils';
 import WeatherWidget from '@/components/dashboard/weather-widget';
+import CalendarWidget from '@/components/dashboard/calendar-widget';
 import type { Layout } from 'react-grid-layout';
 
 const ResponsiveGridLayout = dynamic(
@@ -53,8 +54,9 @@ const DEFAULT_LAYOUTS: Record<string, Layout[]> = {
     { i: 'notepad', x: 0, y: 9, w: 4, h: 5 },
     { i: 'chats', x: 4, y: 9, w: 4, h: 5 },
     { i: 'docs', x: 8, y: 9, w: 4, h: 5 },
-    { i: 'todos', x: 0, y: 14, w: 6, h: 5 },
-    { i: 'activity', x: 6, y: 14, w: 6, h: 5 },
+    { i: 'calendar', x: 0, y: 14, w: 4, h: 7 },
+    { i: 'todos', x: 4, y: 14, w: 4, h: 5 },
+    { i: 'activity', x: 8, y: 14, w: 4, h: 5 },
   ],
   md: [
     { i: 'quick-actions', x: 0, y: 0, w: 10, h: 2, isResizable: false },
@@ -63,18 +65,20 @@ const DEFAULT_LAYOUTS: Record<string, Layout[]> = {
     { i: 'notepad', x: 0, y: 9, w: 5, h: 5 },
     { i: 'chats', x: 5, y: 9, w: 5, h: 5 },
     { i: 'docs', x: 0, y: 14, w: 5, h: 5 },
-    { i: 'todos', x: 5, y: 14, w: 5, h: 5 },
-    { i: 'activity', x: 0, y: 19, w: 10, h: 5 },
+    { i: 'calendar', x: 5, y: 14, w: 5, h: 7 },
+    { i: 'todos', x: 0, y: 19, w: 5, h: 5 },
+    { i: 'activity', x: 5, y: 21, w: 5, h: 5 },
   ],
   sm: [
     { i: 'quick-actions', x: 0, y: 0, w: 6, h: 2, isResizable: false },
     { i: 'weather', x: 0, y: 2, w: 6, h: 7 },
     { i: 'credits', x: 0, y: 9, w: 6, h: 7 },
-    { i: 'notepad', x: 0, y: 16, w: 6, h: 5 },
-    { i: 'chats', x: 0, y: 21, w: 6, h: 5 },
-    { i: 'docs', x: 0, y: 26, w: 6, h: 5 },
-    { i: 'todos', x: 0, y: 31, w: 6, h: 5 },
-    { i: 'activity', x: 0, y: 36, w: 6, h: 5 },
+    { i: 'calendar', x: 0, y: 16, w: 6, h: 7 },
+    { i: 'notepad', x: 0, y: 23, w: 6, h: 5 },
+    { i: 'chats', x: 0, y: 28, w: 6, h: 5 },
+    { i: 'docs', x: 0, y: 33, w: 6, h: 5 },
+    { i: 'todos', x: 0, y: 38, w: 6, h: 5 },
+    { i: 'activity', x: 0, y: 43, w: 6, h: 5 },
   ],
 };
 
@@ -300,6 +304,11 @@ export default function DashboardPage() {
               ))
             )}
           </div>
+        </div>
+
+        {/* Calendar */}
+        <div key="calendar">
+          <CalendarWidget />
         </div>
 
         {/* To-Do */}
