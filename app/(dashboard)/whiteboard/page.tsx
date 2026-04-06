@@ -35,13 +35,13 @@ const STATUS_LABELS: Record<string, string> = {
 export default function WhiteboardPage() {
   const [items, setItems] = useState<WhiteboardItem[]>([]);
   const [activeFilter, setActiveFilter] = useState('All');
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [showAdd, setShowAdd] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newTags, setNewTags] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editStatus, setEditStatus] = useState('');
 
   const fetchItems = useCallback(async () => {
     const res = await fetch('/api/whiteboard');
@@ -96,8 +96,139 @@ export default function WhiteboardPage() {
     fetchItems();
   };
 
+  // ── Status badge (reused in both views) ──
+  const StatusBadge = ({ item }: { item: WhiteboardItem }) => {
+    if (editingId === item.id) {
+      return (
+        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+          {Object.entries(STATUS_LABELS).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => updateStatus(item.id, key)}
+              className={cn(
+                'text-xs px-2 py-1 rounded-full border',
+                STATUS_COLORS[key],
+                item.status === key && 'ring-1 ring-white'
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      );
+    }
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); setEditingId(item.id); }}
+        className={cn('text-xs px-2.5 py-1 rounded-full border', STATUS_COLORS[item.status] || STATUS_COLORS.idea)}
+      >
+        {STATUS_LABELS[item.status] || item.status}
+      </button>
+    );
+  };
+
+  // ── Table View ──
+  const TableView = () => (
+    <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-gray-700">
+            <th className="text-left text-gray-400 text-xs font-semibold uppercase tracking-wider px-5 py-3 w-12">#</th>
+            <th className="text-left text-gray-400 text-xs font-semibold uppercase tracking-wider px-5 py-3">Item</th>
+            <th className="text-left text-gray-400 text-xs font-semibold uppercase tracking-wider px-5 py-3 w-32">Tags</th>
+            <th className="text-left text-gray-400 text-xs font-semibold uppercase tracking-wider px-5 py-3 w-36">Status</th>
+            <th className="text-left text-gray-400 text-xs font-semibold uppercase tracking-wider px-5 py-3 w-24">Added</th>
+            <th className="w-10"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-700">
+          {filtered.map((item) => (
+            <>
+              <tr
+                key={item.id}
+                className="hover:bg-gray-700/50 cursor-pointer transition-colors"
+                onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+              >
+                <td className="px-5 py-3 text-gray-500 text-sm font-mono">{item.priority}</td>
+                <td className="px-5 py-3 text-white text-sm font-medium">{item.title}</td>
+                <td className="px-5 py-3">
+                  <div className="flex gap-1 flex-wrap">
+                    {item.tags.map((tag) => (
+                      <span key={tag} className="text-xs px-1.5 py-0.5 rounded bg-gray-700 text-gray-400">{tag}</span>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-5 py-3"><StatusBadge item={item} /></td>
+                <td className="px-5 py-3 text-gray-500 text-xs">{formatRelativeDate(item.created_at)}</td>
+                <td className="px-3 py-3">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }}
+                    className="text-gray-600 hover:text-red-400 text-sm transition-colors"
+                  >
+                    x
+                  </button>
+                </td>
+              </tr>
+              {expandedId === item.id && item.description && (
+                <tr key={`${item.id}-desc`}>
+                  <td colSpan={6} className="px-5 py-4 bg-gray-900/50">
+                    <pre className="text-gray-300 text-sm whitespace-pre-wrap font-sans leading-relaxed">{item.description}</pre>
+                  </td>
+                </tr>
+              )}
+            </>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  // ── Card View ──
+  const CardView = () => (
+    <div className="space-y-3">
+      {filtered.map((item) => (
+        <div
+          key={item.id}
+          className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden hover:border-gray-600 transition-colors"
+        >
+          <div
+            className="px-5 py-4 cursor-pointer"
+            onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-1">
+                  <span className="text-gray-500 text-xs font-mono">#{item.priority}</span>
+                  <h3 className="text-white font-medium">{item.title}</h3>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <StatusBadge item={item} />
+                  {item.tags.map((tag) => (
+                    <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">{tag}</span>
+                  ))}
+                  <span className="text-gray-600 text-xs">{formatRelativeDate(item.created_at)}</span>
+                </div>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }}
+                className="text-gray-600 hover:text-red-400 text-sm transition-colors"
+              >
+                x
+              </button>
+            </div>
+          </div>
+          {expandedId === item.id && item.description && (
+            <div className="px-5 pb-4 border-t border-gray-700 pt-3">
+              <pre className="text-gray-300 text-sm whitespace-pre-wrap font-sans leading-relaxed">{item.description}</pre>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
   return (
-    <div className="p-6 max-w-4xl space-y-6">
+    <div className="p-6 max-w-5xl space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -122,27 +253,53 @@ export default function WhiteboardPage() {
         </div>
       </div>
 
-      {/* Status Tabs */}
-      <div className="flex gap-2 flex-wrap">
-        {STATUSES.map((status) => {
-          const count = status === 'All'
-            ? items.length
-            : items.filter((i) => i.status === status).length;
-          return (
-            <button
-              key={status}
-              onClick={() => setActiveFilter(status)}
-              className={cn(
-                'px-4 py-2 rounded-full text-sm font-medium border transition-colors',
-                activeFilter === status
-                  ? 'bg-white text-gray-900 border-white'
-                  : 'bg-transparent text-gray-400 border-gray-600 hover:border-gray-400 hover:text-gray-300'
-              )}
-            >
-              {status === 'All' ? 'All' : STATUS_LABELS[status]} ({count})
-            </button>
-          );
-        })}
+      {/* Status Tabs + View Toggle */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex gap-2 flex-wrap">
+          {STATUSES.map((status) => {
+            const count = status === 'All'
+              ? items.length
+              : items.filter((i) => i.status === status).length;
+            return (
+              <button
+                key={status}
+                onClick={() => setActiveFilter(status)}
+                className={cn(
+                  'px-4 py-2 rounded-full text-sm font-medium border transition-colors',
+                  activeFilter === status
+                    ? 'bg-white text-gray-900 border-white'
+                    : 'bg-transparent text-gray-400 border-gray-600 hover:border-gray-400 hover:text-gray-300'
+                )}
+              >
+                {status === 'All' ? 'All' : STATUS_LABELS[status]} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* View toggle */}
+        <div className="flex bg-gray-800 border border-gray-700 rounded-lg overflow-hidden shrink-0">
+          <button
+            onClick={() => setViewMode('table')}
+            className={cn(
+              'px-3 py-1.5 text-sm transition-colors',
+              viewMode === 'table' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'
+            )}
+            title="Table view"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18"/></svg>
+          </button>
+          <button
+            onClick={() => setViewMode('card')}
+            className={cn(
+              'px-3 py-1.5 text-sm transition-colors',
+              viewMode === 'card' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'
+            )}
+            title="Card view"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+          </button>
+        </div>
       </div>
 
       {/* Add Form */}
@@ -193,86 +350,10 @@ export default function WhiteboardPage() {
             {activeFilter !== 'All' ? 'No items with this status.' : 'Whiteboard is empty. Add your first idea.'}
           </p>
         </div>
+      ) : viewMode === 'table' ? (
+        <TableView />
       ) : (
-        <div className="space-y-3">
-          {filtered.map((item) => (
-            <div
-              key={item.id}
-              className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden hover:border-gray-600 transition-colors"
-            >
-              <div
-                className="px-5 py-4 cursor-pointer"
-                onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="text-gray-500 text-xs font-mono">#{item.priority}</span>
-                      <h3 className="text-white font-medium">{item.title}</h3>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {editingId === item.id ? (
-                        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                          {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                            <button
-                              key={key}
-                              onClick={() => updateStatus(item.id, key)}
-                              className={cn(
-                                'text-xs px-2 py-1 rounded-full border',
-                                STATUS_COLORS[key],
-                                item.status === key && 'ring-1 ring-white'
-                              )}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingId(item.id);
-                            setEditStatus(item.status);
-                          }}
-                          className={cn(
-                            'text-xs px-2.5 py-1 rounded-full border',
-                            STATUS_COLORS[item.status] || STATUS_COLORS.idea
-                          )}
-                        >
-                          {STATUS_LABELS[item.status] || item.status}
-                        </button>
-                      )}
-                      {item.tags.map((tag) => (
-                        <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">
-                          {tag}
-                        </span>
-                      ))}
-                      <span className="text-gray-600 text-xs">{formatRelativeDate(item.created_at)}</span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteItem(item.id);
-                    }}
-                    className="text-gray-600 hover:text-red-400 text-sm transition-colors"
-                  >
-                    x
-                  </button>
-                </div>
-              </div>
-
-              {/* Expanded description */}
-              {expandedId === item.id && item.description && (
-                <div className="px-5 pb-4 border-t border-gray-700 pt-3">
-                  <pre className="text-gray-300 text-sm whitespace-pre-wrap font-sans leading-relaxed">
-                    {item.description}
-                  </pre>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        <CardView />
       )}
     </div>
   );
