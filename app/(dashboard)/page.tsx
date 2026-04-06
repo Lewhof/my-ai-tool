@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { MessageSquare, FileText, Zap } from 'lucide-react';
 import { formatRelativeDate, truncate } from '@/lib/utils';
+import WeatherWidget from '@/components/dashboard/weather-widget';
 
 interface DashboardData {
   recentChats: Array<{ id: string; title: string; updated_at: string }>;
@@ -201,6 +202,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Weather */}
+        <WeatherWidget />
+
         {/* Recent Chats */}
         <div className="bg-gray-800 border border-gray-700 rounded-lg">
           <div className="px-5 py-3 border-b border-gray-700 flex items-center justify-between">
