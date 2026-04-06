@@ -133,15 +133,6 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      <link
-        rel="stylesheet"
-        href="https://unpkg.com/react-grid-layout@1.5.0/css/styles.css"
-      />
-      <link
-        rel="stylesheet"
-        href="https://unpkg.com/react-resizable@3.0.5/css/styles.css"
-      />
-
       <ResponsiveGridLayout
         layouts={layouts}
         breakpoints={{ lg: 1200, md: 768, sm: 0 }}
