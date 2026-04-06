@@ -103,5 +103,8 @@ create policy "Users own their workflows" on workflows for all using (user_id = 
 create policy "Users own their runs" on workflow_runs for all using (workflow_id in (select id from workflows where user_id = current_setting('request.jwt.claim.sub', true)));
 create policy "Users own their settings" on user_settings for all using (user_id = current_setting('request.jwt.claim.sub', true));
 
--- 10. Create storage bucket for documents
+-- 10. Diagrams share token migration
+ALTER TABLE diagrams ADD COLUMN IF NOT EXISTS share_token text UNIQUE;
+
+-- 11. Create storage bucket for documents
 insert into storage.buckets (id, name, public) values ('documents', 'documents', false);
