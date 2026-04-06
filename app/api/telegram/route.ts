@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 
 const client = new Anthropic();
-
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_OWNER = process.env.GITHUB_OWNER;
@@ -38,37 +37,27 @@ async function writeFileToGitHub(path: string, content: string) {
 }
 
 async function processMessage(chatId: number, userText: string, imageData?: { base64: string; mediaType: string }) {
-  const existingFiles: Record<string, string> = {};
-for (const file of ['app/page.tsx']) {
-    const content = await getFileFromGitHub(file);
-    if (content) existingFiles[file] = content;
-  }
-
-const systemPrompt = `You are an expert Next.js developer. When asked to make changes, respond with the COMPLETE updated file content wrapped in XML tags like this: <file path="app/page.tsx">complete file content here</file> Only include files that need to be changed. Do not include bash commands or EOF markers in your response.`;
-
+  const pageContent = await getFileFromGitHub('app/page.tsx');
+  const existingFiles = pageContent ? `<file path="app/page.tsx">${pageContent}</file>` : '';
+  const systemPrompt = 'You are an expert Next.js developer. When asked to make changes, respond with the COMPLETE updated file content wrapped in XML tags like this: <file path="app/page.tsx">complete file content here</file>. Only include files that need to be changed. Do not include bash commands or EOF markers.';
   const userContent: Anthropic.MessageParam['content'] = [];
   if (imageData) {
     userContent.push({ type: 'image', source: { type: 'base64', media_type: imageData.mediaType as 'image/jpeg', data: imageData.base64 } });
   }
-  userContent.push({ type: 'text', text: `Current files:\n${Object.entries(existingFiles).map(([k, v]) => `<file path="${k}">\n${v}\n</file>`).join('\n')}\n\nRequest: ${userText}` });
-
+  userContent.push({ type: 'text', text: `Current files:\n${existingFiles}\n\nRequest: ${userText}` });
   const response = await client.messages.create({
     model: 'claude-sonnet-4-5',
     max_tokens: 8000,
     system: systemPrompt,
     messages: [{ role: 'user', content: userContent }],
   });
-
   const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
-  const fileMatches = responseText.matchAll(/<file path="([^"]+)">([\s\S]*?)<\/file>/g);
+  const fileMatches = [...responseText.matchAll(/<file path="([^"]+)">([\s\S]*?)<\/file>/g)];
   let filesUpdated = 0;
-
   for (const match of fileMatches) {
-    const [, filePath, fileContent] = match;
-    const success = await writeFileToGitHub(filePath, fileContent.trim());
+    const success = await writeFileToGitHub(match[1], match[2].trim());
     if (success) filesUpdated++;
   }
-
   if (filesUpdated > 0) {
     await sendTelegramMessage(chatId, `✅ Done! Updated ${filesUpdated} file(s). Deploying now...`);
   } else {
@@ -79,19 +68,12 @@ const systemPrompt = `You are an expert Next.js developer. When asked to make ch
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const message = body?.message;
-
-  if (!message || !message.from || message.from.is_bot) {
-    return NextResponse.json({ ok: true });
-  }
-
+  if (!message || !message.from || message.from.is_bot) return NextResponse.json({ ok: true });
   const chatId = message.chat.id;
   const userText = message.text || message.caption || '';
-
   if (!userText && !message.photo) return NextResponse.json({ ok: true });
   if (userText.startsWith('/')) return NextResponse.json({ ok: true });
-
   await sendTelegramMessage(chatId, '🤖 On it...');
-
   let imageData: { base64: string; mediaType: string } | undefined;
   if (message.photo) {
     const largest = message.photo[message.photo.length - 1];
@@ -102,8 +84,4 @@ export async function POST(req: NextRequest) {
     const buffer = await imgRes.arrayBuffer();
     imageData = { base64: Buffer.from(buffer).toString('base64'), mediaType: 'image/jpeg' };
   }
-
-  processMessage(chatId, userText, imageData).catch(console.error);
-
-  return NextResponse.json({ ok: true });
-}
+  processMessage(ch
