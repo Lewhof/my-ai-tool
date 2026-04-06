@@ -1,5 +1,37 @@
 @import "tailwindcss";
 
+/* KB and markdown table styling */
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.prose th {
+  background-color: #1a1a24;
+  border: 1px solid #2d2d3d;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #d1d5db;
+  font-size: 0.875rem;
+}
+
+.prose td {
+  border: 1px solid #2d2d3d;
+  padding: 0.75rem 1rem;
+  color: #e5e7eb;
+  font-size: 0.875rem;
+}
+
+.prose tr:hover td {
+  background-color: #1a1a24;
+}
+
+.prose strong {
+  color: #f3f4f6;
+}
+
 @theme {
   --color-gray-950: #0a0a0f;
   --color-gray-900: #13131a;
