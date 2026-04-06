@@ -111,19 +111,30 @@ export default function CreditsPage() {
           <div className="space-y-6">
             {/* Summary */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              {[
-                { icon: DollarSign, color: 'text-accent-500', label: 'Spend', value: formatCost(period.totalCost as number) },
-                { icon: Zap, color: 'text-yellow-500', label: 'Requests', value: (period.totalRequests as number).toLocaleString() },
-                { icon: BarChart3, color: 'text-blue-500', label: 'Tokens', value: formatTokens(period.totalTokens as number) },
-                { icon: DollarSign, color: 'text-gray-500', label: 'Avg/Req', value: formatCost(period.avgCostPerRequest as number) },
-                { icon: Clock, color: 'text-cyan-500', label: 'Latency', value: (period.avgLatency as number) < 1000 ? `${period.avgLatency}ms` : `${((period.avgLatency as number) / 1000).toFixed(1)}s` },
-                { icon: (period.errorCount as number) > 0 ? AlertTriangle : CheckCircle, color: (period.errorCount as number) > 0 ? 'text-red-500' : 'text-green-500', label: 'Success', value: `${period.successRate}%` },
-              ].map((card) => (
-                <div key={card.label} className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2"><card.icon size={14} className={card.color} /><p className="text-gray-400 text-xs">{card.label}</p></div>
-                  <p className="text-white text-2xl font-bold">{card.value}</p>
-                </div>
-              ))}
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2"><DollarSign size={14} className="text-accent-500" /><p className="text-gray-400 text-xs">Spend</p></div>
+                <p className="text-white text-2xl font-bold">{formatCost(period.totalCost as number)}</p>
+              </div>
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2"><Zap size={14} className="text-yellow-500" /><p className="text-gray-400 text-xs">Requests</p></div>
+                <p className="text-white text-2xl font-bold">{(period.totalRequests as number).toLocaleString()}</p>
+              </div>
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2"><BarChart3 size={14} className="text-blue-500" /><p className="text-gray-400 text-xs">Tokens</p></div>
+                <p className="text-white text-2xl font-bold">{formatTokens(period.totalTokens as number)}</p>
+              </div>
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2"><DollarSign size={14} className="text-gray-500" /><p className="text-gray-400 text-xs">Avg/Req</p></div>
+                <p className="text-white text-2xl font-bold">{formatCost(period.avgCostPerRequest as number)}</p>
+              </div>
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2"><Clock size={14} className="text-cyan-500" /><p className="text-gray-400 text-xs">Latency</p></div>
+                <p className="text-white text-2xl font-bold">{(period.avgLatency as number) < 1000 ? `${period.avgLatency}ms` : `${((period.avgLatency as number) / 1000).toFixed(1)}s`}</p>
+              </div>
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">{(period.errorCount as number) > 0 ? <AlertTriangle size={14} className="text-red-500" /> : <CheckCircle size={14} className="text-green-500" />}<p className="text-gray-400 text-xs">Success</p></div>
+                <p className="text-white text-2xl font-bold">{String(period.successRate)}%</p>
+              </div>
             </div>
 
             {/* Model Table */}
