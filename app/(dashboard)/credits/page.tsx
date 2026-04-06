@@ -155,8 +155,10 @@ export default function CreditsPage() {
 
         {!data ? (
           <p className="text-gray-500">Loading...</p>
-        ) : !period ? (
-          <p className="text-gray-500">No AI usage data for this period.</p>
+        ) : !period || period.totalRequests === 0 ? (
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
+            <p className="text-gray-500">No AI usage data for this period. Send a message in Chat to start tracking.</p>
+          </div>
         ) : (
           <div className="space-y-6">
             {/* Summary Cards */}
