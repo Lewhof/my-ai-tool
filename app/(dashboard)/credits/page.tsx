@@ -65,10 +65,10 @@ export default function CreditsPage() {
   const helicone = apiData?.helicone as Record<string, unknown> | undefined;
   const periods = helicone?.periods as Record<string, Record<string, unknown>> | undefined;
   const period = periods?.[activePeriod];
-  const vercel = apiData?.vercel as Record<string, unknown> | undefined;
-  const supabase = apiData?.supabase as Record<string, unknown> | undefined;
-  const clerk = apiData?.clerk as Record<string, unknown> | undefined;
-  const github = apiData?.github as Record<string, unknown> | undefined;
+  const vercel = apiData?.vercel as { status: string; plan?: string; totalDeployments?: number; successfulDeployments?: number; failedDeployments?: number; successRate?: number } | undefined;
+  const supabase = apiData?.supabase as { status: string; plan?: string; tables?: number; totalRows?: number; tableBreakdown?: Array<{ table: string; rows: number }>; dbSize?: string; dbSizeBytes?: number; dbSizeLimit?: string; storageFiles?: number; storageBytes?: number; storageLimit?: string } | undefined;
+  const clerk = apiData?.clerk as { status: string; plan?: string; totalUsers?: number } | undefined;
+  const github = apiData?.github as { status: string; repo?: string; size?: number; commits?: number; defaultBranch?: string } | undefined;
 
   // Cast period to concrete type
   const p = period as {
@@ -190,14 +190,14 @@ export default function CreditsPage() {
             <div className="flex items-center gap-2 mb-3">
               <Server size={16} className="text-gray-400" />
               <h4 className="text-white font-semibold text-sm">Vercel</h4>
-              <span className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 ml-auto">{String(vercel?.plan || 'Free')}</span>
+              <span className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 ml-auto">{vercel?.plan || 'Free'}</span>
             </div>
             {vercel?.totalDeployments !== undefined ? (
               <div className="space-y-2">
-                <div className="flex justify-between"><span className="text-gray-400 text-xs">Deployments</span><span className="text-white text-sm">{String(vercel.totalDeployments)}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400 text-xs">Successful</span><span className="text-green-400 text-sm">{String(vercel.successfulDeployments)}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400 text-xs">Failed</span><span className={`text-sm ${Number(vercel.failedDeployments) > 0 ? 'text-red-400' : 'text-gray-400'}`}>{String(vercel.failedDeployments)}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400 text-xs">Success Rate</span><span className="text-white text-sm">{String(vercel.successRate)}%</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Deployments</span><span className="text-white text-sm">{vercel.totalDeployments}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Successful</span><span className="text-green-400 text-sm">{vercel.successfulDeployments}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Failed</span><span className={`text-sm ${Number(vercel.failedDeployments) > 0 ? 'text-red-400' : 'text-gray-400'}`}>{vercel.failedDeployments}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Success Rate</span><span className="text-white text-sm">{vercel.successRate}%</span></div>
               </div>
             ) : <p className="text-gray-500 text-sm">{vercel?.status === 'error' ? 'Could not connect' : 'Loading...'}</p>}
           </div>
@@ -207,32 +207,30 @@ export default function CreditsPage() {
             <div className="flex items-center gap-2 mb-3">
               <Database size={16} className="text-gray-400" />
               <h4 className="text-white font-semibold text-sm">Supabase</h4>
-              <span className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 ml-auto">{String(supabase?.plan || 'Free')}</span>
+              <span className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 ml-auto">{supabase?.plan || 'Free'}</span>
             </div>
-            {(supabase?.tableBreakdown as Array<{ table: string; rows: number }>) ? (
+            {supabase?.tableBreakdown ? (
               <div className="space-y-1.5">
-                {/* Storage stats */}
-                {supabase?.dbSize && (
+                {supabase.dbSize && (
                   <div className="mb-3 space-y-1.5">
                     <div className="flex justify-between">
                       <span className="text-gray-400 text-xs">Database Size</span>
-                      <span className="text-white text-xs">{String(supabase.dbSize)} / {String(supabase.dbSizeLimit)}</span>
+                      <span className="text-white text-xs">{supabase.dbSize} / {supabase.dbSizeLimit}</span>
                     </div>
                     <div className="w-full bg-gray-900 rounded-full h-2">
-                      <div className="h-full bg-blue-500/60 rounded-full" style={{ width: `${Math.min((Number(supabase.dbSizeBytes) / (500 * 1024 * 1024)) * 100, 100)}%` }} />
+                      <div className="h-full bg-blue-500/60 rounded-full" style={{ width: `${Math.min(((supabase.dbSizeBytes ?? 0) / (500 * 1024 * 1024)) * 100, 100)}%` }} />
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400 text-xs">File Storage</span>
-                      <span className="text-white text-xs">{Number(supabase.storageFiles)} files ({Number(supabase.storageBytes) > 1024 * 1024 ? `${(Number(supabase.storageBytes) / 1024 / 1024).toFixed(1)} MB` : `${(Number(supabase.storageBytes) / 1024).toFixed(0)} KB`}) / {String(supabase.storageLimit)}</span>
+                      <span className="text-white text-xs">{supabase.storageFiles ?? 0} files ({(supabase.storageBytes ?? 0) > 1024 * 1024 ? `${((supabase.storageBytes ?? 0) / 1024 / 1024).toFixed(1)} MB` : `${((supabase.storageBytes ?? 0) / 1024).toFixed(0)} KB`}) / {supabase.storageLimit}</span>
                     </div>
                     <div className="w-full bg-gray-900 rounded-full h-2">
-                      <div className="h-full bg-green-500/60 rounded-full" style={{ width: `${Math.min((Number(supabase.storageBytes) / (1024 * 1024 * 1024)) * 100, 100)}%` }} />
+                      <div className="h-full bg-green-500/60 rounded-full" style={{ width: `${Math.min(((supabase.storageBytes ?? 0) / (1024 * 1024 * 1024)) * 100, 100)}%` }} />
                     </div>
                     <div className="border-b border-gray-700 my-2" />
                   </div>
                 )}
-                {/* Table rows */}
-                {(supabase!.tableBreakdown as Array<{ table: string; rows: number }>).map((t) => (
+                {supabase.tableBreakdown.map((t) => (
                   <div key={t.table} className="flex justify-between">
                     <span className="text-gray-400 text-xs font-mono">{t.table}</span>
                     <span className="text-white text-xs">{Number(t.rows).toLocaleString()} rows</span>
@@ -240,7 +238,7 @@ export default function CreditsPage() {
                 ))}
                 <div className="flex justify-between border-t border-gray-700 pt-1.5 mt-1.5">
                   <span className="text-gray-300 text-xs font-semibold">Total</span>
-                  <span className="text-white text-xs font-semibold">{Number(supabase!.totalRows).toLocaleString()} rows</span>
+                  <span className="text-white text-xs font-semibold">{(supabase?.totalRows ?? 0).toLocaleString()} rows</span>
                 </div>
               </div>
             ) : <p className="text-gray-500 text-sm">{supabase?.status === 'error' ? 'Could not connect' : 'Loading...'}</p>}
@@ -254,10 +252,10 @@ export default function CreditsPage() {
             </div>
             {github?.repo ? (
               <div className="space-y-2">
-                <div className="flex justify-between"><span className="text-gray-400 text-xs">Repository</span><span className="text-white text-sm">{String(github.repo)}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400 text-xs">Commits</span><span className="text-white text-sm">{String(github.commits)}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Repository</span><span className="text-white text-sm">{github.repo}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Commits</span><span className="text-white text-sm">{github.commits}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400 text-xs">Size</span><span className="text-white text-sm">{github.size ? `${(Number(github.size) / 1024).toFixed(1)} MB` : '...'}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400 text-xs">Branch</span><span className="text-white text-sm">{String(github.defaultBranch)}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400 text-xs">Branch</span><span className="text-white text-sm">{github.defaultBranch}</span></div>
               </div>
             ) : <p className="text-gray-500 text-sm">{github?.status === 'error' ? 'Could not connect' : 'Loading...'}</p>}
           </div>
@@ -267,10 +265,10 @@ export default function CreditsPage() {
             <div className="flex items-center gap-2 mb-3">
               <Users size={16} className="text-gray-400" />
               <h4 className="text-white font-semibold text-sm">Clerk</h4>
-              <span className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 ml-auto">{String(clerk?.plan || 'Free')}</span>
+              <span className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 ml-auto">{clerk?.plan || 'Free'}</span>
             </div>
             <div className="space-y-2">
-              <div className="flex justify-between"><span className="text-gray-400 text-xs">Total Users</span><span className="text-white text-sm">{String(clerk?.totalUsers ?? '...')}</span></div>
+              <div className="flex justify-between"><span className="text-gray-400 text-xs">Total Users</span><span className="text-white text-sm">{clerk?.totalUsers ?? '...'}</span></div>
               <div className="flex justify-between"><span className="text-gray-400 text-xs">Status</span><span className="text-green-400 text-sm">Active</span></div>
             </div>
           </div>
