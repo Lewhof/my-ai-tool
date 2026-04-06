@@ -5,7 +5,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/telegram(.*)',
   '/api/auth/microsoft/callback(.*)',
   '/api/tasks/pending(.*)',
-  '/api/diagrams/*/share(.*)',
+  '/api/diagrams/:id/share(.*)',
   '/api/migrate(.*)',
   '/diagrams/share(.*)',
 ]);
