@@ -85,12 +85,12 @@ export default function WorkflowRunner({ workflowId }: WorkflowRunnerProps) {
           onChange={(e) => setInput(e.target.value)}
           rows={4}
           placeholder="Enter your input here..."
-          className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600 resize-none"
+          className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent-600 resize-none"
         />
         <button
           onClick={runWorkflow}
           disabled={running || !input.trim()}
-          className="mt-2 bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+          className="mt-2 bg-accent-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-accent-700 transition-colors disabled:opacity-50"
         >
           {running ? 'Running...' : 'Run Workflow'}
         </button>

@@ -43,7 +43,7 @@ export default function WorkflowsPage() {
           <h3 className="text-lg font-semibold text-white">My Workflows</h3>
           <button
             onClick={() => createWorkflow('New Workflow', '', [])}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+            className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
           >
             + New Workflow
           </button>
@@ -83,12 +83,12 @@ export default function WorkflowsPage() {
           {workflowTemplates.map((t) => (
             <div
               key={t.name}
-              className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-indigo-600 transition-colors cursor-pointer"
+              className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-accent-600 transition-colors cursor-pointer"
               onClick={() => createWorkflow(t.name, t.description, t.steps)}
             >
               <p className="text-white font-medium mb-1">{t.name}</p>
               <p className="text-gray-400 text-sm mb-2">{t.description}</p>
-              <span className="text-indigo-400 text-xs">{t.steps.length} steps — Click to use</span>
+              <span className="text-accent-400 text-xs">{t.steps.length} steps — Click to use</span>
             </div>
           ))}
         </div>

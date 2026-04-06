@@ -36,7 +36,7 @@ export default function MessageList({ messages, streamingContent }: MessageListP
             className={cn(
               'max-w-2xl px-4 py-3 rounded-lg',
               msg.role === 'user'
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-accent-600 text-white'
                 : 'bg-gray-700 text-gray-100'
             )}
           >

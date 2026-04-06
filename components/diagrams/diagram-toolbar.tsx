@@ -44,12 +44,12 @@ export default function DiagramToolbar({
             onBlur={submitName}
             onKeyDown={(e) => e.key === 'Enter' && submitName()}
             autoFocus
-            className="bg-gray-800 text-white border border-gray-600 rounded px-2 py-1 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-indigo-600"
+            className="bg-gray-800 text-white border border-gray-600 rounded px-2 py-1 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-accent-600"
           />
         ) : (
           <button
             onClick={() => { setEditName(name); setEditing(true); }}
-            className="text-white text-sm font-medium hover:text-indigo-400 transition-colors"
+            className="text-white text-sm font-medium hover:text-accent-400 transition-colors"
           >
             {name}
           </button>

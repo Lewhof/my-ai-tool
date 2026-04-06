@@ -48,7 +48,7 @@ export default function SettingsPage() {
                 setDefaultModel(e.target.value);
                 save({ default_model: e.target.value });
               }}
-              className="bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-600"
+              className="bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-accent-600"
             >
               <option value="fast">Haiku (fast, cheap)</option>
               <option value="smart">Sonnet (smart, more expensive)</option>
@@ -86,9 +86,9 @@ export default function SettingsPage() {
           <p>Lewhof AI Dashboard v0.1.0</p>
           <p>Built with Next.js, Supabase, Claude AI</p>
           <div className="flex gap-4 pt-2">
-            <a href="https://fwzsjylbczeqldckwqfy.supabase.co" target="_blank" className="text-indigo-400 hover:underline">Supabase</a>
-            <a href="https://dashboard.clerk.com" target="_blank" className="text-indigo-400 hover:underline">Clerk</a>
-            <a href="https://helicone.ai" target="_blank" className="text-indigo-400 hover:underline">Helicone</a>
+            <a href="https://fwzsjylbczeqldckwqfy.supabase.co" target="_blank" className="text-accent-400 hover:underline">Supabase</a>
+            <a href="https://dashboard.clerk.com" target="_blank" className="text-accent-400 hover:underline">Clerk</a>
+            <a href="https://helicone.ai" target="_blank" className="text-accent-400 hover:underline">Helicone</a>
           </div>
         </div>
       </section>

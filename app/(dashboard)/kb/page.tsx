@@ -107,7 +107,7 @@ export default function KnowledgeBasePage() {
               )}
               <button
                 onClick={() => setShowAdd(!showAdd)}
-                className="bg-indigo-600 text-white px-3 py-1 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                className="bg-accent-600 text-white px-3 py-1 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
               >
                 {showAdd ? 'Cancel' : '+'}
               </button>
@@ -117,7 +117,7 @@ export default function KnowledgeBasePage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search..."
-            className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-600 placeholder-gray-500"
+            className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600 placeholder-gray-500"
           />
           <div className="flex gap-1.5 flex-wrap">
             {categories.filter((c) => c === 'All' || entries.some((e) => e.category === c)).map((cat) => (
@@ -144,7 +144,7 @@ export default function KnowledgeBasePage() {
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder="Title"
-              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-600"
+              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600"
             />
             <select
               value={newCategory}
@@ -160,18 +160,18 @@ export default function KnowledgeBasePage() {
               onChange={(e) => setNewContent(e.target.value)}
               rows={6}
               placeholder="Content (supports Markdown tables, headers, lists...)"
-              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-600 resize-none font-mono"
+              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600 resize-none font-mono"
             />
             <input
               value={newTags}
               onChange={(e) => setNewTags(e.target.value)}
               placeholder="Tags (comma separated)"
-              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-600"
+              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600"
             />
             <button
               onClick={addEntry}
               disabled={!newTitle.trim() || !newContent.trim()}
-              className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              className="bg-accent-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors disabled:opacity-50"
             >
               Save Entry
             </button>
@@ -258,13 +258,13 @@ export default function KnowledgeBasePage() {
                   <input
                     defaultValue={selected.title}
                     onBlur={(e) => updateEntry(selected.id, { title: e.target.value })}
-                    className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-2 text-lg font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                    className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-2 text-lg font-semibold focus:outline-none focus:ring-1 focus:ring-accent-600"
                   />
                   <textarea
                     defaultValue={selected.content}
                     onBlur={(e) => updateEntry(selected.id, { content: e.target.value })}
                     rows={20}
-                    className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-600 resize-none font-mono leading-relaxed"
+                    className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600 resize-none font-mono leading-relaxed"
                   />
                 </div>
               ) : (

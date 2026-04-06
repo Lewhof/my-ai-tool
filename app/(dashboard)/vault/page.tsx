@@ -136,7 +136,7 @@ export default function VaultPage() {
           )}
           <button
             onClick={() => setShowAdd(!showAdd)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+            className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
           >
             {showAdd ? 'Cancel' : '+ Add Entry'}
           </button>
@@ -149,7 +149,7 @@ export default function VaultPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search entries..."
-          className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600 placeholder-gray-500"
+          className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent-600 placeholder-gray-500"
         />
       </div>
 
@@ -181,7 +181,7 @@ export default function VaultPage() {
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="e.g. ANTHROPIC_API_KEY"
-                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent-600"
               />
             </div>
             <div>
@@ -216,13 +216,13 @@ export default function VaultPage() {
               value={newValue}
               onChange={(e) => setNewValue(e.target.value)}
               placeholder="sk-ant-api03-..."
-              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-600 font-mono"
+              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent-600 font-mono"
             />
           </div>
           <button
             onClick={addKey}
             disabled={!newName.trim() || !newValue.trim()}
-            className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            className="bg-accent-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-accent-700 transition-colors disabled:opacity-50"
           >
             Save Entry
           </button>

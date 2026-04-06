@@ -44,13 +44,13 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
         onKeyDown={handleKeyDown}
         placeholder="Type a message... (Shift+Enter for newline)"
         rows={1}
-        className="flex-1 bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-600 resize-none"
+        className="flex-1 bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent-600 resize-none"
         disabled={disabled}
       />
       <button
         onClick={handleSend}
         disabled={disabled || !input.trim()}
-        className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 self-end"
+        className="bg-accent-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-accent-700 transition-colors disabled:opacity-50 self-end"
       >
         {disabled ? 'Thinking...' : 'Send'}
       </button>
