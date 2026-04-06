@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { after } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS } from '@/lib/anthropic';
-import { v4 as uuidv4 } from 'crypto';
+
 
 export async function POST(req: Request) {
   const { userId } = await auth();
