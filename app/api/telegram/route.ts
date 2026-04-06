@@ -2,7 +2,12 @@ cat > app/api/telegram/route.ts << 'EOF'
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 
-const client = new Anthropic();
+const client = new Anthropic({
+  baseURL: "https://anthropic.helicone.ai",
+  defaultHeaders: {
+    "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+  },
+});
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_OWNER = process.env.GITHUB_OWNER;
