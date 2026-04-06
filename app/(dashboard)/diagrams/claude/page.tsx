@@ -17,13 +17,14 @@ export default function ClaudeDiagramsPage() {
 
   return (
     <div className="flex h-full min-h-0">
-      {/* Sidebar - diagram list */}
-      <div className="w-64 border-r border-gray-700 flex flex-col">
+      {/* Sidebar */}
+      <div className="w-56 border-r border-gray-700 flex flex-col shrink-0">
         <div className="px-4 py-3 border-b border-gray-700">
           <Link href="/diagrams" className="text-gray-400 text-sm hover:text-white transition-colors">
             &larr; All Diagrams
           </Link>
           <h3 className="text-white font-semibold mt-2">Claude Diagrams</h3>
+          <p className="text-gray-500 text-xs mt-0.5">AI-generated diagrams</p>
         </div>
         <div className="flex-1 overflow-auto">
           {DIAGRAMS.map((d) => (
@@ -48,6 +49,7 @@ export default function ClaudeDiagramsPage() {
           <DiagramCanvas
             initialNodes={aiStackNodes}
             initialEdges={aiStackEdges}
+            readOnly
           />
         )}
       </div>
