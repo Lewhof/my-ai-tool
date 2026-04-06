@@ -107,6 +107,9 @@ export async function POST(req: Request) {
     imageBase64 = Buffer.from(imgBuffer).toString('base64');
   }
 
-  processMessage(chatId, userText, imageBase64).catch(console.error);
+  processMessage(chatId, userText, imageBase64).catch(async (err) => {
+    console.error(err);
+    await sendTelegramMessage(chatId, `Error: ${err?.message ?? String(err)}`);
+  });
   return Response.json({ ok: true });
 }
