@@ -1,3 +1,4 @@
+cat > app/api/telegram/route.ts << 'EOF'
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -70,14 +71,15 @@ ${fileContext}
 
 RULES:
 - globals.css must only contain: @import "tailwindcss";
-- Respond with ONE file at a time in this exact format:
+- Respond with ONE file at a time:
 FILE: path/to/file.tsx
 \`\`\`tsx
 <complete file content>
 \`\`\`
-- If given a screenshot, replicate that UI using Tailwind
+- If given a screenshot, replicate that UI
+- Use Tailwind classes for styling
 - Never import from files that don't exist
-- If asked a question, just answer it without writing any files`,
+- If asked a question, just answer it without writing files`,
     messages: [{ role: 'user', content: userContent }],
   });
 
@@ -94,9 +96,9 @@ FILE: path/to/file.tsx
   await sendTelegramMessage(chatId, `📝 Writing \`${filePath}\`...`);
   const success = await writeFileToGitHub(filePath, fileContent, `Agent: ${userText.slice(0, 60)}`);
   if (success) {
-    await sendTelegramMessage(chatId, `✅ Done! \`${filePath}\` updated.\n\nDeploying automatically — check lewhofmeyr.co.za in ~1 min`);
+    await sendTelegramMessage(chatId, `✅ Done! \`${filePath}\` updated.\n\nVercel will deploy in ~1 min: lewhofmeyr.co.za`);
   } else {
-    await sendTelegramMessage(chatId, '❌ Failed to write file. Check GitHub token.');
+    await sendTelegramMessage(chatId, '❌ Failed to write file.');
   }
 }
 
@@ -132,3 +134,4 @@ export async function POST(req: NextRequest) {
   await processMessage(chatId, userText, imageData, existingFiles);
   return NextResponse.json({ ok: true });
 }
+EOF
