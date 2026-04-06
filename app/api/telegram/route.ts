@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 
 const client = new Anthropic({
-  baseURL: "https://anthropic.helicone.ai",
+baseURL: "https://anthropic.helicone.ai/v1",
   defaultHeaders: {
     "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
   },
@@ -116,5 +116,6 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true });
 }
+
 
 
