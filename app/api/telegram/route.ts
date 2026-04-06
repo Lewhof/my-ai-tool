@@ -4,8 +4,8 @@ import Anthropic from '@anthropic-ai/sdk';
 const client = new Anthropic();
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const GITHUB_REPO = process.env.GITHUB_REPO;
 const GITHUB_OWNER = process.env.GITHUB_OWNER;
+const GITHUB_REPO = process.env.GITHUB_REPO;
 
 async function sendTelegramMessage(chatId: number, text: string) {
   await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
@@ -19,10 +19,7 @@ async function writeFileToGitHub(path: string, content: string, message: string)
   const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${path}`;
   const existing = await fetch(url, { headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, 'User-Agent': 'lewhof-agent' } });
   let sha = undefined;
-  if (existing.ok) {
-    const data = await existing.json();
-    sha = data.sha;
-  }
+  if (existing.ok) { const data = await existing.json(); sha = data.sha; }
   const response = await fetch(url, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, 'Content-Type': 'application/json', 'User-Agent': 'lewhof-agent' },
@@ -34,41 +31,30 @@ async function writeFileToGitHub(path: string, content: string, message: string)
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const message = body?.message;
-  if (!message) return NextResponse.json({ ok: true });
-
+  if (!message || !message.text || message.from?.is_bot) return NextResponse.json({ ok: true });
+  if (message.text.startsWith('/')) return NextResponse.json({ ok: true });
   const chatId = message.chat.id;
   const userText = message.text;
-
-  await sendTelegramMessage(chatId, '🤖 Agent thinking...');
-
+  await sendTelegramMessage(chatId, '⏳ Working on it...');
   const response = await client.messages.create({
     model: 'claude-sonnet-4-5',
     max_tokens: 4096,
-    system: `You are a coding agent that builds and modifies a Next.js app. 
-When asked to create or modify pages, respond with EXACTLY this format and nothing else:
-FILE: app/page.tsx
-\`\`\`
-<full file contents here>
-\`\`\`
-Only output one file at a time. Write complete, working code.`,
+    system: `You are a coding agent that builds and modifies a Next.js app. When asked to create or modify pages, respond with EXACTLY this format:\nFILE: app/page.tsx\n\`\`\`tsx\n<full file contents here>\n\`\`\`\nWrite complete, working Next.js code only. No explanations.`,
     messages: [{ role: 'user', content: userText }],
   });
-
   const reply = response.content[0].type === 'text' ? response.content[0].text : '';
-
   const fileMatch = reply.match(/FILE: (.+)\n```(?:tsx|ts|js|jsx)?\n([\s\S]+?)\n```/);
   if (fileMatch) {
     const filePath = fileMatch[1].trim();
     const fileContent = fileMatch[2].trim();
     const success = await writeFileToGitHub(filePath, fileContent, `Agent: ${userText}`);
     if (success) {
-      await sendTelegramMessage(chatId, `✅ Done! Updated \`${filePath}\`\n\nDeploying to lewhofmeyr.co.za... (1-2 min)`);
+      await sendTelegramMessage(chatId, `✅ Done! Updated \`${filePath}\`\nDeploying to lewhofmeyr.co.za... (1-2 min)`);
     } else {
-      await sendTelegramMessage(chatId, '❌ Failed to write file. Check GitHub token.');
+      await sendTelegramMessage(chatId, '❌ GitHub write failed. Check your token.');
     }
   } else {
-    await sendTelegramMessage(chatId, reply);
+    await sendTelegramMessage(chatId, reply.slice(0, 4000));
   }
-
   return NextResponse.json({ ok: true });
 }
