@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { after } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS } from '@/lib/anthropic';
+import pdfParse from 'pdf-parse';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
@@ -54,7 +55,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (fileData) {
       const buffer = Buffer.from(await fileData.arrayBuffer());
       try {
-        const pdfParse = (await import('pdf-parse')).default;
         const pdf = await pdfParse(buffer);
         const text = pdf.text.slice(0, 50000);
         systemContent.push(`Document "${doc.name}" content:\n${text}`);
