@@ -9,36 +9,41 @@
 }
 
 .prose th {
-  background-color: #1a1a24;
-  border: 1px solid #2d2d3d;
+  background-color: #131720;
+  border: 1px solid #1e2330;
   padding: 0.75rem 1rem;
   text-align: left;
   font-weight: 600;
-  color: #d1d5db;
+  color: #cbd5e1;
   font-size: 0.875rem;
 }
 
 .prose td {
-  border: 1px solid #2d2d3d;
+  border: 1px solid #1e2330;
   padding: 0.75rem 1rem;
-  color: #e5e7eb;
+  color: #e2e8f0;
   font-size: 0.875rem;
 }
 
 .prose tr:hover td {
-  background-color: #1a1a24;
+  background-color: #131720;
 }
 
 .prose strong {
-  color: #f3f4f6;
+  color: #f1f5f9;
 }
 
 @theme {
-  --color-gray-950: #0a0a0f;
-  --color-gray-900: #13131a;
-  --color-gray-800: #1a1a24;
-  --color-gray-700: #2d2d3d;
-  --color-gray-600: #4a4a5e;
-  --color-indigo-600: #4f46e5;
-  --color-indigo-700: #4338ca;
+  --color-gray-950: #0c0c14;
+  --color-gray-900: #0f1117;
+  --color-gray-800: #151921;
+  --color-gray-700: #1e2330;
+  --color-gray-600: #334155;
+  --color-gray-500: #64748b;
+  --color-gray-400: #94a3b8;
+  --color-gray-300: #cbd5e1;
+  --color-indigo-600: #6366f1;
+  --color-indigo-700: #4f46e5;
+  --color-indigo-500: #818cf8;
+  --color-indigo-400: #a5b4fc;
 }
