@@ -11,6 +11,7 @@ const pageTitles: Record<string, string> = {
   '/documents': 'Documents',
   '/workflows': 'Workflows',
   '/whiteboard': 'Whiteboard',
+  '/kb': 'Knowledge Base',
   '/vault': 'Vault',
   '/settings': 'Settings',
 };

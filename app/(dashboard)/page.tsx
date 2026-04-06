@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { formatRelativeDate, truncate } from '@/lib/utils';
 
@@ -39,9 +39,13 @@ function formatTokens(tokens: number): string {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [credits, setCredits] = useState<CreditsData | null>(null);
+  const [notepad, setNotepad] = useState('');
+  const [noteSaved, setNoteSaved] = useState(true);
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch('/api/dashboard').then((r) => r.json()).then(setData);
+    fetch('/api/notes').then((r) => r.json()).then((d) => setNotepad(d?.content ?? ''));
     fetch('/api/dashboard/credits').then((r) => r.json()).then(setCredits);
   }, []);
 
@@ -163,6 +167,36 @@ export default function DashboardPage() {
           <p className="text-2xl mb-1">{'\u{26A1}'}</p>
           <p className="font-medium">Run Workflow</p>
         </Link>
+      </div>
+
+      {/* Notepad Widget */}
+      <div className="bg-gray-800 border border-gray-700 rounded-lg">
+        <div className="px-5 py-3 border-b border-gray-700 flex items-center justify-between">
+          <h3 className="text-white font-semibold">Notepad</h3>
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${noteSaved ? 'bg-green-400' : 'bg-yellow-400'}`} />
+            <span className="text-gray-500 text-xs">{noteSaved ? 'Saved' : 'Saving...'}</span>
+          </div>
+        </div>
+        <textarea
+          value={notepad}
+          onChange={(e) => {
+            setNotepad(e.target.value);
+            setNoteSaved(false);
+            if (noteTimer.current) clearTimeout(noteTimer.current);
+            noteTimer.current = setTimeout(async () => {
+              await fetch('/api/notes', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: e.target.value }),
+              });
+              setNoteSaved(true);
+            }, 1000);
+          }}
+          placeholder="Quick notes... (auto-saves)"
+          className="w-full bg-transparent text-gray-300 px-5 py-4 text-sm focus:outline-none resize-none placeholder-gray-600"
+          rows={4}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
