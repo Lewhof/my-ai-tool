@@ -29,7 +29,7 @@ export async function PATCH(req: Request) {
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
   const updates = await req.json();
-  const allowed = ['default_model', 'dashboard_layout', 'theme'];
+  const allowed = ['default_model', 'dashboard_layout', 'theme', 'theme_colors'];
   const filtered = Object.fromEntries(
     Object.entries(updates).filter(([k]) => allowed.includes(k))
   );

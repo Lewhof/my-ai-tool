@@ -15,6 +15,7 @@ import {
   BookOpen,
   KeyRound,
   Settings,
+  Palette,
   ChevronDown,
   type LucideIcon,
 } from 'lucide-react';
@@ -58,7 +59,13 @@ const navGroups: NavGroup[] = [
     items: [
       { name: 'Knowledge Base', href: '/kb', icon: BookOpen },
       { name: 'Vault', href: '/vault', icon: KeyRound },
-      { name: 'Settings', href: '/settings', icon: Settings },
+    ],
+  },
+  {
+    label: 'Settings',
+    items: [
+      { name: 'General', href: '/settings', icon: Settings },
+      { name: 'Theme', href: '/settings/theme', icon: Palette },
     ],
   },
 ];

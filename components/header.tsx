@@ -14,7 +14,8 @@ const pageTitles: Record<string, string> = {
   '/whiteboard': 'Whiteboard',
   '/kb': 'Knowledge Base',
   '/vault': 'Vault',
-  '/settings': 'Settings',
+  '/settings': 'General',
+  '/settings/theme': 'Theme & Colours',
 };
 
 interface HeaderProps {
