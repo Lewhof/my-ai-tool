@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
       code,
       redirect_uri: REDIRECT_URI,
       grant_type: 'authorization_code',
-      scope: 'openid profile User.Read Calendars.Read offline_access',
+      scope: 'openid profile User.Read Calendars.ReadWrite offline_access',
     }),
   });
 
