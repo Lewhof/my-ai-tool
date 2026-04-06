@@ -8,6 +8,7 @@ const pageTitles: Record<string, string> = {
   '/chat': 'Chat',
   '/documents': 'Documents',
   '/workflows': 'Workflows',
+  '/whiteboard': 'Whiteboard',
   '/vault': 'Vault',
   '/settings': 'Settings',
 };
