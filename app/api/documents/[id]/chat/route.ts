@@ -81,39 +81,43 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
   }
 
-  // For images, use vision
-  type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif';
-  const userContent: Anthropic.MessageCreateParams['messages'][0]['content'] = [];
+  // Build messages for API call
+  const historyMessages = history.slice(0, -1).map((m) => ({
+    role: m.role as 'user' | 'assistant',
+    content: m.content,
+  }));
+
+  // For images, use vision content blocks
+  let lastUserMessage: Anthropic.Messages.MessageParam;
 
   if (doc.file_type.startsWith('image/')) {
     const { data: fileData } = await supabaseAdmin.storage
       .from('documents')
       .download(doc.file_path);
+
+    const contentBlocks: Anthropic.Messages.ContentBlockParam[] = [];
     if (fileData) {
       const buffer = Buffer.from(await fileData.arrayBuffer());
-      (userContent as Array<unknown>).push({
-        type: 'image' as const,
+      contentBlocks.push({
+        type: 'image',
         source: {
-          type: 'base64' as const,
-          media_type: doc.file_type as ImageMediaType,
+          type: 'base64',
+          media_type: doc.file_type as 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif',
           data: buffer.toString('base64'),
         },
       });
     }
+    contentBlocks.push({ type: 'text', text: message });
+    lastUserMessage = { role: 'user', content: contentBlocks };
+  } else {
+    lastUserMessage = { role: 'user', content: message };
   }
-  (userContent as Array<unknown>).push({ type: 'text' as const, text: message });
-
-  // Only use text messages for history (not image blocks)
-  const apiMessages: Anthropic.MessageCreateParams['messages'] = [
-    ...history.slice(0, -1).map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-    { role: 'user' as const, content: userContent },
-  ];
 
   const stream = anthropic.messages.stream({
     model: MODELS.fast,
     max_tokens: 2048,
     system: systemContent.join('\n\n'),
-    messages: apiMessages,
+    messages: [...historyMessages, lastUserMessage],
   });
 
   let fullResponse = '';
