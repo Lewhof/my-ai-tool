@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   CheckSquare,
   MessageSquare,
+  CalendarDays,
   GitFork,
   FileText,
   Zap,
@@ -42,6 +43,7 @@ const navGroups: NavGroup[] = [
     label: 'Productivity',
     items: [
       { name: 'To-Do', href: '/todos', icon: CheckSquare },
+      { name: 'Calendar', href: '/calendar', icon: CalendarDays },
       { name: 'Chat', href: '/chat', icon: MessageSquare },
       { name: 'Documents', href: '/documents', icon: FileText },
     ],
