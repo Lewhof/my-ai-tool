@@ -5,7 +5,7 @@ export async function GET() {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
-  const [threadsRes, docsRes, runsRes] = await Promise.all([
+  const [threadsRes, docsRes, runsRes, todosRes] = await Promise.all([
     supabaseAdmin
       .from('chat_threads')
       .select('id, title, updated_at')
@@ -23,11 +23,19 @@ export async function GET() {
       .select('id, input, status, created_at, workflow_id')
       .order('created_at', { ascending: false })
       .limit(5),
+    supabaseAdmin
+      .from('todos')
+      .select('id, title, status, priority, due_date')
+      .eq('user_id', userId)
+      .neq('status', 'done')
+      .order('created_at', { ascending: false })
+      .limit(5),
   ]);
 
   return Response.json({
     recentChats: threadsRes.data ?? [],
     recentDocs: docsRes.data ?? [],
     recentRuns: runsRes.data ?? [],
+    pendingTodos: todosRes.data ?? [],
   });
 }

@@ -98,12 +98,15 @@ export default function NodePanel({ collapsed, onToggle }: NodePanelProps) {
 
   if (collapsed) {
     return (
-      <button
-        onClick={onToggle}
-        className="absolute left-2 top-2 z-10 bg-gray-800 border border-gray-700 rounded-lg p-2 text-gray-400 hover:text-white transition-colors"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
+      <div className="w-10 border-r border-gray-700 bg-gray-800/50 flex flex-col items-center pt-3 shrink-0">
+        <button
+          onClick={onToggle}
+          className="bg-gray-700 border border-gray-600 rounded-lg p-2 text-gray-400 hover:text-white transition-colors"
+          title="Show node types"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
     );
   }
 

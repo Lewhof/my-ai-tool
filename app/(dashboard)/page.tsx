@@ -8,6 +8,7 @@ interface DashboardData {
   recentChats: Array<{ id: string; title: string; updated_at: string }>;
   recentDocs: Array<{ id: string; name: string; file_type: string; created_at: string }>;
   recentRuns: Array<{ id: string; input: string; status: string; created_at: string }>;
+  pendingTodos: Array<{ id: string; title: string; status: string; priority: string; due_date: string | null }>;
 }
 
 interface CreditsData {
@@ -199,6 +200,33 @@ export default function DashboardPage() {
                 <Link key={doc.id} href={`/documents/${doc.id}`} className="flex items-center justify-between px-5 py-3 hover:bg-gray-700 transition-colors">
                   <span className="text-white text-sm truncate mr-4">{doc.name}</span>
                   <span className="text-gray-500 text-xs whitespace-nowrap">{formatRelativeDate(doc.created_at)}</span>
+                </Link>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Pending To-Do */}
+        <div className="bg-gray-800 border border-gray-700 rounded-lg lg:col-span-2">
+          <div className="px-5 py-3 border-b border-gray-700 flex items-center justify-between">
+            <h3 className="text-white font-semibold">To-Do</h3>
+            <Link href="/todos" className="text-indigo-400 text-sm hover:underline">View all</Link>
+          </div>
+          <div className="divide-y divide-gray-700">
+            {!data || data.pendingTodos.length === 0 ? (
+              <p className="text-gray-500 text-sm p-5">No pending tasks</p>
+            ) : (
+              data.pendingTodos.map((todo) => (
+                <Link key={todo.id} href="/todos" className="flex items-center justify-between px-5 py-3 hover:bg-gray-700 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <span className={`w-2 h-2 rounded-full ${todo.status === 'in-progress' ? 'bg-yellow-400' : 'bg-blue-400'}`} />
+                    <span className="text-white text-sm">{todo.title}</span>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded border ${
+                    todo.priority === 'urgent' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                    todo.priority === 'high' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
+                    'bg-gray-700 text-gray-400 border-gray-600'
+                  }`}>{todo.priority}</span>
                 </Link>
               ))
             )}
