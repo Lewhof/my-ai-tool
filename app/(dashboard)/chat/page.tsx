@@ -31,7 +31,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full min-h-0">
       <ThreadList threads={threads} onNewChat={handleNewChat} onDelete={handleDelete} />
       <div className="flex-1">
         <ChatContainer />
