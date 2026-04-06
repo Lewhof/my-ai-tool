@@ -266,6 +266,18 @@ export default function ThemePage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ theme_colors: colors }),
     });
+    // Cache locally for instant apply on next page load
+    localStorage.setItem('theme_colors', JSON.stringify(colors));
+    // Apply now
+    const root = document.documentElement;
+    root.style.setProperty('--color-gray-950', colors.primary);
+    root.style.setProperty('--color-gray-900', colors.primary);
+    root.style.setProperty('--color-gray-800', colors.surface);
+    root.style.setProperty('--color-gray-700', colors.border);
+    root.style.setProperty('--color-accent-600', colors.accent);
+    root.style.setProperty('--color-accent-700', colors.accentHover);
+    root.style.setProperty('--color-accent-500', colors.accent);
+    root.style.setProperty('--color-accent-400', colors.accent);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
