@@ -135,7 +135,7 @@ FILE: path/to/file.tsx
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const message = body?.message;
-  if (!message || message.from?.is_bot) return NextResponse.json({ ok: true });
+  if (!message || !message.from || message.from.is_bot || !message.text && !message.photo) return NextResponse.json({ ok: true });
 
   const chatId = message.chat.id;
   const userText = message.text || message.caption || 'Build this UI from the screenshot';
