@@ -1,5 +1,5 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
-const client = new Anthropic({
   baseURL: "https://anthropic.helicone.ai",
   defaultHeaders: {
     "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
