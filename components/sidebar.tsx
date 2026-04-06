@@ -9,6 +9,7 @@ const navItems = [
   { name: 'Chat', href: '/chat', icon: '\u{1F4AC}' },
   { name: 'Documents', href: '/documents', icon: '\u{1F4C4}' },
   { name: 'Workflows', href: '/workflows', icon: '\u{26A1}' },
+  { name: 'Vault', href: '/vault', icon: '\u{1F512}' },
   { name: 'Settings', href: '/settings', icon: '\u{2699}\u{FE0F}' },
 ];
 
