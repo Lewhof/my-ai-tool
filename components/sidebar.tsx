@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 const navItems = [
   { name: 'Dashboard', href: '/', icon: '\u{1F4CA}' },
   { name: 'Chat', href: '/chat', icon: '\u{1F4AC}' },
+  { name: 'Diagrams', href: '/diagrams', icon: '\u{1F5D3}' },
   { name: 'Documents', href: '/documents', icon: '\u{1F4C4}' },
   { name: 'Workflows', href: '/workflows', icon: '\u{26A1}' },
   { name: 'Whiteboard', href: '/whiteboard', icon: '\u{1F4CB}' },
