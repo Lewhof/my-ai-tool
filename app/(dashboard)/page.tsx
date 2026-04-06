@@ -149,9 +149,9 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Link
           href="/chat"
-          className="bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-600/30 text-white rounded-lg p-4 flex items-center gap-3 transition-colors"
+          className="bg-accent-600/15 hover:bg-accent-600/25 border border-accent-600/30 text-white rounded-lg p-4 flex items-center gap-3 transition-colors"
         >
-          <MessageSquare size={20} className="text-indigo-400" />
+          <MessageSquare size={20} className="text-accent-500" />
           <span className="text-sm font-medium">New Chat</span>
         </Link>
         <Link
@@ -205,7 +205,7 @@ export default function DashboardPage() {
         <div className="bg-gray-800 border border-gray-700 rounded-lg">
           <div className="px-5 py-3 border-b border-gray-700 flex items-center justify-between">
             <h3 className="text-white font-semibold">Recent Chats</h3>
-            <Link href="/chat" className="text-indigo-400 text-sm hover:underline">View all</Link>
+            <Link href="/chat" className="text-accent-400 text-sm hover:underline">View all</Link>
           </div>
           <div className="divide-y divide-gray-700">
             {!data || data.recentChats.length === 0 ? (
@@ -225,7 +225,7 @@ export default function DashboardPage() {
         <div className="bg-gray-800 border border-gray-700 rounded-lg">
           <div className="px-5 py-3 border-b border-gray-700 flex items-center justify-between">
             <h3 className="text-white font-semibold">Recent Documents</h3>
-            <Link href="/documents" className="text-indigo-400 text-sm hover:underline">View all</Link>
+            <Link href="/documents" className="text-accent-400 text-sm hover:underline">View all</Link>
           </div>
           <div className="divide-y divide-gray-700">
             {!data || data.recentDocs.length === 0 ? (
@@ -245,7 +245,7 @@ export default function DashboardPage() {
         <div className="bg-gray-800 border border-gray-700 rounded-lg lg:col-span-2">
           <div className="px-5 py-3 border-b border-gray-700 flex items-center justify-between">
             <h3 className="text-white font-semibold">To-Do</h3>
-            <Link href="/todos" className="text-indigo-400 text-sm hover:underline">View all</Link>
+            <Link href="/todos" className="text-accent-400 text-sm hover:underline">View all</Link>
           </div>
           <div className="divide-y divide-gray-700">
             {!data || data.pendingTodos.length === 0 ? (
@@ -272,7 +272,7 @@ export default function DashboardPage() {
         <div className="bg-gray-800 border border-gray-700 rounded-lg lg:col-span-2">
           <div className="px-5 py-3 border-b border-gray-700 flex items-center justify-between">
             <h3 className="text-white font-semibold">Recent Activity</h3>
-            <Link href="/workflows" className="text-indigo-400 text-sm hover:underline">View all</Link>
+            <Link href="/workflows" className="text-accent-400 text-sm hover:underline">View all</Link>
           </div>
           <div className="divide-y divide-gray-700">
             {!data || data.recentRuns.length === 0 ? (

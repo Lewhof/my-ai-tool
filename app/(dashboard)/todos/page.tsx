@@ -306,7 +306,7 @@ export default function TodosPage() {
           </div>
           <button
             onClick={() => { setAddToColumn('todo'); setShowAdd(!showAdd); }}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+            className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
           >
             {showAdd ? 'Cancel' : '+ Add Task'}
           </button>
@@ -323,7 +323,7 @@ export default function TodosPage() {
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder="What needs to be done?"
-                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent-600"
                 onKeyDown={(e) => e.key === 'Enter' && addTodo()}
               />
             </div>
@@ -334,7 +334,7 @@ export default function TodosPage() {
                 onChange={(e) => setNewDesc(e.target.value)}
                 rows={2}
                 placeholder="Optional details..."
-                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-600 resize-none"
+                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent-600 resize-none"
               />
             </div>
             <div>
@@ -356,7 +356,7 @@ export default function TodosPage() {
                 type="date"
                 value={newDueDate}
                 onChange={(e) => setNewDueDate(e.target.value)}
-                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent-600"
               />
             </div>
             <div>
@@ -365,14 +365,14 @@ export default function TodosPage() {
                 value={newBucket}
                 onChange={(e) => setNewBucket(e.target.value)}
                 placeholder="General"
-                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent-600"
               />
             </div>
             <div className="flex items-end">
               <button
                 onClick={addTodo}
                 disabled={!newTitle.trim()}
-                className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                className="bg-accent-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-accent-700 transition-colors disabled:opacity-50"
               >
                 Add Task
               </button>

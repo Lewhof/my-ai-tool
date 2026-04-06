@@ -39,7 +39,7 @@ export default function WorkflowEditor({ steps, onChange }: WorkflowEditorProps)
             <input
               value={step.name}
               onChange={(e) => updateStep(i, { name: e.target.value })}
-              className="flex-1 bg-gray-700 text-white border border-gray-600 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-600"
+              className="flex-1 bg-gray-700 text-white border border-gray-600 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600"
               placeholder="Step name"
             />
             <select
@@ -58,7 +58,7 @@ export default function WorkflowEditor({ steps, onChange }: WorkflowEditorProps)
             value={step.prompt}
             onChange={(e) => updateStep(i, { prompt: e.target.value })}
             rows={3}
-            className="w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-600 resize-none"
+            className="w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600 resize-none"
             placeholder="Prompt template. Use {{input}} for original input, {{previous}} for last step's output."
           />
         </div>

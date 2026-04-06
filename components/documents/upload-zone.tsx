@@ -52,7 +52,7 @@ export default function UploadZone({ onUpload }: UploadZoneProps) {
         {...getRootProps()}
         className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
           isDragActive
-            ? 'border-indigo-500 bg-indigo-500/10'
+            ? 'border-accent-500 bg-accent-600/10'
             : 'border-gray-600 hover:border-gray-500'
         }`}
       >
@@ -60,7 +60,7 @@ export default function UploadZone({ onUpload }: UploadZoneProps) {
         {uploading ? (
           <p className="text-gray-400">Uploading...</p>
         ) : isDragActive ? (
-          <p className="text-indigo-400">Drop files here</p>
+          <p className="text-accent-400">Drop files here</p>
         ) : (
           <div>
             <p className="text-gray-300 mb-1">Drag & drop files here, or click to select</p>

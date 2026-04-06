@@ -52,7 +52,7 @@ export default function DiagramsPage() {
         </div>
         <button
           onClick={createDiagram}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+          className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
         >
           + New Diagram
         </button>
@@ -61,7 +61,7 @@ export default function DiagramsPage() {
       {/* Claude sub-page link */}
       <Link
         href="/diagrams/claude"
-        className="block bg-gray-800 border border-indigo-600/30 rounded-lg p-5 hover:border-indigo-600 transition-colors"
+        className="block bg-gray-800 border border-accent-600/30 rounded-lg p-5 hover:border-accent-600 transition-colors"
       >
         <div className="flex items-center gap-3">
           <span className="text-2xl">{'\u{1F916}'}</span>

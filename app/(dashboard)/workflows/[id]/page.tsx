@@ -64,7 +64,7 @@ export default function WorkflowDetailPage({ params }: { params: Promise<{ id: s
         <button
           onClick={() => setActiveTab('editor')}
           className={`pb-2 px-1 text-sm font-medium transition-colors ${
-            activeTab === 'editor' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-gray-500 hover:text-gray-300'
+            activeTab === 'editor' ? 'text-accent-400 border-b-2 border-accent-500' : 'text-gray-500 hover:text-gray-300'
           }`}
         >
           Editor
@@ -72,7 +72,7 @@ export default function WorkflowDetailPage({ params }: { params: Promise<{ id: s
         <button
           onClick={() => setActiveTab('run')}
           className={`pb-2 px-1 text-sm font-medium transition-colors ${
-            activeTab === 'run' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-gray-500 hover:text-gray-300'
+            activeTab === 'run' ? 'text-accent-400 border-b-2 border-accent-500' : 'text-gray-500 hover:text-gray-300'
           }`}
         >
           Run
@@ -85,7 +85,7 @@ export default function WorkflowDetailPage({ params }: { params: Promise<{ id: s
           <button
             onClick={save}
             disabled={saving}
-            className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            className="bg-accent-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-accent-700 transition-colors disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save Workflow'}
           </button>

@@ -71,7 +71,6 @@ interface SidebarProps {
 export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
 
-  // Auto-expand groups that contain the active page
   const getInitialExpanded = () => {
     const expanded: Record<string, boolean> = {};
     navGroups.forEach((group) => {
@@ -100,14 +99,19 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
       <aside
         className={cn(
-          'bg-gray-900 border-r border-gray-800/60 flex flex-col z-50',
+          'bg-gray-900 border-r border-gray-700/40 flex flex-col z-50',
           'hidden lg:flex lg:w-56 lg:relative',
           mobileOpen && 'fixed inset-y-0 left-0 w-56 flex lg:hidden'
         )}
       >
         {/* Logo */}
-        <div className="h-12 flex items-center justify-between px-4 border-b border-gray-800/60">
-          <h1 className="text-base font-bold text-slate-100 tracking-tight">Lewhof AI</h1>
+        <div className="h-12 flex items-center justify-between px-4 border-b border-gray-700/40">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded bg-accent-600 flex items-center justify-center">
+              <span className="text-white text-xs font-bold">L</span>
+            </div>
+            <h1 className="text-base font-bold text-slate-100 tracking-tight">Lewhof AI</h1>
+          </div>
           <button
             onClick={onClose}
             className="lg:hidden text-gray-500 hover:text-white transition-colors"
@@ -122,7 +126,6 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             const isExpanded = expanded[group.label] ?? true;
             return (
               <div key={group.label} className="mb-1">
-                {/* Group header */}
                 <button
                   onClick={() => toggleGroup(group.label)}
                   className="w-full flex items-center justify-between px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
@@ -137,7 +140,6 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
                   />
                 </button>
 
-                {/* Group items */}
                 {isExpanded && (
                   <div className="mt-0.5 px-2 space-y-0.5">
                     {group.items.map((item) => {
@@ -154,7 +156,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
                           className={cn(
                             'flex items-center gap-3 px-3 py-2 rounded-md text-[13px] transition-all duration-150',
                             isActive
-                              ? 'bg-indigo-600/10 text-indigo-400 border-l-2 border-indigo-500 ml-0 pl-[10px]'
+                              ? 'bg-accent-600/10 text-accent-500 border-l-2 border-accent-600 pl-[10px]'
                               : 'text-gray-400 hover:bg-gray-800/80 hover:text-gray-200'
                           )}
                         >

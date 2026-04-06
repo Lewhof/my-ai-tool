@@ -19,7 +19,7 @@ export default function ThreadList({ threads, onNewChat, onDelete }: ThreadListP
       <div className="p-3 border-b border-gray-700">
         <button
           onClick={onNewChat}
-          className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors text-sm"
+          className="w-full bg-accent-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-accent-700 transition-colors text-sm"
         >
           + New Chat
         </button>

@@ -246,7 +246,7 @@ export default function WhiteboardPage() {
           )}
           <button
             onClick={() => setShowAdd(!showAdd)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+            className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
           >
             {showAdd ? 'Cancel' : '+ Add Item'}
           </button>
@@ -311,7 +311,7 @@ export default function WhiteboardPage() {
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder="What needs to be built?"
-              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent-600"
             />
           </div>
           <div>
@@ -321,7 +321,7 @@ export default function WhiteboardPage() {
               onChange={(e) => setNewDesc(e.target.value)}
               rows={4}
               placeholder="Describe the feature, scope, or context..."
-              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600 resize-none"
+              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent-600 resize-none"
             />
           </div>
           <div>
@@ -330,13 +330,13 @@ export default function WhiteboardPage() {
               value={newTags}
               onChange={(e) => setNewTags(e.target.value)}
               placeholder="feature, chat, agent"
-              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent-600"
             />
           </div>
           <button
             onClick={addItem}
             disabled={!newTitle.trim()}
-            className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            className="bg-accent-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-accent-700 transition-colors disabled:opacity-50"
           >
             Add to Whiteboard
           </button>
