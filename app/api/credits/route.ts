@@ -152,12 +152,47 @@ export async function GET() {
     if (countRes.ok) {
       const tables = await countRes.json();
       const totalRows = tables.reduce((sum: number, t: { rows: number }) => sum + Number(t.rows), 0);
+
+      // Get database size
+      let dbSize = null;
+      try {
+        const sizeRes = await fetch(`https://api.supabase.com/v1/projects/${supaRef}/database/query`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${supaPat}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: "SELECT pg_size_pretty(pg_database_size(current_database())) as db_size, pg_database_size(current_database()) as db_size_bytes" }),
+        });
+        if (sizeRes.ok) {
+          const sizeData = await sizeRes.json();
+          dbSize = sizeData[0] ?? null;
+        }
+      } catch { /* skip */ }
+
+      // Get storage usage
+      let storageInfo = null;
+      try {
+        const storageRes = await fetch(`https://api.supabase.com/v1/projects/${supaRef}/database/query`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${supaPat}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: "SELECT count(*) as file_count, coalesce(sum((metadata->>'size')::bigint), 0) as total_bytes FROM storage.objects WHERE bucket_id = 'documents'" }),
+        });
+        if (storageRes.ok) {
+          const storageData = await storageRes.json();
+          storageInfo = storageData[0] ?? null;
+        }
+      } catch { /* skip */ }
+
       results.supabase = {
         status: 'connected',
         plan: 'Free',
         tables: tables.length,
         totalRows,
         tableBreakdown: tables,
+        dbSize: dbSize?.db_size ?? null,
+        dbSizeBytes: dbSize?.db_size_bytes ?? null,
+        dbSizeLimit: '500 MB',
+        storageFiles: storageInfo?.file_count ?? 0,
+        storageBytes: storageInfo?.total_bytes ?? 0,
+        storageLimit: '1 GB',
       };
     } else {
       results.supabase = { status: 'connected', plan: 'Free' };
