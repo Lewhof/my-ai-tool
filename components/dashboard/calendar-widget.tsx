@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Calendar, Clock, MapPin, ExternalLink } from 'lucide-react';
+import { Calendar, Clock, MapPin, ExternalLink, Plus } from 'lucide-react';
 
 interface CalendarEvent {
   id: string;
@@ -97,7 +97,17 @@ export default function CalendarWidget() {
     <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden h-full flex flex-col">
       <div className="widget-handle px-5 py-3 border-b border-gray-700 flex items-center justify-between cursor-move">
         <h3 className="text-white font-semibold text-sm">Calendar</h3>
-        <span className="text-gray-500 text-xs">Next 7 days</span>
+        <div className="flex items-center gap-2">
+          <a
+            href="https://outlook.live.com/calendar/0/deeplink/compose"
+            target="_blank"
+            className="text-gray-500 hover:text-accent-400 transition-colors"
+            title="Add event"
+          >
+            <Plus size={16} />
+          </a>
+          <span className="text-gray-500 text-xs">Next 7 days</span>
+        </div>
       </div>
       <div className="flex-1 overflow-auto">
         {events.length === 0 ? (
