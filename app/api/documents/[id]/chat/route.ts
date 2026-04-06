@@ -82,14 +82,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   // Build messages for API call
-  const historyMessages = history.slice(0, -1).map((m) => ({
-    role: m.role as 'user' | 'assistant',
+  const messages: Anthropic.Messages.MessageParam[] = history.slice(0, -1).map((m) => ({
+    role: m.role,
     content: m.content,
   }));
 
   // For images, use vision content blocks
-  let lastUserMessage: Anthropic.Messages.MessageParam;
-
   if (doc.file_type.startsWith('image/')) {
     const { data: fileData } = await supabaseAdmin.storage
       .from('documents')
@@ -108,16 +106,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       });
     }
     contentBlocks.push({ type: 'text', text: message });
-    lastUserMessage = { role: 'user', content: contentBlocks };
+    messages.push({ role: 'user', content: contentBlocks });
   } else {
-    lastUserMessage = { role: 'user', content: message };
+    messages.push({ role: 'user', content: message });
   }
 
   const stream = anthropic.messages.stream({
     model: MODELS.fast,
     max_tokens: 2048,
     system: systemContent.join('\n\n'),
-    messages: [...historyMessages, lastUserMessage],
+    messages,
   });
 
   let fullResponse = '';
