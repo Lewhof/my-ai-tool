@@ -137,8 +137,8 @@ export async function GET() {
 
   // ── 3. Supabase ──
   try {
-    const supaPat = '***REMOVED***';
-    const supaRef = 'fwzsjylbczeqldckwqfy';
+    const supaPat = process.env.SUPABASE_PAT;
+    const supaRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/\/\/([^.]+)/)?.[1];
 
     // Table row counts
     const countRes = await fetch(`https://api.supabase.com/v1/projects/${supaRef}/database/query`, {
