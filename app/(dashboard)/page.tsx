@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { MessageSquare, FileText, Zap } from 'lucide-react';
 import { formatRelativeDate, truncate } from '@/lib/utils';
 
 interface DashboardData {
@@ -145,27 +146,27 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Link
           href="/chat"
-          className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg p-5 text-center transition-colors"
+          className="bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-600/30 text-white rounded-lg p-4 flex items-center gap-3 transition-colors"
         >
-          <p className="text-2xl mb-1">{'\u{1F4AC}'}</p>
-          <p className="font-medium">New Chat</p>
+          <MessageSquare size={20} className="text-indigo-400" />
+          <span className="text-sm font-medium">New Chat</span>
         </Link>
         <Link
           href="/documents"
-          className="bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 rounded-lg p-5 text-center transition-colors"
+          className="bg-gray-800/50 hover:bg-gray-800 border border-gray-700 text-white rounded-lg p-4 flex items-center gap-3 transition-colors"
         >
-          <p className="text-2xl mb-1">{'\u{1F4C4}'}</p>
-          <p className="font-medium">Upload Document</p>
+          <FileText size={20} className="text-gray-400" />
+          <span className="text-sm font-medium">Upload Document</span>
         </Link>
         <Link
           href="/workflows"
-          className="bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 rounded-lg p-5 text-center transition-colors"
+          className="bg-gray-800/50 hover:bg-gray-800 border border-gray-700 text-white rounded-lg p-4 flex items-center gap-3 transition-colors"
         >
-          <p className="text-2xl mb-1">{'\u{26A1}'}</p>
-          <p className="font-medium">Run Workflow</p>
+          <Zap size={20} className="text-gray-400" />
+          <span className="text-sm font-medium">Run Workflow</span>
         </Link>
       </div>
 
