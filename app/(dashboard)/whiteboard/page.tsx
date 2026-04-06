@@ -87,6 +87,28 @@ export default function WhiteboardPage() {
     setItems((prev) => prev.filter((i) => i.id !== id));
   };
 
+  const [pushedIds, setPushedIds] = useState<Set<string>>(new Set());
+
+  const pushToClaude = async (item: WhiteboardItem) => {
+    await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: item.title,
+        description: item.description,
+        whiteboard_id: item.id,
+      }),
+    });
+    // Update whiteboard status to in-progress
+    await fetch(`/api/whiteboard/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'in-progress' }),
+    });
+    setPushedIds((prev) => new Set(prev).add(item.id));
+    fetchItems();
+  };
+
   const filtered = activeFilter === 'All'
     ? items
     : items.filter((i) => i.status === activeFilter);
@@ -161,12 +183,22 @@ export default function WhiteboardPage() {
                 <td className="px-5 py-3"><StatusBadge item={item} /></td>
                 <td className="px-5 py-3 text-gray-500 text-xs">{formatRelativeDate(item.created_at)}</td>
                 <td className="px-3 py-3">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }}
-                    className="text-gray-600 hover:text-red-400 text-sm transition-colors"
-                  >
-                    x
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); pushToClaude(item); }}
+                      disabled={pushedIds.has(item.id) || item.status === 'in-progress'}
+                      className="text-gray-600 hover:text-accent-400 text-xs transition-colors disabled:opacity-30"
+                      title="Push to Claude Code"
+                    >
+                      {pushedIds.has(item.id) ? '✓' : '▶'}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }}
+                      className="text-gray-600 hover:text-red-400 text-sm transition-colors"
+                    >
+                      x
+                    </button>
+                  </div>
                 </td>
               </tr>
               {expandedId === item.id && item.description && (
@@ -209,12 +241,22 @@ export default function WhiteboardPage() {
                   <span className="text-gray-600 text-xs">{formatRelativeDate(item.created_at)}</span>
                 </div>
               </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }}
-                className="text-gray-600 hover:text-red-400 text-sm transition-colors"
-              >
-                x
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={(e) => { e.stopPropagation(); pushToClaude(item); }}
+                  disabled={pushedIds.has(item.id) || item.status === 'in-progress'}
+                  className="text-gray-600 hover:text-accent-400 text-xs px-2 py-1 border border-gray-700 rounded transition-colors disabled:opacity-30"
+                  title="Push to Claude Code"
+                >
+                  {pushedIds.has(item.id) ? 'Queued' : '▶ Claude'}
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }}
+                  className="text-gray-600 hover:text-red-400 text-sm transition-colors"
+                >
+                  x
+                </button>
+              </div>
             </div>
           </div>
           {expandedId === item.id && item.description && (
