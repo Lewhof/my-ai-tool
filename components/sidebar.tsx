@@ -9,6 +9,7 @@ import {
   CheckSquare,
   MessageSquare,
   CalendarDays,
+  CreditCard,
   GitFork,
   FileText,
   Zap,
@@ -59,6 +60,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'System',
     items: [
+      { name: 'AI Credits', href: '/credits', icon: CreditCard },
       { name: 'Knowledge Base', href: '/kb', icon: BookOpen },
       { name: 'Vault', href: '/vault', icon: KeyRound },
     ],
