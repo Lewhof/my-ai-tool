@@ -44,7 +44,7 @@ async function writeFileToGitHub(path: string, content: string) {
 
 async function processMessage(chatId: number, userText: string, imageData?: { base64: string; mediaType: string }) {
   const existingFiles: Record<string, string> = {};
-  for (const file of ['app/page.tsx', 'app/layout.tsx', 'app/globals.css']) {
+for (const file of ['app/page.tsx']) {
     const content = await getFileFromGitHub(file);
     if (content) existingFiles[file] = content;
   }
