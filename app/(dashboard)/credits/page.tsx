@@ -70,7 +70,20 @@ export default function CreditsPage() {
   const clerk = apiData?.clerk as Record<string, unknown> | undefined;
   const github = apiData?.github as Record<string, unknown> | undefined;
 
-  const hasPeriodData = period && (period.totalRequests as number) > 0;
+  // Cast period to concrete type
+  const p = period as {
+    totalCost: number;
+    totalRequests: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    totalTokens: number;
+    avgLatency: number;
+    avgCostPerRequest: number;
+    successRate: number;
+    errorCount: number;
+    models: Record<string, { cost: number; requests: number; inputTokens: number; outputTokens: number; avgLatency: number }>;
+  } | undefined;
+  const hasPeriodData = p && p.totalRequests > 0;
 
   return (
     <div className="p-6 space-y-6 max-w-6xl">
@@ -81,7 +94,7 @@ export default function CreditsPage() {
 
       {/* ── Service Status ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <StatusCard name="Anthropic" icon={Zap} status={loading ? 'loading' : helicone?.status === 'connected' ? 'connected' : 'error'} detail={hasPeriodData ? `${period.totalRequests} requests` : helicone?.status === 'connected' ? 'No usage yet' : String(helicone?.message || 'Not connected')} />
+        <StatusCard name="Anthropic" icon={Zap} status={loading ? 'loading' : helicone?.status === 'connected' ? 'connected' : 'error'} detail={hasPeriodData ? `${p!.totalRequests} requests` : helicone?.status === 'connected' ? 'No usage yet' : String(helicone?.message || 'Not connected')} />
         <StatusCard name="Vercel" icon={Server} status={loading ? 'loading' : vercel?.status === 'connected' ? 'connected' : 'error'} detail={vercel?.plan as string || 'Checking...'} />
         <StatusCard name="Supabase" icon={Database} status={loading ? 'loading' : supabase?.status === 'connected' ? 'connected' : 'error'} detail={supabase?.tables ? `${supabase.tables} tables, ${supabase.totalRows} rows` : 'Checking...'} />
         <StatusCard name="Clerk" icon={Users} status={loading ? 'loading' : clerk?.status === 'connected' ? 'connected' : 'error'} detail={clerk?.plan as string || 'Checking...'} />
@@ -113,32 +126,32 @@ export default function CreditsPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2"><DollarSign size={14} className="text-accent-500" /><p className="text-gray-400 text-xs">Spend</p></div>
-                <p className="text-white text-2xl font-bold">{formatCost(period.totalCost as number)}</p>
+                <p className="text-white text-2xl font-bold">{formatCost(p!.totalCost)}</p>
               </div>
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2"><Zap size={14} className="text-yellow-500" /><p className="text-gray-400 text-xs">Requests</p></div>
-                <p className="text-white text-2xl font-bold">{(period.totalRequests as number).toLocaleString()}</p>
+                <p className="text-white text-2xl font-bold">{(p!.totalRequests).toLocaleString()}</p>
               </div>
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2"><BarChart3 size={14} className="text-blue-500" /><p className="text-gray-400 text-xs">Tokens</p></div>
-                <p className="text-white text-2xl font-bold">{formatTokens(period.totalTokens as number)}</p>
+                <p className="text-white text-2xl font-bold">{formatTokens(p!.totalTokens)}</p>
               </div>
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2"><DollarSign size={14} className="text-gray-500" /><p className="text-gray-400 text-xs">Avg/Req</p></div>
-                <p className="text-white text-2xl font-bold">{formatCost(period.avgCostPerRequest as number)}</p>
+                <p className="text-white text-2xl font-bold">{formatCost(p!.avgCostPerRequest)}</p>
               </div>
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2"><Clock size={14} className="text-cyan-500" /><p className="text-gray-400 text-xs">Latency</p></div>
-                <p className="text-white text-2xl font-bold">{(period.avgLatency as number) < 1000 ? `${period.avgLatency}ms` : `${((period.avgLatency as number) / 1000).toFixed(1)}s`}</p>
+                <p className="text-white text-2xl font-bold">{(p!.avgLatency) < 1000 ? `${p!.avgLatency}ms` : `${((p!.avgLatency) / 1000).toFixed(1)}s`}</p>
               </div>
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">{(period.errorCount as number) > 0 ? <AlertTriangle size={14} className="text-red-500" /> : <CheckCircle size={14} className="text-green-500" />}<p className="text-gray-400 text-xs">Success</p></div>
-                <p className="text-white text-2xl font-bold">{String(period.successRate)}%</p>
+                <div className="flex items-center gap-2 mb-2">{(p!.errorCount) > 0 ? <AlertTriangle size={14} className="text-red-500" /> : <CheckCircle size={14} className="text-green-500" />}<p className="text-gray-400 text-xs">Success</p></div>
+                <p className="text-white text-2xl font-bold">{p!.successRate}%</p>
               </div>
             </div>
 
             {/* Model Table */}
-            {period.models && Object.keys(period.models as Record<string, unknown>).length > 0 && (
+            {p!.models && Object.keys(p!.models).length > 0 && (
               <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
                 <div className="px-5 py-3 border-b border-gray-700"><h4 className="text-white font-semibold text-sm">Cost by Model</h4></div>
                 <div className="overflow-x-auto">
@@ -149,7 +162,7 @@ export default function CreditsPage() {
                       ))}
                     </tr></thead>
                     <tbody className="divide-y divide-gray-700">
-                      {Object.entries(period.models as Record<string, Record<string, number>>).sort(([, a], [, b]) => b.cost - a.cost).map(([model, s]) => (
+                      {Object.entries(p!.models).sort(([, a], [, b]) => b.cost - a.cost).map(([model, s]) => (
                         <tr key={model} className="hover:bg-gray-700/30">
                           <td className="px-5 py-3"><div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${modelColor(model)}`} /><span className={`text-sm font-mono ${modelColorText(model)}`}>{model}</span></div></td>
                           <td className="px-5 py-3 text-right text-white text-sm">{s.requests.toLocaleString()}</td>
