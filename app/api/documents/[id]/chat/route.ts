@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { after } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import Anthropic from '@anthropic-ai/sdk';
 import { anthropic, MODELS } from '@/lib/anthropic';
 import pdfParse from 'pdf-parse';
 
@@ -81,8 +82,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   // For images, use vision
-  type ContentBlock = { type: 'text'; text: string } | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
-  const userContent: ContentBlock[] = [];
+  type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif';
+  const userContent: Anthropic.MessageCreateParams['messages'][0]['content'] = [];
 
   if (doc.file_type.startsWith('image/')) {
     const { data: fileData } = await supabaseAdmin.storage
@@ -90,21 +91,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .download(doc.file_path);
     if (fileData) {
       const buffer = Buffer.from(await fileData.arrayBuffer());
-      userContent.push({
-        type: 'image',
+      (userContent as Array<unknown>).push({
+        type: 'image' as const,
         source: {
-          type: 'base64',
-          media_type: doc.file_type,
+          type: 'base64' as const,
+          media_type: doc.file_type as ImageMediaType,
           data: buffer.toString('base64'),
         },
       });
     }
   }
-  userContent.push({ type: 'text', text: message });
+  (userContent as Array<unknown>).push({ type: 'text' as const, text: message });
 
   // Only use text messages for history (not image blocks)
-  const apiMessages = [
-    ...history.slice(0, -1).map((m) => ({ role: m.role, content: m.content })),
+  const apiMessages: Anthropic.MessageCreateParams['messages'] = [
+    ...history.slice(0, -1).map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
     { role: 'user' as const, content: userContent },
   ];
 
