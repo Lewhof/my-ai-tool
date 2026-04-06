@@ -2,6 +2,7 @@
 
 import { UserButton } from '@clerk/nextjs';
 import { usePathname } from 'next/navigation';
+import { Menu } from 'lucide-react';
 
 const pageTitles: Record<string, string> = {
   '/': 'Dashboard',
@@ -28,16 +29,15 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     'Dashboard';
 
   return (
-    <header className="h-14 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-4 sm:px-6 shrink-0">
+    <header className="h-12 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-4 shrink-0">
       <div className="flex items-center gap-3">
-        {/* Hamburger — mobile only */}
         <button
           onClick={onMenuToggle}
-          className="lg:hidden text-gray-400 hover:text-white transition-colors"
+          className="lg:hidden text-gray-500 hover:text-white transition-colors"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+          <Menu size={20} />
         </button>
-        <p className="text-white font-medium">{title}</p>
+        <p className="text-white text-sm font-medium">{title}</p>
       </div>
       <UserButton />
     </header>
