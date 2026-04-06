@@ -44,7 +44,10 @@ async function processMessage(chatId: number, userText: string, imageData?: { ba
   if (imageData) {
     userContent.push({ type: 'image', source: { type: 'base64', media_type: imageData.mediaType as 'image/jpeg', data: imageData.base64 } });
   }
-  userContent.push({ type: 'text', text: `Current files:\n${existingFiles}\n\nRequest: ${userText}` });
+  userContent.push({ type: 'text', text: `Current files:
+${existingFiles}
+
+Request: ${userText}` });
   const response = await client.messages.create({
     model: 'claude-sonnet-4-5',
     max_tokens: 8000,
@@ -59,9 +62,9 @@ async function processMessage(chatId: number, userText: string, imageData?: { ba
     if (success) filesUpdated++;
   }
   if (filesUpdated > 0) {
-    await sendTelegramMessage(chatId, `✅ Done! Updated ${filesUpdated} file(s). Deploying now...`);
+    await sendTelegramMessage(chatId, `Done! Updated ${filesUpdated} file(s). Deploying now...`);
   } else {
-    await sendTelegramMessage(chatId, `💬 ${responseText}`);
+    await sendTelegramMessage(chatId, responseText);
   }
 }
 
@@ -73,7 +76,7 @@ export async function POST(req: NextRequest) {
   const userText = message.text || message.caption || '';
   if (!userText && !message.photo) return NextResponse.json({ ok: true });
   if (userText.startsWith('/')) return NextResponse.json({ ok: true });
-  await sendTelegramMessage(chatId, '🤖 On it...');
+  await sendTelegramMessage(chatId, 'On it...');
   let imageData: { base64: string; mediaType: string } | undefined;
   if (message.photo) {
     const largest = message.photo[message.photo.length - 1];
@@ -84,4 +87,6 @@ export async function POST(req: NextRequest) {
     const buffer = await imgRes.arrayBuffer();
     imageData = { base64: Buffer.from(buffer).toString('base64'), mediaType: 'image/jpeg' };
   }
-  processMessage(ch
+  processMessage(chatId, userText, imageData).catch(console.error);
+  return NextResponse.json({ ok: true });
+}
