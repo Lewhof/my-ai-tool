@@ -10,17 +10,135 @@ interface DashboardData {
   recentRuns: Array<{ id: string; input: string; status: string; created_at: string }>;
 }
 
+interface CreditsData {
+  ai?: {
+    totalCost: number;
+    totalRequests: number;
+    totalTokens: number;
+    models: Record<string, { cost: number; requests: number }>;
+    period: string;
+    error?: string;
+  };
+  vercel?: { status?: string; error?: string };
+  supabase?: { status: string; tier: string };
+  clerk?: { status: string; tier: string };
+}
+
+function formatCost(cost: number): string {
+  if (cost < 0.01) return `$${cost.toFixed(4)}`;
+  return `$${cost.toFixed(2)}`;
+}
+
+function formatTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`;
+  return String(tokens);
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [credits, setCredits] = useState<CreditsData | null>(null);
 
   useEffect(() => {
-    fetch('/api/dashboard')
-      .then((r) => r.json())
-      .then(setData);
+    fetch('/api/dashboard').then((r) => r.json()).then(setData);
+    fetch('/api/dashboard/credits').then((r) => r.json()).then(setCredits);
   }, []);
 
   return (
     <div className="p-6 space-y-6">
+      {/* AI Credits Widget */}
+      <div className="bg-gray-800 border border-gray-700 rounded-lg">
+        <div className="px-5 py-3 border-b border-gray-700">
+          <h3 className="text-white font-semibold">AI Credits & Usage</h3>
+          <p className="text-gray-500 text-xs mt-0.5">Last 30 days</p>
+        </div>
+        <div className="p-5">
+          {!credits ? (
+            <p className="text-gray-500 text-sm">Loading usage data...</p>
+          ) : (
+            <div className="space-y-5">
+              {/* AI Usage Summary */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-gray-900 rounded-lg p-4">
+                  <p className="text-gray-400 text-xs mb-1">Total Spend</p>
+                  <p className="text-white text-xl font-bold">
+                    {credits.ai?.totalCost !== undefined ? formatCost(credits.ai.totalCost) : '--'}
+                  </p>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-4">
+                  <p className="text-gray-400 text-xs mb-1">API Requests</p>
+                  <p className="text-white text-xl font-bold">
+                    {credits.ai?.totalRequests ?? '--'}
+                  </p>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-4">
+                  <p className="text-gray-400 text-xs mb-1">Tokens Used</p>
+                  <p className="text-white text-xl font-bold">
+                    {credits.ai?.totalTokens !== undefined ? formatTokens(credits.ai.totalTokens) : '--'}
+                  </p>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-4">
+                  <p className="text-gray-400 text-xs mb-1">Avg Cost/Request</p>
+                  <p className="text-white text-xl font-bold">
+                    {credits.ai?.totalRequests
+                      ? formatCost(credits.ai.totalCost / credits.ai.totalRequests)
+                      : '--'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Per-Model Breakdown */}
+              {credits.ai?.models && Object.keys(credits.ai.models).length > 0 && (
+                <div>
+                  <p className="text-gray-400 text-xs uppercase tracking-wider mb-2">By Model</p>
+                  <div className="space-y-2">
+                    {Object.entries(credits.ai.models)
+                      .sort(([, a], [, b]) => b.cost - a.cost)
+                      .map(([model, data]) => (
+                        <div key={model} className="flex items-center justify-between bg-gray-900 rounded-lg px-4 py-2.5">
+                          <div className="flex items-center gap-3">
+                            <span className={`w-2 h-2 rounded-full ${
+                              model.includes('haiku') ? 'bg-green-400' :
+                              model.includes('sonnet') ? 'bg-blue-400' :
+                              model.includes('opus') ? 'bg-purple-400' : 'bg-gray-400'
+                            }`} />
+                            <span className="text-white text-sm font-mono">{model}</span>
+                          </div>
+                          <div className="flex items-center gap-6">
+                            <span className="text-gray-400 text-xs">{data.requests} req</span>
+                            <span className="text-white text-sm font-medium">{formatCost(data.cost)}</span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Service Status */}
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-wider mb-2">Services</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { name: 'Anthropic', status: credits.ai?.error ? 'error' : 'active', detail: credits.ai?.error || 'Via Helicone' },
+                    { name: 'Vercel', status: credits.vercel?.error ? 'error' : 'active', detail: credits.vercel?.error || 'Pro' },
+                    { name: 'Supabase', status: 'active', detail: credits.supabase?.tier || 'Free' },
+                    { name: 'Clerk', status: 'active', detail: credits.clerk?.tier || 'Free' },
+                  ].map((svc) => (
+                    <div key={svc.name} className="bg-gray-900 rounded-lg px-3 py-2.5 flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${svc.status === 'active' ? 'bg-green-400' : 'bg-red-400'}`} />
+                      <div>
+                        <p className="text-white text-xs font-medium">{svc.name}</p>
+                        <p className="text-gray-500 text-xs">{svc.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Quick Actions */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Link
