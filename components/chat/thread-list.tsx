@@ -15,11 +15,11 @@ export default function ThreadList({ threads, onNewChat, onDelete }: ThreadListP
   const pathname = usePathname();
 
   return (
-    <div className="w-72 border-r border-gray-700 flex flex-col h-full">
+    <div className="w-full sm:w-72 border-b sm:border-b-0 sm:border-r border-gray-700 flex flex-col shrink-0 max-h-48 sm:max-h-none sm:h-full">
       <div className="p-3 border-b border-gray-700">
         <button
           onClick={onNewChat}
-          className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+          className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors text-sm"
         >
           + New Chat
         </button>

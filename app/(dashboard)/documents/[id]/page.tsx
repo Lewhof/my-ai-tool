@@ -25,9 +25,9 @@ export default function DocumentViewPage({ params }: { params: Promise<{ id: str
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-col lg:flex-row h-full">
       {/* Document viewer */}
-      <div className="flex-1 border-r border-gray-700 p-4">
+      <div className="flex-1 border-b lg:border-b-0 lg:border-r border-gray-700 p-4">
         <h3 className="text-white font-medium mb-3 truncate">{doc.name}</h3>
         {doc.signed_url ? (
           doc.file_type === 'application/pdf' ? (
@@ -48,7 +48,7 @@ export default function DocumentViewPage({ params }: { params: Promise<{ id: str
       </div>
 
       {/* Chat about document */}
-      <div className="w-96 flex flex-col">
+      <div className="w-full lg:w-96 flex flex-col min-h-[300px] lg:min-h-0">
         <div className="px-4 py-3 border-b border-gray-700">
           <p className="text-white font-medium text-sm">Ask about this document</p>
         </div>
