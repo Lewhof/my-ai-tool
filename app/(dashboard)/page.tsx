@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { MessageSquare, FileText, Zap, Lock, Unlock, RotateCcw } from 'lucide-react';
+import { MessageSquare, FileText, Zap, Lock, Unlock, RotateCcw, Plus } from 'lucide-react';
 import { formatRelativeDate, truncate } from '@/lib/utils';
 import WeatherWidget from '@/components/dashboard/weather-widget';
 import type { Layout } from 'react-grid-layout';
@@ -85,10 +85,28 @@ export default function DashboardPage() {
   const [noteSaved, setNoteSaved] = useState(true);
   const [locked, setLocked] = useState(true);
   const [layouts, setLayouts] = useState<Record<string, Layout[]>>(DEFAULT_LAYOUTS);
+  const [newTodo, setNewTodo] = useState('');
+  const [addingTodo, setAddingTodo] = useState(false);
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
+  const fetchDashboard = useCallback(() => {
     fetch('/api/dashboard').then((r) => r.json()).then(setData);
+  }, []);
+
+  const addTodo = async () => {
+    if (!newTodo.trim()) return;
+    await fetch('/api/todos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newTodo }),
+    });
+    setNewTodo('');
+    setAddingTodo(false);
+    fetchDashboard();
+  };
+
+  useEffect(() => {
+    fetchDashboard();
     fetch('/api/notes').then((r) => r.json()).then((d) => setNotepad(d?.content ?? ''));
     fetch('/api/dashboard/credits').then((r) => r.json()).then(setCredits);
 
@@ -288,8 +306,36 @@ export default function DashboardPage() {
         <div key="todos" className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden flex flex-col">
           <div className="widget-handle px-5 py-3 border-b border-gray-700 flex items-center justify-between cursor-move">
             <h3 className="text-white font-semibold text-sm">To-Do</h3>
-            <Link href="/todos" className="text-accent-400 text-xs hover:underline">View all</Link>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setAddingTodo(!addingTodo)}
+                className="text-gray-500 hover:text-accent-400 transition-colors"
+                title="Add task"
+              >
+                <Plus size={16} />
+              </button>
+              <Link href="/todos" className="text-accent-400 text-xs hover:underline">View all</Link>
+            </div>
           </div>
+          {addingTodo && (
+            <div className="px-4 py-2.5 border-b border-gray-700 flex gap-2">
+              <input
+                value={newTodo}
+                onChange={(e) => setNewTodo(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addTodo()}
+                placeholder="New task..."
+                autoFocus
+                className="flex-1 bg-gray-700 text-white border border-gray-600 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600"
+              />
+              <button
+                onClick={addTodo}
+                disabled={!newTodo.trim()}
+                className="bg-accent-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-accent-700 transition-colors disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+          )}
           <div className="flex-1 overflow-auto divide-y divide-gray-700">
             {!data || data.pendingTodos.length === 0 ? (
               <p className="text-gray-500 text-sm p-5">No pending tasks</p>
