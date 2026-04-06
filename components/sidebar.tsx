@@ -18,6 +18,7 @@ import {
   KeyRound,
   Settings,
   Palette,
+  Globe,
   ChevronDown,
   type LucideIcon,
 } from 'lucide-react';
@@ -55,6 +56,12 @@ const navGroups: NavGroup[] = [
       { name: 'Diagrams', href: '/diagrams', icon: GitFork },
       { name: 'Workflows', href: '/workflows', icon: Zap },
       { name: 'Whiteboard', href: '/whiteboard', icon: ClipboardList },
+    ],
+  },
+  {
+    label: 'Social',
+    items: [
+      { name: 'Social Hub', href: '/social', icon: Globe },
     ],
   },
   {

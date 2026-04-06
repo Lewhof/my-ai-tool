@@ -13,6 +13,7 @@ const pageTitles: Record<string, string> = {
   '/documents': 'Documents',
   '/workflows': 'Workflows',
   '/whiteboard': 'Whiteboard',
+  '/social': 'Social',
   '/credits': 'AI Credits',
   '/kb': 'Knowledge Base',
   '/vault': 'Vault',
