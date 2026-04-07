@@ -227,8 +227,33 @@ export default function AgentPage() {
                   : 'bg-gray-800 border border-gray-700'
               )}>
                 {msg.role === 'assistant' ? (
-                  <div className="prose prose-invert prose-sm max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                  <div>
+                    {/* Render images if present */}
+                    {msg.content.includes('IMAGE_GENERATED:') && (() => {
+                      const match = msg.content.match(/IMAGE_GENERATED:(https?:\/\/[^\s\n]+)/);
+                      const imageUrl = match?.[1];
+                      const textContent = msg.content.replace(/IMAGE_GENERATED:https?:\/\/[^\s\n]+\n*/, '').trim();
+                      return (
+                        <>
+                          {imageUrl && (
+                            <div className="mb-3">
+                              <img src={imageUrl} alt="Generated image" className="max-w-full rounded-lg border border-gray-700" />
+                              <a href={imageUrl} target="_blank" download className="text-accent-400 text-xs hover:underline mt-1 inline-block">Download image</a>
+                            </div>
+                          )}
+                          {textContent && (
+                            <div className="prose prose-invert prose-sm max-w-none">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{textContent}</ReactMarkdown>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                    {!msg.content.includes('IMAGE_GENERATED:') && (
+                      <div className="prose prose-invert prose-sm max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
