@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import {
-  Send, Loader2, Bot, User, Sparkles, Mic, MicOff, Camera,
+  Send, Loader2, Bot, User, Sparkles, Mic, MicOff, Camera, X,
   Calendar, CheckSquare, ClipboardList, FileText,
   StickyNote, Cloud, CreditCard, BookOpen, Search,
 } from 'lucide-react';
@@ -31,6 +31,7 @@ export default function AgentPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
+  const [replyTo, setReplyTo] = useState<{ index: number; content: string; role: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -121,8 +122,14 @@ export default function AgentPage() {
     const msg = text || input.trim();
     if (!msg || loading) return;
 
+    // Build message with quote if replying
+    const fullMsg = replyTo
+      ? `> Replying to: "${replyTo.content.slice(0, 150)}${replyTo.content.length > 150 ? '...' : ''}"\n\n${msg}`
+      : msg;
+
     setInput('');
-    setMessages((prev) => [...prev, { role: 'user', content: msg }]);
+    setReplyTo(null);
+    setMessages((prev) => [...prev, { role: 'user', content: fullMsg }]);
     setLoading(true);
 
     try {
@@ -130,7 +137,7 @@ export default function AgentPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: msg,
+          message: fullMsg,
           history: messages.slice(-20),
         }),
       });
@@ -223,7 +230,7 @@ export default function AgentPage() {
           </div>
         ) : (
           messages.map((msg, i) => (
-            <div key={i} className={cn('flex gap-3', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+            <div key={i} className={cn('flex gap-3 group', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
               {msg.role === 'assistant' && (
                 <div className="w-7 h-7 rounded-lg bg-accent-600/20 flex items-center justify-center shrink-0 mt-1">
                   <Bot size={14} className="text-accent-400" />
@@ -268,6 +275,14 @@ export default function AgentPage() {
                   <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                 )}
               </div>
+              {/* Reply button */}
+              <button
+                onClick={() => setReplyTo({ index: i, content: msg.content, role: msg.role })}
+                className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-accent-400 p-1 self-start mt-1 transition-opacity shrink-0"
+                title="Reply"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 17H4V12"/><path d="M4 17L13 8C14.66 6.34 17.34 6.34 19 8C20.66 9.66 20.66 12.34 19 14L15 18"/></svg>
+              </button>
               {msg.role === 'user' && (
                 <div className="w-7 h-7 rounded-lg bg-gray-700 flex items-center justify-center shrink-0 mt-1">
                   <User size={14} className="text-gray-400" />
@@ -292,6 +307,20 @@ export default function AgentPage() {
       </div>
 
       {/* Input */}
+      {/* Reply preview */}
+      {replyTo && (
+        <div className="px-4 py-2 bg-gray-800 border-t border-gray-700 flex items-start gap-2 shrink-0">
+          <div className="border-l-2 border-accent-600 pl-3 flex-1 min-w-0">
+            <p className="text-accent-400 text-xs font-medium mb-0.5">
+              Replying to {replyTo.role === 'user' ? 'yourself' : 'Cerebro'}
+            </p>
+            <p className="text-gray-400 text-xs truncate">{replyTo.content.slice(0, 100)}</p>
+          </div>
+          <button onClick={() => setReplyTo(null)} className="text-gray-500 hover:text-white shrink-0 p-1">
+            <X size={14} />
+          </button>
+        </div>
+      )}
       <div className="border-t border-gray-700 p-3 sm:p-4 shrink-0">
         <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} className="hidden" />
         <div className="flex gap-2 max-w-3xl mx-auto">
