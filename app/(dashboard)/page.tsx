@@ -321,14 +321,18 @@ export default function DashboardPage() {
           <div className="p-4 space-y-3">
             <div className="grid grid-cols-2 gap-2">
               {[
-                { label: 'Spend', value: credits?.ai?.totalCost !== undefined ? formatCost(credits.ai.totalCost) : '--', icon: TrendingUp },
-                { label: 'Requests', value: credits?.ai?.totalRequests?.toString() ?? '--', icon: Zap },
-                { label: 'Tokens', value: credits?.ai?.totalTokens !== undefined ? formatTokens(credits.ai.totalTokens) : '--', icon: Cpu },
-                { label: 'Avg/Req', value: credits?.ai?.totalRequests ? formatCost(credits.ai.totalCost / credits.ai.totalRequests) : '--', icon: Database },
+                { label: 'Spend', value: credits?.ai?.totalCost !== undefined ? formatCost(credits.ai.totalCost) : null },
+                { label: 'Requests', value: credits?.ai?.totalRequests?.toString() ?? null },
+                { label: 'Tokens', value: credits?.ai?.totalTokens !== undefined ? formatTokens(credits.ai.totalTokens) : null },
+                { label: 'Avg/Req', value: credits?.ai?.totalRequests ? formatCost(credits.ai.totalCost / credits.ai.totalRequests) : null },
               ].map((stat) => (
                 <div key={stat.label} className="rounded-xl p-3 border border-border" style={{ background: 'var(--color-surface-2)' }}>
                   <p className="text-[10px] text-muted-foreground mb-1">{stat.label}</p>
-                  <p className="text-[15px] font-bold text-foreground font-mono">{stat.value}</p>
+                  {stat.value !== null ? (
+                    <p className="text-[15px] font-bold text-foreground font-mono">{stat.value}</p>
+                  ) : (
+                    <div className="skeleton h-5 w-16 mt-0.5" />
+                  )}
                 </div>
               ))}
             </div>

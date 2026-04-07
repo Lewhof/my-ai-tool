@@ -48,6 +48,20 @@ export async function POST(req: Request) {
   const { message, history } = await req.json();
   if (!message?.trim()) return Response.json({ error: 'Message required' }, { status: 400 });
 
+  // Inject notepad context if available
+  let notepadContext = '';
+  try {
+    const { data: noteData } = await supabaseAdmin
+      .from('notes')
+      .select('content')
+      .eq('user_id', userId)
+      .limit(1)
+      .single();
+    if (noteData?.content?.trim()) {
+      notepadContext = `\n\nUser's strategic notepad (always-on context):\n${noteData.content.slice(0, 2000)}`;
+    }
+  } catch { /* no notepad */ }
+
   // Search KB for relevant context to inject
   let kbContext = '';
   try {
@@ -72,7 +86,7 @@ export async function POST(req: Request) {
       role: m.role as 'user' | 'assistant',
       content: m.content,
     })),
-    { role: 'user', content: message + kbContext },
+    { role: 'user', content: message + kbContext + notepadContext },
   ];
 
   // Agentic loop — keep calling tools until the model stops

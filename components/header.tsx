@@ -48,7 +48,7 @@ export default function Header() {
       <div className="flex items-center gap-2">
         <button
           className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors"
-          onClick={() => toast('Search — coming soon')}
+          onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
         >
           <Search size={16} />
         </button>
