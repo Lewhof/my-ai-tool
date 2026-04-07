@@ -9,6 +9,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/diagrams/:id/share(.*)',
   '/api/migrate(.*)',
   '/api/cron(.*)',
+  '/api/health(.*)',
   '/diagrams/share(.*)',
 ]);
 

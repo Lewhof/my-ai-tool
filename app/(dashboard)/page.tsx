@@ -8,6 +8,7 @@ import { formatRelativeDate, truncate } from '@/lib/utils';
 import WeatherWidget from '@/components/dashboard/weather-widget';
 import CalendarWidget from '@/components/dashboard/calendar-widget';
 import BriefingWidget from '@/components/dashboard/briefing-widget';
+import HealthWidget from '@/components/dashboard/health-widget';
 import type { Layout } from 'react-grid-layout';
 
 const ResponsiveGridLayout = dynamic(
@@ -53,6 +54,7 @@ const DEFAULT_LAYOUTS: Record<string, Layout[]> = {
     { i: 'briefing', x: 0, y: 2, w: 8, h: 8 },
     { i: 'credits', x: 8, y: 10, w: 4, h: 7 },
     { i: 'weather', x: 8, y: 2, w: 4, h: 7 },
+    { i: 'health', x: 8, y: 17, w: 4, h: 5 },
     { i: 'notepad', x: 0, y: 9, w: 4, h: 5 },
     { i: 'chats', x: 4, y: 9, w: 4, h: 5 },
     { i: 'docs', x: 8, y: 9, w: 4, h: 5 },
@@ -82,6 +84,7 @@ const DEFAULT_LAYOUTS: Record<string, Layout[]> = {
     { i: 'calendar', x: 0, y: 38, w: 6, h: 7 },
     { i: 'credits', x: 0, y: 45, w: 6, h: 7 },
     { i: 'activity', x: 0, y: 52, w: 6, h: 5 },
+    { i: 'health', x: 0, y: 57, w: 6, h: 5 },
   ],
 };
 
@@ -401,6 +404,10 @@ export default function DashboardPage() {
               ))
             )}
           </div>
+        </div>
+        {/* Health */}
+        <div key="health">
+          <HealthWidget />
         </div>
       </ResponsiveGridLayout>
     </div>
