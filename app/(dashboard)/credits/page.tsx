@@ -123,7 +123,7 @@ export default function CreditsPage() {
         ) : (
           <div className="space-y-6">
             {/* Summary */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2"><DollarSign size={14} className="text-accent-500" /><p className="text-gray-400 text-xs">Spend</p></div>
                 <p className="text-white text-2xl font-bold">{formatCost(p!.totalCost)}</p>

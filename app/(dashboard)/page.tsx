@@ -72,15 +72,16 @@ const DEFAULT_LAYOUTS: Record<string, Layout[]> = {
     { i: 'activity', x: 5, y: 21, w: 5, h: 5 },
   ],
   sm: [
-    { i: 'quick-actions', x: 0, y: 0, w: 6, h: 2, isResizable: false },
-    { i: 'weather', x: 0, y: 2, w: 6, h: 7 },
-    { i: 'credits', x: 0, y: 9, w: 6, h: 7 },
-    { i: 'calendar', x: 0, y: 16, w: 6, h: 7 },
-    { i: 'notepad', x: 0, y: 23, w: 6, h: 5 },
+    { i: 'quick-actions', x: 0, y: 0, w: 6, h: 3, isResizable: false },
+    { i: 'briefing', x: 0, y: 3, w: 6, h: 8 },
+    { i: 'weather', x: 0, y: 11, w: 6, h: 7 },
+    { i: 'notepad', x: 0, y: 18, w: 6, h: 5 },
+    { i: 'todos', x: 0, y: 23, w: 6, h: 5 },
     { i: 'chats', x: 0, y: 28, w: 6, h: 5 },
     { i: 'docs', x: 0, y: 33, w: 6, h: 5 },
-    { i: 'todos', x: 0, y: 38, w: 6, h: 5 },
-    { i: 'activity', x: 0, y: 43, w: 6, h: 5 },
+    { i: 'calendar', x: 0, y: 38, w: 6, h: 7 },
+    { i: 'credits', x: 0, y: 45, w: 6, h: 7 },
+    { i: 'activity', x: 0, y: 52, w: 6, h: 5 },
   ],
 };
 
