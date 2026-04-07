@@ -199,7 +199,7 @@ export default function TodosPage() {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-700">
-          {todos.map((todo) => {
+          {todos.filter((t) => t.status !== 'done').map((todo) => {
             const due = formatDueDate(todo.due_date);
             return (
               <>
@@ -265,6 +265,35 @@ export default function TodosPage() {
                   </tr>
                 )}
               </>
+            );
+          })}
+          {/* Completed divider */}
+          {todos.filter((t) => t.status === 'done').length > 0 && (
+            <tr>
+              <td colSpan={7} className="px-5 py-2 bg-gray-900/70">
+                <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider">Completed ({todos.filter((t) => t.status === 'done').length})</p>
+              </td>
+            </tr>
+          )}
+          {todos.filter((t) => t.status === 'done').map((todo) => {
+            const due = formatDueDate(todo.due_date);
+            return (
+              <tr key={todo.id} className="hover:bg-gray-700/30 opacity-60">
+                <td className="px-5 py-3">
+                  <button
+                    onClick={() => updateTodo(todo.id, { status: 'todo' })}
+                    className="w-5 h-5 rounded border-2 bg-green-500 border-green-500 flex items-center justify-center transition-colors"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20,6 9,17 4,12"/></svg>
+                  </button>
+                </td>
+                <td className="px-5 py-3 text-gray-500 text-sm line-through">{todo.title}</td>
+                <td className="px-5 py-3"><span className={cn('text-xs px-2 py-0.5 rounded border', PRIORITY_COLORS[todo.priority])}>{PRIORITY_LABELS[todo.priority]}</span></td>
+                <td className="px-5 py-3 text-gray-500 text-xs">Done</td>
+                <td className="px-5 py-3 text-gray-500 text-xs">{todo.bucket}</td>
+                <td className="px-5 py-3">{due && <span className={cn('text-xs', due.className)}>{due.text}</span>}</td>
+                <td className="px-3 py-3"><button onClick={() => deleteTodo(todo.id)} className="text-gray-600 hover:text-red-400 text-sm">x</button></td>
+              </tr>
             );
           })}
         </tbody>

@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, NodeResizer, type NodeProps } from '@xyflow/react';
 
 const baseHandle = { width: 8, height: 8, border: '2px solid #1a1a24' };
 const hs = (color: string) => ({ ...baseHandle, background: color });
@@ -16,12 +16,13 @@ export const RectangleNode = memo(({ data, selected }: NodeProps) => {
   const color = c(data, '#6b7280');
   return (
     <div
-      className="px-5 py-3 rounded-lg border-2 bg-gray-800 text-white text-sm font-medium min-w-[120px] text-center"
+      className="px-5 py-3 rounded-lg border-2 bg-gray-800 text-white text-sm font-medium min-w-[80px] min-h-[40px] text-center w-full h-full flex items-center justify-center"
       style={{ borderColor: selected ? '#6366f1' : color }}
     >
+      <NodeResizer isVisible={selected} minWidth={80} minHeight={40} lineStyle={{ borderColor: '#6366f1' }} handleStyle={{ background: '#6366f1', width: 8, height: 8 }} />
       <Handle type="target" position={Position.Top} style={hs(color)} />
       <Handle type="target" position={Position.Left} style={hs(color)} />
-      <span>{String(data.label || 'Rectangle')}</span>
+      <span className="whitespace-pre-wrap">{String(data.label || 'Rectangle')}</span>
       <Handle type="source" position={Position.Bottom} style={hs(color)} />
       <Handle type="source" position={Position.Right} style={hs(color)} id="right" />
     </div>
