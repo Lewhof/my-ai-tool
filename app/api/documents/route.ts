@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { after } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS } from '@/lib/anthropic';
+import { fireEvent } from '@/lib/agent/event-triggers';
 
 export async function GET() {
   const { userId } = await auth();
@@ -70,6 +71,11 @@ export async function POST(req: Request) {
     .single();
 
   if (dbError) return Response.json({ error: dbError.message }, { status: 500 });
+
+  // Fire event triggers
+  after(async () => {
+    await fireEvent('document.uploaded', userId, { name: file.name, type: file.type, size: file.size, id: docId });
+  });
 
   // AI classification in background (only if no folder_id specified)
   if (!folderId) {

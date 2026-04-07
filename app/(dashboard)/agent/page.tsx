@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import {
-  Send, Loader2, Bot, User, Sparkles,
+  Send, Loader2, Bot, User, Sparkles, Mic, MicOff, Camera,
   Calendar, CheckSquare, ClipboardList, FileText,
   StickyNote, Cloud, CreditCard, BookOpen, Search,
 } from 'lucide-react';
@@ -30,12 +30,68 @@ export default function AgentPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [listening, setListening] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
+
+  // Voice input
+  const toggleVoice = () => {
+    if (listening) {
+      recognitionRef.current?.stop();
+      setListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as unknown as Record<string, unknown>).SpeechRecognition || (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Voice input not supported in this browser.');
+      return;
+    }
+
+    const recognition = new (SpeechRecognition as new () => SpeechRecognition)();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const transcript = Array.from(event.results)
+        .map((r) => r[0].transcript)
+        .join('');
+      setInput(transcript);
+    };
+
+    recognition.onend = () => {
+      setListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  };
+
+  // Camera/image upload
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Upload to notes storage for a URL
+    const formData = new FormData();
+    formData.append('file', file);
+    const uploadRes = await fetch('/api/notes-v2/upload', { method: 'POST', body: formData });
+    const uploadData = await uploadRes.json();
+
+    if (uploadData.url) {
+      const msg = `I'm sharing an image with you: ${uploadData.url}\n\nPlease analyze this image and tell me what you see.`;
+      sendMessage(msg);
+    }
+    e.target.value = '';
+  };
 
   const sendMessage = async (text?: string) => {
     const msg = text || input.trim();
@@ -157,13 +213,33 @@ export default function AgentPage() {
 
       {/* Input */}
       <div className="border-t border-gray-700 p-4 shrink-0">
-        <div className="flex gap-3 max-w-3xl mx-auto">
+        <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} className="hidden" />
+        <div className="flex gap-2 max-w-3xl mx-auto">
+          {/* Voice button */}
+          <button
+            onClick={toggleVoice}
+            className={cn(
+              'p-3 rounded-lg transition-colors self-end shrink-0',
+              listening ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
+            )}
+            title={listening ? 'Stop listening' : 'Voice input'}
+          >
+            {listening ? <MicOff size={18} /> : <Mic size={18} />}
+          </button>
+          {/* Camera button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-3 rounded-lg bg-gray-800 text-gray-400 hover:text-white border border-gray-700 transition-colors self-end shrink-0"
+            title="Upload image / Take photo"
+          >
+            <Camera size={18} />
+          </button>
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-            placeholder="Ask anything — I can check your calendar, create tasks, search docs, and more..."
+            placeholder={listening ? 'Listening...' : 'Ask anything — voice, camera, or type...'}
             rows={1}
             className="flex-1 bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent-600 resize-none placeholder-gray-500"
             disabled={loading}

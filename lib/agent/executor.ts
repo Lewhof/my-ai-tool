@@ -220,6 +220,31 @@ export async function executeTool(
         return 'Email triage requires the AI triage endpoint. Go to the Email page and click "AI Triage" for a categorized view of your unread emails.';
       }
 
+      case 'push_to_claude_code': {
+        const title = input.title as string;
+        const description = (input.description as string) || '';
+
+        const { data, error } = await supabaseAdmin.from('task_queue').insert({
+          user_id: userId,
+          title,
+          description,
+          status: 'queued',
+        }).select('id').single();
+
+        if (error) return `Error queuing task: ${error.message}`;
+
+        // Also add to whiteboard
+        await supabaseAdmin.from('whiteboard').insert({
+          user_id: userId,
+          title,
+          description,
+          status: 'in-progress',
+          tags: ['claude-code', 'agent-pushed'],
+        });
+
+        return `Development task queued for Claude Code: "${title}" (ID: ${data.id}). It will be picked up in the next Claude Code session.`;
+      }
+
       default:
         return `Unknown tool: ${toolName}`;
     }
