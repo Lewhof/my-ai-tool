@@ -51,6 +51,7 @@ export default function SpotifyWidget() {
   const [volume, setVolume] = useState(50);
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'off' | 'track'>('off');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const fetchNowPlaying = useCallback(async () => {
     try {
@@ -70,12 +71,31 @@ export default function SpotifyWidget() {
   }, [fetchNowPlaying]);
 
   const playerAction = async (action: string, extra: Record<string, unknown> = {}) => {
-    await fetch('/api/spotify/player', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, ...extra }),
-    });
-    setTimeout(fetchNowPlaying, 500);
+    setActionError(null);
+    try {
+      const res = await fetch('/api/spotify/player', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...extra }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Action failed' }));
+        const errMsg = typeof data.error === 'string' ? data.error : 'Action failed';
+        if (errMsg.includes('NO_ACTIVE_DEVICE') || errMsg.includes('Not found')) {
+          setActionError('No active device. Open Spotify on a device first.');
+        } else if (errMsg.includes('PREMIUM_REQUIRED')) {
+          setActionError('Spotify Premium required for playback control.');
+        } else if (res.status === 403) {
+          setActionError('Permission denied. Try re-connecting Spotify.');
+        } else {
+          setActionError(errMsg.slice(0, 100));
+        }
+        return;
+      }
+      setTimeout(fetchNowPlaying, 500);
+    } catch {
+      setActionError('Network error');
+    }
   };
 
   const fetchTab = async (t: Tab) => {
@@ -160,9 +180,12 @@ export default function SpotifyWidget() {
             <Music size={16} className="text-green-500" />
             <h3 className="text-white font-semibold text-sm">Spotify</h3>
           </div>
-          {nowPlaying?.url && (
-            <a href={nowPlaying.url} target="_blank" className="text-gray-500 hover:text-green-400 transition-colors"><ExternalLink size={13} /></a>
-          )}
+          <div className="flex items-center gap-2">
+            <a href="/api/auth/spotify" className="text-gray-600 hover:text-green-400 text-xs transition-colors" title="Re-connect Spotify">reconnect</a>
+            {nowPlaying?.url && (
+              <a href={nowPlaying.url} target="_blank" className="text-gray-500 hover:text-green-400 transition-colors"><ExternalLink size={13} /></a>
+            )}
+          </div>
         </div>
         <div className="flex gap-0.5">
           {tabs.map((t) => (
@@ -176,6 +199,14 @@ export default function SpotifyWidget() {
           ))}
         </div>
       </div>
+
+      {/* Error banner */}
+      {actionError && (
+        <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/30 flex items-center justify-between">
+          <p className="text-red-400 text-xs">{actionError}</p>
+          <button onClick={() => setActionError(null)} className="text-red-400/50 hover:text-red-400 text-xs">dismiss</button>
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
