@@ -10,7 +10,7 @@ export async function GET() {
   const [docsRes, foldersRes] = await Promise.all([
     supabaseAdmin
       .from('documents')
-      .select('id, name, file_type, file_size, folder, folder_id, upload_comment, created_at')
+      .select('id, name, display_name, file_type, file_size, folder, folder_id, upload_comment, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false }),
     supabaseAdmin
@@ -103,17 +103,21 @@ export async function POST(req: Request) {
 
         const response = await anthropic.messages.create({
           model: MODELS.fast,
-          max_tokens: 50,
+          max_tokens: 100,
           messages: [{
             role: 'user',
-            content: `Classify this document into exactly one folder. Respond with ONLY the folder name.\n\nFolders: ${allFolders.join(', ')}\n\nFilename: ${file.name}${commentContext}\nContent: ${classifyText}`,
+            content: `Classify this document into a folder AND suggest a clean display name. Respond in this exact format (2 lines only):\nFOLDER: <folder name>\nNAME: <clean descriptive name>\n\nFolders: ${allFolders.join(', ')}\n\nFilename: ${file.name}${commentContext}\nContent: ${classifyText}`,
           }],
         });
 
-        const folderName = response.content[0].type === 'text' ? response.content[0].text.trim() : 'Other';
+        const responseText = response.content[0].type === 'text' ? response.content[0].text.trim() : '';
+        const folderMatch = responseText.match(/FOLDER:\s*(.+)/i);
+        const nameMatch = responseText.match(/NAME:\s*(.+)/i);
+
+        const folderName = folderMatch?.[1]?.trim() ?? 'Other';
+        const displayName = nameMatch?.[1]?.trim() ?? null;
         const validFolder = allFolders.includes(folderName) ? folderName : 'Other';
 
-        // Find matching folder_id
         const matchingFolder = (folders ?? []).find((f) => f.name === validFolder);
 
         await supabaseAdmin
@@ -121,6 +125,7 @@ export async function POST(req: Request) {
           .update({
             folder: validFolder,
             folder_id: matchingFolder?.id ?? null,
+            display_name: displayName,
           })
           .eq('id', docId);
       } catch { /* classification failed */ }
