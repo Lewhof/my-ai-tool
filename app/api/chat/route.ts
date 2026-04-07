@@ -1,7 +1,9 @@
 import { auth } from '@clerk/nextjs/server';
 import { after } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
-import { anthropic, MODELS } from '@/lib/anthropic';
+import { createClaudeStream } from '@/lib/providers/claude';
+import { createGroqStream } from '@/lib/providers/groq';
+import { createPerplexityStream } from '@/lib/providers/perplexity';
 
 export async function POST(req: Request) {
   const { userId } = await auth();
@@ -14,20 +16,40 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const { threadId, message } = body;
+  const { threadId, message, model: requestModel } = body;
   if (!message?.trim()) return Response.json({ error: 'Message required' }, { status: 400 });
 
   // Create or get thread
   let currentThreadId = threadId;
+  let threadModel = requestModel || 'claude-haiku';
+
   if (!currentThreadId) {
     const title = message.slice(0, 50) + (message.length > 50 ? '...' : '');
     const { data, error } = await supabaseAdmin
       .from('chat_threads')
-      .insert({ user_id: userId, title })
-      .select('id')
+      .insert({ user_id: userId, title, model: threadModel })
+      .select('id, model')
       .single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     currentThreadId = data.id;
+    threadModel = data.model;
+  } else {
+    // Get existing thread's model
+    const { data: thread } = await supabaseAdmin
+      .from('chat_threads')
+      .select('model')
+      .eq('id', currentThreadId)
+      .single();
+    if (thread?.model) threadModel = thread.model;
+
+    // Update model if changed
+    if (requestModel && requestModel !== threadModel) {
+      threadModel = requestModel;
+      await supabaseAdmin
+        .from('chat_threads')
+        .update({ model: threadModel })
+        .eq('id', currentThreadId);
+    }
   }
 
   // Save user message
@@ -38,7 +60,7 @@ export async function POST(req: Request) {
   });
   if (msgError) return Response.json({ error: msgError.message }, { status: 500 });
 
-  // Load conversation history (last 30 messages for better context)
+  // Load conversation history
   const { data: history } = await supabaseAdmin
     .from('chat_messages')
     .select('role, content')
@@ -51,52 +73,42 @@ export async function POST(req: Request) {
     content: m.content,
   }));
 
-  // Stream response
-  let fullResponse = '';
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let streamError = false;
+  const systemPrompt = 'You are a helpful AI assistant. Be concise and clear. Use markdown formatting when appropriate.';
 
-  const readable = new ReadableStream({
-    async start(controller) {
-      try {
-        const stream = anthropic.messages.stream({
-          model: MODELS.fast,
-          max_tokens: 4096,
-          system: 'You are a helpful AI assistant. Be concise and clear. Use markdown formatting when appropriate.',
-          messages,
-        });
+  // Route to provider
+  let result: { stream: ReadableStream; getFullResponse: () => string; getUsage: () => { inputTokens: number; outputTokens: number } };
 
-        for await (const event of stream) {
-          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-            fullResponse += event.delta.text;
-            controller.enqueue(new TextEncoder().encode(event.delta.text));
-          }
-          if (event.type === 'message_delta' && event.usage) {
-            outputTokens = event.usage.output_tokens;
-          }
-          if (event.type === 'message_start' && event.message.usage) {
-            inputTokens = event.message.usage.input_tokens;
-          }
-        }
-        controller.close();
-      } catch (err) {
-        streamError = true;
-        const errMsg = err instanceof Error ? err.message : 'Stream failed';
-        controller.enqueue(new TextEncoder().encode(`\n\n[Error: ${errMsg}]`));
-        controller.close();
-      }
-    },
-  });
+  try {
+    switch (threadModel) {
+      case 'claude-sonnet':
+        result = createClaudeStream('smart', messages, systemPrompt);
+        break;
+      case 'groq-llama':
+        result = createGroqStream(messages, systemPrompt);
+        break;
+      case 'perplexity':
+        result = createPerplexityStream(messages, systemPrompt);
+        break;
+      case 'claude-haiku':
+      default:
+        result = createClaudeStream('fast', messages, systemPrompt);
+        break;
+    }
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : 'Provider error';
+    return Response.json({ error: errMsg }, { status: 500 });
+  }
 
   // Save assistant message after stream completes
   after(async () => {
-    if (fullResponse && !streamError) {
+    const fullResponse = result.getFullResponse();
+    if (fullResponse) {
+      const { inputTokens, outputTokens } = result.getUsage();
       await supabaseAdmin.from('chat_messages').insert({
         thread_id: currentThreadId,
         role: 'assistant',
         content: fullResponse,
-        model: MODELS.fast,
+        model: threadModel,
         tokens_used: inputTokens + outputTokens,
       });
       await supabaseAdmin
@@ -106,12 +118,13 @@ export async function POST(req: Request) {
     }
   });
 
-  return new Response(readable, {
+  return new Response(result.stream, {
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
       'Transfer-Encoding': 'chunked',
       'Cache-Control': 'no-cache, no-store',
       'X-Thread-Id': currentThreadId,
+      'X-Model': threadModel,
     },
   });
 }

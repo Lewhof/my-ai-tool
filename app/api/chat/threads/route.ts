@@ -7,7 +7,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from('chat_threads')
-    .select('id, title, updated_at')
+    .select('id, title, model, updated_at')
     .eq('user_id', userId)
     .order('updated_at', { ascending: false });
 

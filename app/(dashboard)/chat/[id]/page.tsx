@@ -11,6 +11,7 @@ export default function ChatThreadPage({ params }: { params: Promise<{ id: strin
   const router = useRouter();
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [threadModel, setThreadModel] = useState('claude-haiku');
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(true);
 
@@ -32,6 +33,7 @@ export default function ChatThreadPage({ params }: { params: Promise<{ id: strin
       if (res.ok) {
         const data = await res.json();
         setMessages(data.messages ?? []);
+        if (data.thread?.model) setThreadModel(data.thread.model);
       }
     } catch { /* silent */ }
     finally { setMessagesLoading(false); }
@@ -61,7 +63,7 @@ export default function ChatThreadPage({ params }: { params: Promise<{ id: strin
             <p className="text-gray-500 text-sm">Loading messages...</p>
           </div>
         ) : (
-          <ChatContainer threadId={id} initialMessages={messages} />
+          <ChatContainer threadId={id} initialMessages={messages} initialModel={threadModel} />
         )}
       </div>
     </div>
