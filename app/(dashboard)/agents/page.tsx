@@ -58,6 +58,7 @@ export default function AgentsPage() {
   const [newPrompt, setNewPrompt] = useState('');
   const [newSchedule, setNewSchedule] = useState('daily');
   const [newTriggerType, setNewTriggerType] = useState('manual');
+  const [newTriggerEvent, setNewTriggerEvent] = useState('document.uploaded');
   const [newActions, setNewActions] = useState<string[]>([]);
   const [runningId, setRunningId] = useState<string | null>(null);
 
@@ -85,6 +86,7 @@ export default function AgentsPage() {
         prompt: newPrompt,
         schedule: newTriggerType === 'scheduled' ? newSchedule : null,
         trigger_type: newTriggerType,
+        trigger_event: newTriggerType === 'event' ? newTriggerEvent : null,
         actions: newActions.map((a) => ({ type: a })),
       }),
     });
@@ -159,6 +161,17 @@ export default function AgentsPage() {
               <label className="text-gray-300 text-sm block mb-1">Schedule</label>
               <select value={newSchedule} onChange={(e) => setNewSchedule(e.target.value)} className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 text-sm">
                 {SCHEDULE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+          )}
+          {newTriggerType === 'event' && (
+            <div>
+              <label className="text-gray-300 text-sm block mb-1">Trigger Event</label>
+              <select value={newTriggerEvent} onChange={(e) => setNewTriggerEvent(e.target.value)} className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 text-sm">
+                <option value="document.uploaded">Document uploaded</option>
+                <option value="whiteboard.created">Whiteboard item created</option>
+                <option value="todo.overdue">Task overdue</option>
+                <option value="email.important">Important email received</option>
               </select>
             </div>
           )}

@@ -1,5 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
+import { after } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { fireEvent } from '@/lib/agent/event-triggers';
 
 export async function GET() {
   const { userId } = await auth();
@@ -37,5 +39,10 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
+
+  after(async () => {
+    await fireEvent('whiteboard.created', userId, { title, description: description || '', id: data.id });
+  });
+
   return Response.json(data);
 }

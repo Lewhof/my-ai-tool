@@ -187,4 +187,16 @@ export const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
       required: [],
     },
   },
+  {
+    name: 'push_to_claude_code',
+    description: 'Push a development task to Claude Code for implementation. The task will be queued and picked up by the next Claude Code session.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title: { type: 'string', description: 'Task title describing what to build or fix' },
+        description: { type: 'string', description: 'Detailed scope and requirements' },
+      },
+      required: ['title'],
+    },
+  },
 ];
