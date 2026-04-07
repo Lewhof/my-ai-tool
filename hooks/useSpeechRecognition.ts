@@ -4,40 +4,11 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-type SpeechRecognitionEvent = {
-  results: SpeechRecognitionResultList;
-  resultIndex: number;
-};
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-type SpeechRecognitionErrorEvent = {
-  error: string;
-  message?: string;
-};
-
-declare global {
-  interface Window {
-    SpeechRecognition: new () => SpeechRecognitionInstance;
-    webkitSpeechRecognition: new () => SpeechRecognitionInstance;
-  }
-}
-
-interface SpeechRecognitionInstance extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  maxAlternatives: number;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
-  onstart: (() => void) | null;
-}
-
-function getSpeechRecognition(): (new () => SpeechRecognitionInstance) | null {
+function getSpeechRecognition(): (new () => any) | null {
   if (typeof window === 'undefined') return null;
-  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  return (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
 }
 
 export interface UseSpeechRecognitionOptions {
@@ -54,7 +25,7 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) 
 
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const recognitionRef = useRef<any | null>(null);
   const accumulatedRef = useRef('');
 
   const stopListening = useCallback(() => {
@@ -83,7 +54,7 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) 
       setIsListening(true);
     };
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.onresult = (event: any) => {
       let interimText = '';
       let newFinal = '';
 
@@ -105,7 +76,7 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) 
       setTranscript((accumulatedRef.current + interimText).trim());
     };
 
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+    recognition.onerror = (event: any) => {
       const msg = event.error;
       if (msg !== 'aborted' && msg !== 'no-speech') {
         onError?.(msg);
