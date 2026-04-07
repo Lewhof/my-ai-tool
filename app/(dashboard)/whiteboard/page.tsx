@@ -22,7 +22,7 @@ const STATUS_COLORS: Record<string, string> = {
   scoped: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
   'in-progress': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
   done: 'bg-green-500/20 text-green-400 border-green-500/30',
-  parked: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+  parked: 'bg-muted text-muted-foreground border-border',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -203,58 +203,58 @@ export default function WhiteboardPage() {
 
   // ── Table View ──
   const TableView = () => (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+    <div className="bg-card border border-border rounded-lg overflow-hidden">
       <table className="w-full">
         <thead>
-          <tr className="border-b border-gray-700">
-            <th className="text-left text-gray-400 text-xs font-semibold uppercase tracking-wider px-5 py-3 w-12">#</th>
-            <th className="text-left text-gray-400 text-xs font-semibold uppercase tracking-wider px-5 py-3">Item</th>
-            <th className="text-left text-gray-400 text-xs font-semibold uppercase tracking-wider px-5 py-3 w-32">Tags</th>
-            <th className="text-left text-gray-400 text-xs font-semibold uppercase tracking-wider px-5 py-3 w-36">Status</th>
-            <th className="text-left text-gray-400 text-xs font-semibold uppercase tracking-wider px-5 py-3 w-24">Added</th>
+          <tr className="border-b border-border">
+            <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 w-12">#</th>
+            <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3">Item</th>
+            <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 w-32">Tags</th>
+            <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 w-36">Status</th>
+            <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 w-24">Added</th>
             <th className="w-10"></th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-700">
+        <tbody className="divide-y divide-border">
           {filtered.map((item) => (
             <React.Fragment key={item.id}>
               <tr
-                className="hover:bg-gray-700/50 cursor-pointer transition-colors"
+                className="hover:bg-secondary/50 cursor-pointer transition-colors"
                 onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
               >
-                <td className="px-5 py-3 text-gray-500 text-sm font-mono">{item.priority}</td>
-                <td className="px-5 py-3 text-white text-sm font-medium">{item.title}</td>
+                <td className="px-5 py-3 text-muted-foreground text-sm font-mono">{item.priority}</td>
+                <td className="px-5 py-3 text-foreground text-sm font-medium">{item.title}</td>
                 <td className="px-5 py-3">
                   <div className="flex gap-1 flex-wrap">
                     {item.tags.map((tag) => (
-                      <span key={tag} className="text-xs px-1.5 py-0.5 rounded bg-gray-700 text-gray-400">{tag}</span>
+                      <span key={tag} className="text-xs px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{tag}</span>
                     ))}
                   </div>
                 </td>
                 <td className="px-5 py-3"><StatusBadge item={item} /></td>
-                <td className="px-5 py-3 text-gray-500 text-xs">{formatRelativeDate(item.created_at)}</td>
+                <td className="px-5 py-3 text-muted-foreground text-xs">{formatRelativeDate(item.created_at)}</td>
                 <td className="px-3 py-3">
                   <div className="flex items-center gap-1">
                     {item.status !== 'done' && (
-                      <button onClick={(e) => { e.stopPropagation(); markComplete(item.id); }} className="text-gray-600 hover:text-green-400 p-1 transition-colors rounded hover:bg-gray-700" title="Mark complete"><Check size={13} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); markComplete(item.id); }} className="text-muted-foreground/60 hover:text-green-400 p-1 transition-colors rounded hover:bg-secondary" title="Mark complete"><Check size={13} /></button>
                     )}
-                    <button onClick={(e) => { e.stopPropagation(); startEdit(item); }} className="text-gray-600 hover:text-accent-400 p-1 transition-colors rounded hover:bg-gray-700" title="Edit"><Pencil size={13} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); startEdit(item); }} className="text-muted-foreground/60 hover:text-primary p-1 transition-colors rounded hover:bg-secondary" title="Edit"><Pencil size={13} /></button>
                     <button
                       onClick={(e) => { e.stopPropagation(); pushToClaude(item); }}
                       disabled={pushedIds.has(item.id) || item.status === 'in-progress'}
-                      className="text-gray-600 hover:text-accent-400 p-1 transition-colors rounded hover:bg-gray-700 disabled:opacity-30"
+                      className="text-muted-foreground/60 hover:text-primary p-1 transition-colors rounded hover:bg-secondary disabled:opacity-30"
                       title="Push to Claude Code"
                     >
                       {pushedIds.has(item.id) ? <Check size={13} /> : <Play size={13} />}
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} className="text-gray-600 hover:text-red-400 p-1 transition-colors rounded hover:bg-gray-700"><Trash2 size={13} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} className="text-muted-foreground/60 hover:text-red-400 p-1 transition-colors rounded hover:bg-secondary"><Trash2 size={13} /></button>
                   </div>
                 </td>
               </tr>
               {expandedId === item.id && item.description && (
                 <tr key={`${item.id}-desc`}>
-                  <td colSpan={6} className="px-5 py-4 bg-gray-900/50">
-                    <pre className="text-gray-300 text-sm whitespace-pre-wrap font-sans leading-relaxed">{item.description}</pre>
+                  <td colSpan={6} className="px-5 py-4 bg-background/50">
+                    <pre className="text-foreground text-sm whitespace-pre-wrap font-sans leading-relaxed">{item.description}</pre>
                   </td>
                 </tr>
               )}
@@ -271,7 +271,7 @@ export default function WhiteboardPage() {
       {filtered.map((item) => (
         <div
           key={item.id}
-          className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden hover:border-gray-600 transition-colors"
+          className="bg-card border border-border rounded-lg overflow-hidden hover:border-border transition-colors"
         >
           <div
             className="px-5 py-4 cursor-pointer"
@@ -280,37 +280,37 @@ export default function WhiteboardPage() {
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-1">
-                  <span className="text-gray-500 text-xs font-mono">#{item.priority}</span>
-                  <h3 className="text-white font-medium">{item.title}</h3>
+                  <span className="text-muted-foreground text-xs font-mono">#{item.priority}</span>
+                  <h3 className="text-foreground font-medium">{item.title}</h3>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <StatusBadge item={item} />
                   {item.tags.map((tag) => (
-                    <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">{tag}</span>
+                    <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">{tag}</span>
                   ))}
-                  <span className="text-gray-600 text-xs">{formatRelativeDate(item.created_at)}</span>
+                  <span className="text-muted-foreground/60 text-xs">{formatRelativeDate(item.created_at)}</span>
                 </div>
               </div>
               <div className="flex items-center gap-1">
                 {item.status !== 'done' && (
-                  <button onClick={(e) => { e.stopPropagation(); markComplete(item.id); }} className="text-gray-600 hover:text-green-400 p-1 rounded hover:bg-gray-700 transition-colors" title="Mark complete"><Check size={14} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); markComplete(item.id); }} className="text-muted-foreground/60 hover:text-green-400 p-1 rounded hover:bg-secondary transition-colors" title="Mark complete"><Check size={14} /></button>
                 )}
-                <button onClick={(e) => { e.stopPropagation(); startEdit(item); }} className="text-gray-600 hover:text-accent-400 p-1 rounded hover:bg-gray-700 transition-colors" title="Edit"><Pencil size={14} /></button>
+                <button onClick={(e) => { e.stopPropagation(); startEdit(item); }} className="text-muted-foreground/60 hover:text-primary p-1 rounded hover:bg-secondary transition-colors" title="Edit"><Pencil size={14} /></button>
                 <button
                   onClick={(e) => { e.stopPropagation(); pushToClaude(item); }}
                   disabled={pushedIds.has(item.id) || item.status === 'in-progress'}
-                  className="text-gray-600 hover:text-accent-400 p-1 rounded hover:bg-gray-700 transition-colors disabled:opacity-30"
+                  className="text-muted-foreground/60 hover:text-primary p-1 rounded hover:bg-secondary transition-colors disabled:opacity-30"
                   title="Push to Claude Code"
                 >
                   {pushedIds.has(item.id) ? <Check size={14} /> : <Play size={14} />}
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} className="text-gray-600 hover:text-red-400 p-1 rounded hover:bg-gray-700 transition-colors"><Trash2 size={14} /></button>
+                <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} className="text-muted-foreground/60 hover:text-red-400 p-1 rounded hover:bg-secondary transition-colors"><Trash2 size={14} /></button>
               </div>
             </div>
           </div>
           {expandedId === item.id && item.description && (
-            <div className="px-5 pb-4 border-t border-gray-700 pt-3">
-              <pre className="text-gray-300 text-sm whitespace-pre-wrap font-sans leading-relaxed">{item.description}</pre>
+            <div className="px-5 pb-4 border-t border-border pt-3">
+              <pre className="text-foreground text-sm whitespace-pre-wrap font-sans leading-relaxed">{item.description}</pre>
             </div>
           )}
         </div>
@@ -323,20 +323,20 @@ export default function WhiteboardPage() {
       {/* Edit Modal */}
       {editingItemId && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setEditingItemId(null)}>
-          <div className="bg-gray-800 border border-gray-700 rounded-xl w-full max-w-lg p-4 sm:p-6 space-y-3 sm:space-y-4 mx-3 sm:mx-0" onClick={(e) => e.stopPropagation()} onPaste={(e) => handlePaste(e, editingItemId)}>
-            <h3 className="text-white font-semibold">Edit Item</h3>
+          <div className="bg-card border border-border rounded-xl w-full max-w-lg p-4 sm:p-6 space-y-3 sm:space-y-4 mx-3 sm:mx-0" onClick={(e) => e.stopPropagation()} onPaste={(e) => handlePaste(e, editingItemId)}>
+            <h3 className="text-foreground font-semibold">Edit Item</h3>
             <div>
-              <label className="text-gray-300 text-sm block mb-1">Title</label>
-              <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-600" />
+              <label className="text-foreground text-sm block mb-1">Title</label>
+              <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
             </div>
             <div>
-              <label className="text-gray-300 text-sm block mb-1">Description / Scope</label>
-              <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={8} className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent-600 resize-none" placeholder="Paste screenshots with Ctrl+V" />
+              <label className="text-foreground text-sm block mb-1">Description / Scope</label>
+              <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={8} className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none" placeholder="Paste screenshots with Ctrl+V" />
             </div>
-            <p className="text-gray-600 text-xs">Tip: Paste screenshots directly (Ctrl+V) — they'll be uploaded and added to the description.</p>
+            <p className="text-muted-foreground/60 text-xs">Tip: Paste screenshots directly (Ctrl+V) — they'll be uploaded and added to the description.</p>
             <div className="flex gap-2">
-              <button onClick={saveEdit} className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700">Save</button>
-              <button onClick={() => setEditingItemId(null)} className="text-gray-400 px-4 py-2 rounded-lg text-sm hover:text-white">Cancel</button>
+              <button onClick={saveEdit} className="bg-primary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary">Save</button>
+              <button onClick={() => setEditingItemId(null)} className="text-muted-foreground px-4 py-2 rounded-lg text-sm hover:text-foreground">Cancel</button>
             </div>
           </div>
         </div>
@@ -345,14 +345,14 @@ export default function WhiteboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">Whiteboard</h2>
-          <p className="text-gray-500 text-sm mt-1">Pipeline ideas, scoping, and dev backlog</p>
+          <h2 className="text-2xl font-bold text-foreground">Whiteboard</h2>
+          <p className="text-muted-foreground text-sm mt-1">Pipeline ideas, scoping, and dev backlog</p>
         </div>
         <div className="flex gap-2">
           {items.length === 0 && (
             <button
               onClick={seedWhiteboard}
-              className="bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-600 transition-colors border border-gray-600"
+              className="bg-secondary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary transition-colors border border-border"
             >
               Seed Items
             </button>
@@ -362,7 +362,7 @@ export default function WhiteboardPage() {
               const res = await fetch('/api/whiteboard/prioritize', { method: 'POST' });
               if (res.ok) fetchItems();
             }}
-            className="text-gray-400 hover:text-accent-400 px-3 py-2 rounded-lg text-sm border border-gray-600 hover:border-accent-600/50 transition-colors flex items-center gap-1.5"
+            className="text-muted-foreground hover:text-primary px-3 py-2 rounded-lg text-sm border border-border hover:border-primary/50 transition-colors flex items-center gap-1.5"
             title="AI auto-prioritize"
           >
             <Sparkles size={14} />
@@ -370,7 +370,7 @@ export default function WhiteboardPage() {
           </button>
           <button
             onClick={() => setShowAdd(!showAdd)}
-            className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
+            className="bg-primary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary transition-colors"
           >
             {showAdd ? 'Cancel' : '+ Add Item'}
           </button>
@@ -391,8 +391,8 @@ export default function WhiteboardPage() {
                 className={cn(
                   'px-4 py-2 rounded-full text-sm font-medium border transition-colors',
                   activeFilter === status
-                    ? 'bg-white text-gray-900 border-white'
-                    : 'bg-transparent text-gray-400 border-gray-600 hover:border-gray-400 hover:text-gray-300'
+                    ? 'bg-white text-background border-white'
+                    : 'bg-transparent text-muted-foreground border-border hover:border-white/15 hover:text-foreground'
                 )}
               >
                 {status === 'All' ? 'All' : STATUS_LABELS[status]} ({count})
@@ -402,12 +402,12 @@ export default function WhiteboardPage() {
         </div>
 
         {/* View toggle */}
-        <div className="flex bg-gray-800 border border-gray-700 rounded-lg overflow-hidden shrink-0">
+        <div className="flex bg-card border border-border rounded-lg overflow-hidden shrink-0">
           <button
             onClick={() => setViewMode('table')}
             className={cn(
               'px-3 py-1.5 text-sm transition-colors',
-              viewMode === 'table' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'
+              viewMode === 'table' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'
             )}
             title="Table view"
           >
@@ -417,7 +417,7 @@ export default function WhiteboardPage() {
             onClick={() => setViewMode('card')}
             className={cn(
               'px-3 py-1.5 text-sm transition-colors',
-              viewMode === 'card' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'
+              viewMode === 'card' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'
             )}
             title="Card view"
           >
@@ -428,39 +428,39 @@ export default function WhiteboardPage() {
 
       {/* Add Form */}
       {showAdd && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-5 space-y-4">
+        <div className="bg-card border border-border rounded-lg p-5 space-y-4">
           <div>
-            <label className="text-gray-300 text-sm block mb-1">Title</label>
+            <label className="text-foreground text-sm block mb-1">Title</label>
             <input
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder="What needs to be built?"
-              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent-600"
+              className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
           <div>
-            <label className="text-gray-300 text-sm block mb-1">Description / Scope</label>
+            <label className="text-foreground text-sm block mb-1">Description / Scope</label>
             <textarea
               value={newDesc}
               onChange={(e) => setNewDesc(e.target.value)}
               rows={4}
               placeholder="Describe the feature, scope, or context..."
-              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent-600 resize-none"
+              className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring resize-none"
             />
           </div>
           <div>
-            <label className="text-gray-300 text-sm block mb-1">Tags (comma separated)</label>
+            <label className="text-foreground text-sm block mb-1">Tags (comma separated)</label>
             <input
               value={newTags}
               onChange={(e) => setNewTags(e.target.value)}
               placeholder="feature, chat, agent"
-              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent-600"
+              className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
           <button
             onClick={addItem}
             disabled={!newTitle.trim()}
-            className="bg-accent-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-accent-700 transition-colors disabled:opacity-50"
+            className="bg-primary text-foreground px-6 py-2 rounded-lg font-medium hover:bg-primary transition-colors disabled:opacity-50"
           >
             Add to Whiteboard
           </button>
@@ -469,8 +469,8 @@ export default function WhiteboardPage() {
 
       {/* Items */}
       {filtered.length === 0 ? (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
-          <p className="text-gray-500">
+        <div className="bg-card border border-border rounded-lg p-8 text-center">
+          <p className="text-muted-foreground">
             {activeFilter !== 'All' ? 'No items with this status.' : 'Whiteboard is empty. Add your first idea.'}
           </p>
         </div>

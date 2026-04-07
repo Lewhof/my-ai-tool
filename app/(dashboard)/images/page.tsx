@@ -51,8 +51,8 @@ export default function ImageLabPage() {
   return (
     <div className="p-6 max-w-5xl space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-white">Image Lab</h2>
-        <p className="text-gray-500 text-sm mt-1">Generate images with Google Gemini (Nano Banana)</p>
+        <h2 className="text-2xl font-bold text-foreground">Image Lab</h2>
+        <p className="text-muted-foreground text-sm mt-1">Generate images with Google Gemini (Nano Banana)</p>
       </div>
 
       {/* Prompt input */}
@@ -63,13 +63,13 @@ export default function ImageLabPage() {
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); } }}
           placeholder="Describe the image you want to generate..."
           rows={2}
-          className="flex-1 bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent-600 resize-none placeholder-gray-500"
+          className="flex-1 bg-card text-foreground border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none placeholder-muted-foreground"
           disabled={generating}
         />
         <button
           onClick={generate}
           disabled={generating || !prompt.trim()}
-          className="bg-accent-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-accent-700 transition-colors disabled:opacity-50 flex items-center gap-2 self-end shrink-0"
+          className="bg-primary text-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary transition-colors disabled:opacity-50 flex items-center gap-2 self-end shrink-0"
         >
           {generating ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
           {generating ? 'Generating...' : 'Generate'}
@@ -85,13 +85,13 @@ export default function ImageLabPage() {
 
       {/* Result */}
       {result && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+        <div className="bg-card border border-border rounded-lg overflow-hidden">
           {result.image ? (
             <div className="relative">
-              <img src={result.image} alt={prompt} className="w-full max-h-[600px] object-contain bg-gray-900" />
+              <img src={result.image} alt={prompt} className="w-full max-h-[600px] object-contain bg-background" />
               <button
                 onClick={() => downloadImage(result.image!, prompt.slice(0, 30))}
-                className="absolute top-3 right-3 bg-gray-900/80 text-white p-2 rounded-lg hover:bg-gray-900 transition-colors"
+                className="absolute top-3 right-3 bg-background/80 text-foreground p-2 rounded-lg hover:bg-background transition-colors"
                 title="Download"
               >
                 <Download size={16} />
@@ -99,13 +99,13 @@ export default function ImageLabPage() {
             </div>
           ) : (
             <div className="p-8 text-center">
-              <ImageIcon size={32} className="mx-auto text-gray-600 mb-2" />
-              <p className="text-gray-500 text-sm">No image generated. Try a more descriptive prompt.</p>
+              <ImageIcon size={32} className="mx-auto text-muted-foreground/60 mb-2" />
+              <p className="text-muted-foreground text-sm">No image generated. Try a more descriptive prompt.</p>
             </div>
           )}
           {result.text && (
-            <div className="px-5 py-3 border-t border-gray-700">
-              <p className="text-gray-300 text-sm">{result.text}</p>
+            <div className="px-5 py-3 border-t border-border">
+              <p className="text-foreground text-sm">{result.text}</p>
             </div>
           )}
         </div>
@@ -114,13 +114,13 @@ export default function ImageLabPage() {
       {/* History */}
       {history.length > 0 && (
         <div>
-          <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-3">Recent Generations</p>
+          <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-3">Recent Generations</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {history.map((item, i) => (
-              <div key={i} className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden group cursor-pointer" onClick={() => setResult({ text: item.text, image: item.image })}>
+              <div key={i} className="bg-card border border-border rounded-lg overflow-hidden group cursor-pointer" onClick={() => setResult({ text: item.text, image: item.image })}>
                 <img src={item.image} alt={item.prompt} className="w-full h-32 object-cover" />
                 <div className="px-3 py-2">
-                  <p className="text-gray-400 text-xs truncate">{item.prompt}</p>
+                  <p className="text-muted-foreground text-xs truncate">{item.prompt}</p>
                 </div>
               </div>
             ))}

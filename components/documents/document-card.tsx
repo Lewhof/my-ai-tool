@@ -57,11 +57,11 @@ export default function DocumentCard({ doc, onDelete, onRename, folder, onMoveTo
     <div
       draggable
       onDragStart={handleDragStart}
-      className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-gray-600 transition-colors group relative cursor-grab active:cursor-grabbing"
+      className="bg-card border border-border rounded-lg p-4 hover:border-border transition-colors group relative cursor-grab active:cursor-grabbing"
     >
       {/* AI suggested name badge */}
       {doc.display_name && doc.display_name !== doc.name && (
-        <div className="flex items-center gap-1 mb-2 text-accent-400">
+        <div className="flex items-center gap-1 mb-2 text-primary">
           <Sparkles size={11} />
           <span className="text-xs truncate">{doc.display_name}</span>
         </div>
@@ -74,26 +74,26 @@ export default function DocumentCard({ doc, onDelete, onRename, folder, onMoveTo
             onChange={(e) => setEditName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setIsRenaming(false); }}
             autoFocus
-            className="w-full bg-gray-700 text-white border border-gray-600 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600"
+            className="w-full bg-secondary text-foreground border border-border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
           />
           <div className="flex gap-1 mt-1">
             <button onClick={handleRename} className="text-green-400 p-0.5"><Check size={14} /></button>
-            <button onClick={() => { setIsRenaming(false); setEditName(doc.name); }} className="text-gray-500 p-0.5"><X size={14} /></button>
+            <button onClick={() => { setIsRenaming(false); setEditName(doc.name); }} className="text-muted-foreground p-0.5"><X size={14} /></button>
           </div>
         </div>
       ) : (
         <Link href={`/documents/${doc.id}`} className="block">
           <div className="text-3xl mb-3">{fileIcon(doc.file_type)}</div>
-          <p className="text-white font-medium truncate mb-1 text-sm">{displayName}</p>
+          <p className="text-foreground font-medium truncate mb-1 text-sm">{displayName}</p>
           {doc.display_name && doc.display_name !== doc.name && (
-            <p className="text-gray-600 text-xs truncate mb-1">{doc.name}</p>
+            <p className="text-muted-foreground/60 text-xs truncate mb-1">{doc.name}</p>
           )}
-          <div className="flex items-center justify-between text-gray-500 text-xs">
+          <div className="flex items-center justify-between text-muted-foreground text-xs">
             <span>{formatFileSize(doc.file_size)}</span>
             <span>{formatRelativeDate(doc.created_at)}</span>
           </div>
           {folder && (
-            <div className="flex items-center gap-1 mt-2 text-gray-500 text-xs">
+            <div className="flex items-center gap-1 mt-2 text-muted-foreground text-xs">
               <Folder size={12} />
               <span>{folder}</span>
             </div>
@@ -105,7 +105,7 @@ export default function DocumentCard({ doc, onDelete, onRename, folder, onMoveTo
       <div className="flex gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={() => { setEditName(doc.name); setIsRenaming(true); }}
-          className="text-gray-500 hover:text-accent-400 text-xs transition-colors flex items-center gap-1"
+          className="text-muted-foreground hover:text-primary text-xs transition-colors flex items-center gap-1"
         >
           <Pencil size={11} />
           Rename
@@ -114,17 +114,17 @@ export default function DocumentCard({ doc, onDelete, onRename, folder, onMoveTo
           <div className="relative">
             <button
               onClick={() => setShowMove(!showMove)}
-              className="text-gray-500 hover:text-accent-400 text-xs transition-colors"
+              className="text-muted-foreground hover:text-primary text-xs transition-colors"
             >
               Move
             </button>
             {showMove && (
-              <div className="absolute bottom-6 left-0 bg-gray-900 border border-gray-700 rounded-lg py-1 z-10 min-w-[140px] shadow-lg">
+              <div className="absolute bottom-6 left-0 bg-background border border-border rounded-lg py-1 z-10 min-w-[140px] shadow-lg">
                 {folderOptions.map((f) => (
                   <button
                     key={f.id}
                     onClick={() => { onMoveToFolder(f.id); setShowMove(false); }}
-                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-800 transition-colors text-gray-300"
+                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-card transition-colors text-foreground"
                   >
                     {f.name}
                   </button>
@@ -135,7 +135,7 @@ export default function DocumentCard({ doc, onDelete, onRename, folder, onMoveTo
         )}
         <button
           onClick={() => onDelete(doc.id)}
-          className="text-gray-500 hover:text-red-400 text-xs transition-colors"
+          className="text-muted-foreground hover:text-red-400 text-xs transition-colors"
         >
           Delete
         </button>

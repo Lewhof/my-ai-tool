@@ -47,22 +47,22 @@ export default function DocumentViewPage({ params }: { params: Promise<{ id: str
   };
 
   if (!doc) {
-    return <div className="p-6 text-gray-400">Loading document...</div>;
+    return <div className="p-6 text-muted-foreground">Loading document...</div>;
   }
 
   return (
     <div className="flex flex-col lg:flex-row h-full">
       {/* Document viewer */}
-      <div className="flex-1 border-b lg:border-b-0 lg:border-r border-gray-700 p-4">
-        <h3 className="text-white font-medium mb-1 truncate">{doc.display_name || doc.name}</h3>
+      <div className="flex-1 border-b lg:border-b-0 lg:border-r border-border p-4">
+        <h3 className="text-foreground font-medium mb-1 truncate">{doc.display_name || doc.name}</h3>
         {doc.display_name && doc.display_name !== doc.name && (
-          <p className="text-gray-600 text-xs mb-3 truncate">{doc.name}</p>
+          <p className="text-muted-foreground/60 text-xs mb-3 truncate">{doc.name}</p>
         )}
         {doc.signed_url ? (
           doc.file_type === 'application/pdf' ? (
             <iframe
               src={doc.signed_url}
-              className="w-full h-[calc(100%-2rem)] rounded border border-gray-700"
+              className="w-full h-[calc(100%-2rem)] rounded border border-border"
             />
           ) : (
             <img
@@ -72,23 +72,23 @@ export default function DocumentViewPage({ params }: { params: Promise<{ id: str
             />
           )
         ) : (
-          <p className="text-gray-500">Could not load document preview.</p>
+          <p className="text-muted-foreground">Could not load document preview.</p>
         )}
       </div>
 
       {/* Right panel — Chat + Analyze */}
       <div className="w-full lg:w-96 flex flex-col min-h-[300px] lg:min-h-0">
-        <div className="px-4 py-2 border-b border-gray-700 flex items-center gap-2 shrink-0">
+        <div className="px-4 py-2 border-b border-border flex items-center gap-2 shrink-0">
           <button
             onClick={() => setActiveTab('chat')}
-            className={`text-sm px-3 py-1 rounded transition-colors ${activeTab === 'chat' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-white'}`}
+            className={`text-sm px-3 py-1 rounded transition-colors ${activeTab === 'chat' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
           >
             Chat
           </button>
           <button
             onClick={analyzeDoc}
             disabled={analyzing}
-            className={`text-sm px-3 py-1 rounded transition-colors flex items-center gap-1.5 ${activeTab === 'analyze' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-white'} disabled:opacity-50`}
+            className={`text-sm px-3 py-1 rounded transition-colors flex items-center gap-1.5 ${activeTab === 'analyze' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'} disabled:opacity-50`}
           >
             {analyzing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
             Analyze
@@ -102,8 +102,8 @@ export default function DocumentViewPage({ params }: { params: Promise<{ id: str
             <div className="p-4">
               {analyzing ? (
                 <div className="flex items-center justify-center py-8 gap-2">
-                  <Loader2 size={18} className="animate-spin text-accent-400" />
-                  <p className="text-gray-400 text-sm">Analyzing document...</p>
+                  <Loader2 size={18} className="animate-spin text-primary" />
+                  <p className="text-muted-foreground text-sm">Analyzing document...</p>
                 </div>
               ) : analysis ? (
                 <div className="prose prose-invert prose-sm max-w-none">
@@ -111,8 +111,8 @@ export default function DocumentViewPage({ params }: { params: Promise<{ id: str
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <Sparkles size={24} className="mx-auto text-gray-600 mb-2" />
-                  <p className="text-gray-500 text-sm">Click Analyze to get an AI summary</p>
+                  <Sparkles size={24} className="mx-auto text-muted-foreground/60 mb-2" />
+                  <p className="text-muted-foreground text-sm">Click Analyze to get an AI summary</p>
                 </div>
               )}
             </div>

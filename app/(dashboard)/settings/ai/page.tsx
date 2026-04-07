@@ -63,15 +63,15 @@ export default function AISettingsPage() {
   return (
     <div className="p-6 max-w-3xl space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-white">AI & Models</h2>
-        <p className="text-gray-500 text-sm mt-1">Configure AI providers and default chat model</p>
+        <h2 className="text-2xl font-bold text-foreground">AI & Models</h2>
+        <p className="text-muted-foreground text-sm mt-1">Configure AI providers and default chat model</p>
       </div>
 
       {/* Default Model */}
-      <section className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-700">
-          <h3 className="text-white font-semibold text-sm">Default Chat Model</h3>
-          <p className="text-gray-500 text-xs mt-0.5">Used when creating new chat threads</p>
+      <section className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="px-5 py-4 border-b border-border">
+          <h3 className="text-foreground font-semibold text-sm">Default Chat Model</h3>
+          <p className="text-muted-foreground text-xs mt-0.5">Used when creating new chat threads</p>
         </div>
         <div className="p-5 space-y-2">
           {MODELS.map((model) => {
@@ -82,18 +82,18 @@ export default function AISettingsPage() {
                 key={model.id}
                 onClick={() => setDefaultModel(model.id)}
                 className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg border transition-colors text-left ${
-                  isSelected ? 'border-accent-600 bg-accent-600/10' : 'border-gray-700 hover:border-gray-600'
+                  isSelected ? 'border-primary bg-primary/10' : 'border-border hover:border-border'
                 }`}
               >
                 <Icon size={20} className={model.color} />
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
-                    <p className="text-white text-sm font-medium">{model.name}</p>
-                    <span className="text-gray-500 text-xs">{model.cost}</span>
+                    <p className="text-foreground text-sm font-medium">{model.name}</p>
+                    <span className="text-muted-foreground text-xs">{model.cost}</span>
                   </div>
-                  <p className="text-gray-500 text-xs">{model.description}</p>
+                  <p className="text-muted-foreground text-xs">{model.description}</p>
                 </div>
-                {isSelected && <span className="w-2 h-2 rounded-full bg-accent-600 shrink-0" />}
+                {isSelected && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
               </button>
             );
           })}
@@ -101,53 +101,53 @@ export default function AISettingsPage() {
       </section>
 
       {/* API Keys */}
-      <section className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-700">
-          <h3 className="text-white font-semibold text-sm">Provider API Keys</h3>
-          <p className="text-gray-500 text-xs mt-0.5">Required for Groq and Perplexity. Claude uses your existing Anthropic key.</p>
+      <section className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="px-5 py-4 border-b border-border">
+          <h3 className="text-foreground font-semibold text-sm">Provider API Keys</h3>
+          <p className="text-muted-foreground text-xs mt-0.5">Required for Groq and Perplexity. Claude uses your existing Anthropic key.</p>
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <label className="text-gray-300 text-sm block mb-1">Anthropic API Key</label>
+            <label className="text-foreground text-sm block mb-1">Anthropic API Key</label>
             <div className="flex items-center gap-2">
               <span className="text-green-400 text-xs">Configured via environment</span>
-              <a href="/vault" className="text-accent-400 text-xs hover:underline">View in Vault</a>
+              <a href="/vault" className="text-primary text-xs hover:underline">View in Vault</a>
             </div>
           </div>
           <div>
-            <label className="text-gray-300 text-sm block mb-1">Helicone API Key</label>
+            <label className="text-foreground text-sm block mb-1">Helicone API Key</label>
             <div className="flex items-center gap-2">
               <span className="text-green-400 text-xs">Configured via environment</span>
-              <a href="/vault" className="text-accent-400 text-xs hover:underline">View in Vault</a>
+              <a href="/vault" className="text-primary text-xs hover:underline">View in Vault</a>
             </div>
           </div>
           <div>
-            <label className="text-gray-300 text-sm block mb-1">
+            <label className="text-foreground text-sm block mb-1">
               Groq API Key
-              <a href="https://console.groq.com/keys" target="_blank" className="text-accent-400 text-xs ml-2 hover:underline">Get key</a>
+              <a href="https://console.groq.com/keys" target="_blank" className="text-primary text-xs ml-2 hover:underline">Get key</a>
             </label>
             <input
               type="password"
               value={groqKey}
               onChange={(e) => setGroqKey(e.target.value)}
               placeholder="gsk_..."
-              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-accent-600"
+              className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
             />
-            <p className="text-gray-600 text-xs mt-1">Free tier: 14,400 requests/day</p>
+            <p className="text-muted-foreground/60 text-xs mt-1">Free tier: 14,400 requests/day</p>
           </div>
           <div>
-            <label className="text-gray-300 text-sm block mb-1">
+            <label className="text-foreground text-sm block mb-1">
               Perplexity API Key
-              <a href="https://www.perplexity.ai/settings/api" target="_blank" className="text-accent-400 text-xs ml-2 hover:underline">Get key</a>
+              <a href="https://www.perplexity.ai/settings/api" target="_blank" className="text-primary text-xs ml-2 hover:underline">Get key</a>
             </label>
             <input
               type="password"
               value={perplexityKey}
               onChange={(e) => setPerplexityKey(e.target.value)}
               placeholder="pplx-..."
-              className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-accent-600"
+              className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
             />
-            <p className="text-gray-600 text-xs mt-1">Pay-per-use, includes web search</p>
+            <p className="text-muted-foreground/60 text-xs mt-1">Pay-per-use, includes web search</p>
           </div>
         </div>
       </section>
@@ -156,7 +156,7 @@ export default function AISettingsPage() {
       <button
         onClick={saveSettings}
         disabled={saving}
-        className="bg-accent-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-accent-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+        className="bg-primary text-foreground px-6 py-2.5 rounded-lg font-medium hover:bg-primary transition-colors disabled:opacity-50 flex items-center gap-2"
       >
         <Save size={16} />
         {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Settings'}

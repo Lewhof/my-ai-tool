@@ -98,10 +98,10 @@ export default function NodePanel({ collapsed, onToggle }: NodePanelProps) {
 
   if (collapsed) {
     return (
-      <div className="w-10 border-r border-gray-700 bg-gray-800/50 flex flex-col items-center pt-3 shrink-0">
+      <div className="w-10 border-r border-border bg-card/50 flex flex-col items-center pt-3 shrink-0">
         <button
           onClick={onToggle}
-          className="bg-gray-700 border border-gray-600 rounded-lg p-2 text-gray-400 hover:text-white transition-colors"
+          className="bg-secondary border border-border rounded-lg p-2 text-muted-foreground hover:text-foreground transition-colors"
           title="Show node types"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
@@ -111,10 +111,10 @@ export default function NodePanel({ collapsed, onToggle }: NodePanelProps) {
   }
 
   return (
-    <div className="w-52 border-r border-gray-700 bg-gray-800/50 flex flex-col shrink-0">
-      <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-        <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Node Types</span>
-        <button onClick={onToggle} className="text-gray-500 hover:text-white transition-colors">
+    <div className="w-52 border-r border-border bg-card/50 flex flex-col shrink-0">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+        <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Node Types</span>
+        <button onClick={onToggle} className="text-muted-foreground hover:text-foreground transition-colors">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
       </div>
@@ -125,13 +125,13 @@ export default function NodePanel({ collapsed, onToggle }: NodePanelProps) {
             draggable
             onDragStart={(e) => onDragStart(e, nt.type, nt.label)}
             className={cn(
-              'flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-grab active:cursor-grabbing transition-colors hover:bg-gray-700/50',
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-grab active:cursor-grabbing transition-colors hover:bg-secondary/50',
               nt.borderStyle === 'dashed' ? 'border-2 border-dashed' : 'border-2 border-solid'
             )}
             style={{ borderColor: nt.color, color: nt.color }}
           >
             {nt.icon}
-            <span className="text-sm font-medium text-white">{nt.label}</span>
+            <span className="text-sm font-medium text-foreground">{nt.label}</span>
           </div>
         ))}
       </div>

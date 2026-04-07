@@ -47,12 +47,12 @@ export default function DiagramsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">Diagrams</h2>
-          <p className="text-gray-500 text-sm mt-1">Visual architecture and planning</p>
+          <h2 className="text-2xl font-bold text-foreground">Diagrams</h2>
+          <p className="text-muted-foreground text-sm mt-1">Visual architecture and planning</p>
         </div>
         <button
           onClick={createDiagram}
-          className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
+          className="bg-primary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary transition-colors"
         >
           + New Diagram
         </button>
@@ -61,37 +61,37 @@ export default function DiagramsPage() {
       {/* Claude sub-page link */}
       <Link
         href="/diagrams/claude"
-        className="block bg-gray-800 border border-accent-600/30 rounded-lg p-5 hover:border-accent-600 transition-colors"
+        className="block bg-card border border-primary/30 rounded-lg p-5 hover:border-primary transition-colors"
       >
         <div className="flex items-center gap-3">
           <span className="text-2xl">{'\u{1F916}'}</span>
           <div>
-            <p className="text-white font-semibold">Claude Diagrams</p>
-            <p className="text-gray-400 text-sm">AI-generated architecture and stack diagrams</p>
+            <p className="text-foreground font-semibold">Claude Diagrams</p>
+            <p className="text-muted-foreground text-sm">AI-generated architecture and stack diagrams</p>
           </div>
         </div>
       </Link>
 
       {/* User diagrams */}
       {diagrams.length === 0 ? (
-        <p className="text-gray-500 text-center py-8">No custom diagrams yet. Create one or explore Claude diagrams.</p>
+        <p className="text-muted-foreground text-center py-8">No custom diagrams yet. Create one or explore Claude diagrams.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {diagrams.map((diagram) => (
             <div
               key={diagram.id}
-              className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-gray-600 transition-colors group cursor-pointer"
+              className="bg-card border border-border rounded-lg p-4 hover:border-border transition-colors group cursor-pointer"
               onClick={() => router.push(`/diagrams/${diagram.id}`)}
             >
-              <p className="text-white font-medium mb-1">{diagram.name}</p>
+              <p className="text-foreground font-medium mb-1">{diagram.name}</p>
               {diagram.description && (
-                <p className="text-gray-400 text-sm mb-2">{diagram.description}</p>
+                <p className="text-muted-foreground text-sm mb-2">{diagram.description}</p>
               )}
-              <div className="flex items-center justify-between text-gray-500 text-xs">
+              <div className="flex items-center justify-between text-muted-foreground text-xs">
                 <span>{formatRelativeDate(diagram.updated_at)}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); deleteDiagram(diagram.id); }}
-                  className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-opacity"
+                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-opacity"
                 >
                   Delete
                 </button>

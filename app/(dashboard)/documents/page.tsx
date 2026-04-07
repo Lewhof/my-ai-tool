@@ -210,25 +210,25 @@ export default function DocumentsPage() {
           onDrop={(e) => handleFolderDrop(e, folder.id)}
           className={cn(
             'flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors group',
-            isDragOver ? 'bg-accent-600/20 border border-accent-600 border-dashed' : '',
-            isActive ? 'bg-accent-600/10 text-accent-400' : 'text-gray-300 hover:bg-gray-800'
+            isDragOver ? 'bg-primary/20 border border-primary border-dashed' : '',
+            isActive ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-card'
           )}
           style={{ paddingLeft: `${12 + depth * 16}px` }}
           onClick={() => setActiveFolder(isActive ? null : folder.id)}
         >
           {hasChildren ? (
-            <button onClick={(e) => { e.stopPropagation(); toggleExpand(folder.id); }} className="text-gray-500">
+            <button onClick={(e) => { e.stopPropagation(); toggleExpand(folder.id); }} className="text-muted-foreground">
               {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
           ) : <span className="w-3.5" />}
           {isActive ? <FolderOpen size={16} style={{ color: folder.color }} /> : <Folder size={16} style={{ color: folder.color }} />}
           <span className="text-sm font-medium flex-1 truncate">{folder.name}</span>
-          {docCount > 0 && <span className="text-xs text-gray-500">{docCount}</span>}
+          {docCount > 0 && <span className="text-xs text-muted-foreground">{docCount}</span>}
           <div className="opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity">
-            <button onClick={(e) => { e.stopPropagation(); setNewFolderParent(folder.id); setShowNewFolder(true); }} className="text-gray-500 hover:text-white" title="Add sub-folder">
+            <button onClick={(e) => { e.stopPropagation(); setNewFolderParent(folder.id); setShowNewFolder(true); }} className="text-muted-foreground hover:text-foreground" title="Add sub-folder">
               <FolderPlus size={13} />
             </button>
-            <button onClick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }} className="text-gray-500 hover:text-red-400" title="Delete folder">
+            <button onClick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }} className="text-muted-foreground hover:text-red-400" title="Delete folder">
               <Trash2 size={13} />
             </button>
           </div>
@@ -247,31 +247,31 @@ export default function DocumentsPage() {
   return (
     <div className="flex h-full min-h-0" onPaste={handlePaste}>
       {/* Folder sidebar */}
-      <div className="w-56 border-r border-gray-700 flex flex-col shrink-0 hidden md:flex">
-        <div className="px-3 py-3 border-b border-gray-700 flex items-center justify-between">
-          <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider">Folders</p>
-          <button onClick={() => { setShowNewFolder(true); setNewFolderParent(null); }} className="text-gray-500 hover:text-white transition-colors" title="New folder">
+      <div className="w-56 border-r border-border flex flex-col shrink-0 hidden md:flex">
+        <div className="px-3 py-3 border-b border-border flex items-center justify-between">
+          <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Folders</p>
+          <button onClick={() => { setShowNewFolder(true); setNewFolderParent(null); }} className="text-muted-foreground hover:text-foreground transition-colors" title="New folder">
             <FolderPlus size={16} />
           </button>
         </div>
 
         {/* New folder form */}
         {showNewFolder && (
-          <div className="px-3 py-2 border-b border-gray-700 space-y-2">
+          <div className="px-3 py-2 border-b border-border space-y-2">
             <input
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               placeholder="Folder name"
               autoFocus
               onKeyDown={(e) => e.key === 'Enter' && createFolder()}
-              className="w-full bg-gray-700 text-white border border-gray-600 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600"
+              className="w-full bg-secondary text-foreground border border-border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
             />
             {newFolderParent && (
-              <p className="text-gray-500 text-xs">Sub-folder of: {folders.find((f) => f.id === newFolderParent)?.name}</p>
+              <p className="text-muted-foreground text-xs">Sub-folder of: {folders.find((f) => f.id === newFolderParent)?.name}</p>
             )}
             <div className="flex gap-1">
-              <button onClick={createFolder} className="bg-accent-600 text-white px-2 py-1 rounded text-xs hover:bg-accent-700">Create</button>
-              <button onClick={() => { setShowNewFolder(false); setNewFolderParent(null); }} className="text-gray-400 px-2 py-1 rounded text-xs hover:text-white">Cancel</button>
+              <button onClick={createFolder} className="bg-primary text-foreground px-2 py-1 rounded text-xs hover:bg-primary">Create</button>
+              <button onClick={() => { setShowNewFolder(false); setNewFolderParent(null); }} className="text-muted-foreground px-2 py-1 rounded text-xs hover:text-foreground">Cancel</button>
             </div>
           </div>
         )}
@@ -281,12 +281,12 @@ export default function DocumentsPage() {
           onClick={() => setActiveFolder(null)}
           className={cn(
             'flex items-center gap-2 px-3 py-2 mx-2 mt-2 rounded-lg transition-colors text-sm',
-            !activeFolder ? 'bg-accent-600/10 text-accent-400' : 'text-gray-400 hover:bg-gray-800'
+            !activeFolder ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-card'
           )}
         >
           <Folder size={16} />
           <span className="font-medium">All Files</span>
-          <span className="text-xs text-gray-500 ml-auto">{documents.length}</span>
+          <span className="text-xs text-muted-foreground ml-auto">{documents.length}</span>
         </button>
 
         {/* Folder tree */}
@@ -301,20 +301,20 @@ export default function DocumentsPage() {
           onClick={() => setActiveFolder('unfiled')}
           className={cn(
             'flex items-center gap-2 px-3 py-2 mx-2 mb-2 rounded-lg transition-colors text-sm',
-            activeFolder === 'unfiled' ? 'bg-accent-600/10 text-accent-400' : 'text-gray-400 hover:bg-gray-800'
+            activeFolder === 'unfiled' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-card'
           )}
         >
-          <Folder size={16} className="text-gray-600" />
+          <Folder size={16} className="text-muted-foreground/60" />
           <span className="font-medium">Unfiled</span>
-          <span className="text-xs text-gray-500 ml-auto">{documents.filter((d) => !d.folder_id).length}</span>
+          <span className="text-xs text-muted-foreground ml-auto">{documents.filter((d) => !d.folder_id).length}</span>
         </button>
       </div>
 
       {/* Main content */}
       <div className="flex-1 overflow-auto p-6 space-y-6 min-w-0">
         <div>
-          <h2 className="text-2xl font-bold text-white">Documents</h2>
-          <p className="text-gray-500 text-sm mt-1">Upload files or paste screenshots — AI suggests where they belong</p>
+          <h2 className="text-2xl font-bold text-foreground">Documents</h2>
+          <p className="text-muted-foreground text-sm mt-1">Upload files or paste screenshots — AI suggests where they belong</p>
         </div>
 
         {/* Upload zone with comment */}
@@ -325,9 +325,9 @@ export default function DocumentsPage() {
               value={uploadComment}
               onChange={(e) => setUploadComment(e.target.value)}
               placeholder="Add context for AI filing (optional)"
-              className="flex-1 bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600 placeholder-gray-600"
+              className="flex-1 bg-card text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring placeholder-muted-foreground/40"
             />
-            <div className="flex items-center gap-1.5 text-gray-600 text-xs px-2">
+            <div className="flex items-center gap-1.5 text-muted-foreground/60 text-xs px-2">
               <Clipboard size={12} />
               <span>Ctrl+V to paste screenshots</span>
             </div>
@@ -336,33 +336,33 @@ export default function DocumentsPage() {
 
         {/* AI Review result */}
         {reviewResult && (
-          <div className="bg-accent-600/10 border border-accent-600/30 rounded-lg p-4 space-y-3">
+          <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 space-y-3">
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <Sparkles size={16} className="text-accent-400" />
-                  <p className="text-white text-sm font-medium">AI suggests: {reviewResult.suggested_folder_name}</p>
-                  <span className={cn('text-xs px-2 py-0.5 rounded', reviewResult.confidence === 'high' ? 'bg-green-500/20 text-green-400' : reviewResult.confidence === 'medium' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-500/20 text-gray-400')}>{reviewResult.confidence}</span>
+                  <Sparkles size={16} className="text-primary" />
+                  <p className="text-foreground text-sm font-medium">AI suggests: {reviewResult.suggested_folder_name}</p>
+                  <span className={cn('text-xs px-2 py-0.5 rounded', reviewResult.confidence === 'high' ? 'bg-green-500/20 text-green-400' : reviewResult.confidence === 'medium' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-muted text-muted-foreground')}>{reviewResult.confidence}</span>
                 </div>
-                <p className="text-gray-400 text-xs mt-1">{reviewResult.reason}</p>
+                <p className="text-muted-foreground text-xs mt-1">{reviewResult.reason}</p>
               </div>
-              <button onClick={() => { setReviewResult(null); setReviewDocId(null); }} className="text-gray-500 hover:text-white text-xs shrink-0">Dismiss</button>
+              <button onClick={() => { setReviewResult(null); setReviewDocId(null); }} className="text-muted-foreground hover:text-foreground text-xs shrink-0">Dismiss</button>
             </div>
 
             {/* Action buttons */}
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={acceptReview}
-                className="bg-accent-600 text-white px-4 py-1.5 rounded-lg text-xs font-medium hover:bg-accent-700 transition-colors"
+                className="bg-primary text-foreground px-4 py-1.5 rounded-lg text-xs font-medium hover:bg-primary transition-colors"
               >
                 Accept — move to {reviewResult.suggested_folder_name}
               </button>
-              <span className="text-gray-600 text-xs">or move to:</span>
+              <span className="text-muted-foreground/60 text-xs">or move to:</span>
               {folders.map((f) => (
                 <button
                   key={f.id}
                   onClick={() => refileToFolder(f.id)}
-                  className="text-gray-400 hover:text-white text-xs px-2.5 py-1 border border-gray-600 rounded-lg hover:border-gray-500 transition-colors"
+                  className="text-muted-foreground hover:text-foreground text-xs px-2.5 py-1 border border-border rounded-lg hover:border-white/15 transition-colors"
                 >
                   {f.name}
                 </button>
@@ -373,12 +373,12 @@ export default function DocumentsPage() {
 
         {/* Documents grid */}
         <div>
-          <p className="text-gray-500 text-xs font-semibold uppercase tracking-widest mb-3">
+          <p className="text-muted-foreground text-xs font-semibold uppercase tracking-widest mb-3">
             {activeFolder === 'unfiled' ? 'Unfiled' : activeFolder ? folders.find((f) => f.id === activeFolder)?.name : 'All Documents'} ({filtered.length === documents.length ? documents.length : `${filtered.length} of ${documents.length}`})
           </p>
           {(activeFolder === 'unfiled' ? documents.filter((d) => !d.folder_id) : filtered).length === 0 ? (
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
-              <p className="text-gray-500">{activeFolder ? 'No files in this folder.' : 'No documents yet.'}</p>
+            <div className="bg-card border border-border rounded-lg p-8 text-center">
+              <p className="text-muted-foreground">{activeFolder ? 'No files in this folder.' : 'No documents yet.'}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -396,7 +396,7 @@ export default function DocumentsPage() {
                   <button
                     onClick={() => reviewDocument(doc.id)}
                     disabled={reviewingId === doc.id}
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-gray-900/80 text-accent-400 p-1.5 rounded-lg hover:bg-gray-900 transition-all disabled:animate-pulse"
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-background/80 text-primary p-1.5 rounded-lg hover:bg-background transition-all disabled:animate-pulse"
                     title="AI Review — suggest filing"
                   >
                     <Sparkles size={14} />

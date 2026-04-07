@@ -81,7 +81,7 @@ function statusColor(showAs: string): string {
     case 'tentative': return 'bg-yellow-500';
     case 'free': return 'bg-green-500';
     case 'oof': return 'bg-purple-500';
-    default: return 'bg-accent-600';
+    default: return 'bg-primary';
   }
 }
 
@@ -188,9 +188,9 @@ export default function CalendarPage() {
   if (!connected) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 gap-4">
-        <CalIcon size={48} className="text-gray-600" />
-        <p className="text-gray-400 text-lg">Connect a Microsoft account to view your calendar</p>
-        <a href="/settings/connections" className="bg-accent-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-accent-700 transition-colors flex items-center gap-2">
+        <CalIcon size={48} className="text-muted-foreground/60" />
+        <p className="text-muted-foreground text-lg">Connect a Microsoft account to view your calendar</p>
+        <a href="/settings/connections" className="bg-primary text-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary transition-colors flex items-center gap-2">
           <ExternalLink size={16} />
           Connect in Settings
         </a>
@@ -203,10 +203,10 @@ export default function CalendarPage() {
     <div className="flex-1 overflow-auto">
       {/* All-day events */}
       {getEventsForDay(currentDate).filter((e) => e.isAllDay).length > 0 && (
-        <div className="px-4 py-2 border-b border-gray-700 bg-gray-800/50">
-          <p className="text-gray-500 text-xs mb-1">All day</p>
+        <div className="px-4 py-2 border-b border-border bg-card/50">
+          <p className="text-muted-foreground text-xs mb-1">All day</p>
           {getEventsForDay(currentDate).filter((e) => e.isAllDay).map((e) => (
-            <div key={e.id} className="text-white text-xs px-2 py-1 rounded mb-1" style={{ backgroundColor: e.accountColor || statusColor(e.showAs).replace('bg-', '') }}>{e.subject}</div>
+            <div key={e.id} className="text-foreground text-xs px-2 py-1 rounded mb-1" style={{ backgroundColor: e.accountColor || statusColor(e.showAs).replace('bg-', '') }}>{e.subject}</div>
           ))}
         </div>
       )}
@@ -215,13 +215,13 @@ export default function CalendarPage() {
         {HOURS.map((hour) => {
           const hourEvents = getEventsForHour(currentDate, hour);
           return (
-            <div key={hour} className="flex border-b border-gray-800 min-h-[48px]">
-              <div className="w-16 shrink-0 text-gray-500 text-xs py-2 text-right pr-3">{formatHour(hour)}</div>
+            <div key={hour} className="flex border-b border-border min-h-[48px]">
+              <div className="w-16 shrink-0 text-muted-foreground text-xs py-2 text-right pr-3">{formatHour(hour)}</div>
               <div className="flex-1 relative py-1 px-1">
                 {hourEvents.map((e) => (
                   <div key={e.id} className={`${statusColor(e.showAs)}/20 border-l-2 ${statusColor(e.showAs).replace('bg-', 'border-')} px-2 py-1 rounded-r text-sm mb-1`}>
-                    <p className="text-white text-xs font-medium truncate">{e.subject}</p>
-                    {e.location && <p className="text-gray-400 text-xs truncate">{e.location}</p>}
+                    <p className="text-foreground text-xs font-medium truncate">{e.subject}</p>
+                    {e.location && <p className="text-muted-foreground text-xs truncate">{e.location}</p>}
                   </div>
                 ))}
               </div>
@@ -238,32 +238,32 @@ export default function CalendarPage() {
     return (
       <div className="flex-1 overflow-auto">
         {/* Day headers */}
-        <div className="flex border-b border-gray-700 sticky top-0 bg-gray-900 z-10">
+        <div className="flex border-b border-border sticky top-0 bg-background z-10">
           <div className="w-16 shrink-0" />
           {weekDays.map((d, i) => (
             <div
               key={i}
               className={cn(
-                'flex-1 text-center py-2 border-l border-gray-800',
-                isSameDay(d, today) && 'bg-accent-600/10'
+                'flex-1 text-center py-2 border-l border-border',
+                isSameDay(d, today) && 'bg-primary/10'
               )}
             >
-              <p className="text-gray-500 text-xs">{WEEKDAYS[d.getDay()]}</p>
-              <p className={cn('text-sm font-medium', isSameDay(d, today) ? 'text-accent-500' : 'text-white')}>{d.getDate()}</p>
+              <p className="text-muted-foreground text-xs">{WEEKDAYS[d.getDay()]}</p>
+              <p className={cn('text-sm font-medium', isSameDay(d, today) ? 'text-primary' : 'text-foreground')}>{d.getDate()}</p>
             </div>
           ))}
         </div>
         {/* Hourly grid */}
         {HOURS.map((hour) => (
-          <div key={hour} className="flex border-b border-gray-800 min-h-[40px]">
-            <div className="w-16 shrink-0 text-gray-500 text-xs py-1 text-right pr-3">{formatHour(hour)}</div>
+          <div key={hour} className="flex border-b border-border min-h-[40px]">
+            <div className="w-16 shrink-0 text-muted-foreground text-xs py-1 text-right pr-3">{formatHour(hour)}</div>
             {weekDays.map((d, i) => {
               const hourEvents = getEventsForHour(d, hour);
               return (
-                <div key={i} className={cn('flex-1 border-l border-gray-800 px-0.5 py-0.5', isSameDay(d, today) && 'bg-accent-600/5')}>
+                <div key={i} className={cn('flex-1 border-l border-border px-0.5 py-0.5', isSameDay(d, today) && 'bg-primary/5')}>
                   {hourEvents.map((e) => (
                     <div key={e.id} className={`${statusColor(e.showAs)}/30 border-l-2 ${statusColor(e.showAs).replace('bg-', 'border-')} px-1 py-0.5 rounded-r`}>
-                      <p className="text-white text-xs truncate">{e.subject}</p>
+                      <p className="text-foreground text-xs truncate">{e.subject}</p>
                     </div>
                   ))}
                 </div>
@@ -281,9 +281,9 @@ export default function CalendarPage() {
     return (
       <div className="flex-1 overflow-auto">
         {/* Weekday headers */}
-        <div className="grid grid-cols-7 border-b border-gray-700">
+        <div className="grid grid-cols-7 border-b border-border">
           {WEEKDAYS.map((d) => (
-            <div key={d} className="text-center py-2 text-gray-500 text-xs font-semibold">{d}</div>
+            <div key={d} className="text-center py-2 text-muted-foreground text-xs font-semibold">{d}</div>
           ))}
         </div>
         {/* Day grid */}
@@ -296,25 +296,25 @@ export default function CalendarPage() {
               <div
                 key={i}
                 className={cn(
-                  'border-b border-r border-gray-800 p-1',
+                  'border-b border-r border-border p-1',
                   !isCurrentMonth && 'opacity-40',
-                  isToday && 'bg-accent-600/5'
+                  isToday && 'bg-primary/5'
                 )}
               >
                 <p className={cn(
                   'text-xs font-medium mb-0.5',
-                  isToday ? 'text-accent-500 font-bold' : 'text-gray-400'
+                  isToday ? 'text-primary font-bold' : 'text-muted-foreground'
                 )}>
                   {d.getDate()}
                 </p>
                 <div className="space-y-0.5 overflow-hidden">
                   {dayEvents.slice(0, 3).map((e) => (
-                    <div key={e.id} className="text-white text-xs px-1 py-0.5 rounded truncate" style={{ backgroundColor: e.accountColor || '#6366f1' }}>
+                    <div key={e.id} className="text-foreground text-xs px-1 py-0.5 rounded truncate" style={{ backgroundColor: e.accountColor || '#6366f1' }}>
                       {e.subject}
                     </div>
                   ))}
                   {dayEvents.length > 3 && (
-                    <p className="text-gray-500 text-xs">+{dayEvents.length - 3} more</p>
+                    <p className="text-muted-foreground text-xs">+{dayEvents.length - 3} more</p>
                   )}
                 </div>
               </div>
@@ -328,25 +328,25 @@ export default function CalendarPage() {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Toolbar */}
-      <div className="px-6 py-3 border-b border-gray-700 flex items-center justify-between shrink-0">
+      <div className="px-6 py-3 border-b border-border flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={goToday} className="text-gray-400 hover:text-white text-xs px-3 py-1.5 border border-gray-600 rounded-lg transition-colors">
+          <button onClick={goToday} className="text-muted-foreground hover:text-foreground text-xs px-3 py-1.5 border border-border rounded-lg transition-colors">
             Today
           </button>
-          <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-white p-1 transition-colors"><ChevronLeft size={18} /></button>
-          <button onClick={() => navigate(1)} className="text-gray-400 hover:text-white p-1 transition-colors"><ChevronRight size={18} /></button>
-          <h2 className="text-white font-semibold text-sm">{headerTitle()}</h2>
+          <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground p-1 transition-colors"><ChevronLeft size={18} /></button>
+          <button onClick={() => navigate(1)} className="text-muted-foreground hover:text-foreground p-1 transition-colors"><ChevronRight size={18} /></button>
+          <h2 className="text-foreground font-semibold text-sm">{headerTitle()}</h2>
         </div>
         <div className="flex items-center gap-3">
           {/* View toggle */}
-          <div className="flex bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+          <div className="flex bg-card border border-border rounded-lg overflow-hidden">
             {(['day', 'week', 'month'] as View[]).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
                 className={cn(
                   'px-3 py-1.5 text-xs font-medium capitalize transition-colors',
-                  view === v ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'
+                  view === v ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'
                 )}
               >
                 {v}
@@ -358,7 +358,7 @@ export default function CalendarPage() {
             onClick={() => setShowAccounts(!showAccounts)}
             className={cn(
               'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center gap-1.5',
-              showAccounts ? 'border-accent-600/50 text-accent-400 bg-accent-600/10' : 'border-gray-700 text-gray-400 hover:text-white'
+              showAccounts ? 'border-primary/50 text-primary bg-primary/10' : 'border-border text-muted-foreground hover:text-foreground'
             )}
           >
             <Users size={14} />
@@ -366,7 +366,7 @@ export default function CalendarPage() {
           </button>
           <button
             onClick={() => { setShowAddEvent(true); setNewDate(currentDate.toISOString().split('T')[0]); }}
-            className="bg-accent-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-accent-700 transition-colors flex items-center gap-1.5"
+            className="bg-primary text-foreground px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-primary transition-colors flex items-center gap-1.5"
           >
             <Plus size={14} />
             Add Event
@@ -376,19 +376,19 @@ export default function CalendarPage() {
 
       {/* Accounts Panel */}
       {showAccounts && (
-        <div className="px-6 py-3 border-b border-gray-700 shrink-0">
+        <div className="px-6 py-3 border-b border-border shrink-0">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider">Calendar Accounts</p>
+            <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Calendar Accounts</p>
             <div className="flex gap-2 items-center">
               <input
                 value={addLabel}
                 onChange={(e) => setAddLabel(e.target.value)}
                 placeholder="Label (e.g. Work)"
-                className="bg-gray-800 text-white border border-gray-700 rounded px-2 py-1 text-xs w-32 focus:outline-none focus:ring-1 focus:ring-accent-600"
+                className="bg-card text-foreground border border-border rounded px-2 py-1 text-xs w-32 focus:outline-none focus:ring-1 focus:ring-ring"
               />
               <a
                 href={`/api/auth/microsoft?label=${encodeURIComponent(addLabel || 'Microsoft')}`}
-                className="bg-accent-600 text-white px-2.5 py-1 rounded text-xs font-medium hover:bg-accent-700 transition-colors flex items-center gap-1"
+                className="bg-primary text-foreground px-2.5 py-1 rounded text-xs font-medium hover:bg-primary transition-colors flex items-center gap-1"
               >
                 <Plus size={12} />
                 Add Account
@@ -402,8 +402,8 @@ export default function CalendarPage() {
                 className={cn(
                   'flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer',
                   hiddenAccounts.has(acc.id)
-                    ? 'border-gray-700 text-gray-600 opacity-50'
-                    : 'border-gray-600 text-white'
+                    ? 'border-border text-muted-foreground/60 opacity-50'
+                    : 'border-border text-foreground'
                 )}
               >
                 <span
@@ -412,11 +412,11 @@ export default function CalendarPage() {
                   onClick={() => toggleAccount(acc.id)}
                 />
                 <span onClick={() => toggleAccount(acc.id)} className="font-medium">{acc.label}</span>
-                {acc.email && <span className="text-gray-500">{acc.email}</span>}
+                {acc.email && <span className="text-muted-foreground">{acc.email}</span>}
                 {!acc.connected && <span className="text-red-400">disconnected</span>}
                 <button
                   onClick={() => deleteAccount(acc.id)}
-                  className="text-gray-600 hover:text-red-400 transition-colors ml-1"
+                  className="text-muted-foreground/60 hover:text-red-400 transition-colors ml-1"
                 >
                   <Trash2 size={12} />
                 </button>
@@ -429,63 +429,63 @@ export default function CalendarPage() {
       {/* Add Event Modal */}
       {showAddEvent && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowAddEvent(false)}>
-          <div className="bg-gray-800 border border-gray-700 rounded-xl w-full max-w-md p-4 sm:p-6 space-y-3 sm:space-y-4 mx-3 sm:mx-0" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-card border border-border rounded-xl w-full max-w-md p-4 sm:p-6 space-y-3 sm:space-y-4 mx-3 sm:mx-0" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-white font-semibold">New Event</h3>
-              <button onClick={() => setShowAddEvent(false)} className="text-gray-500 hover:text-white"><X size={18} /></button>
+              <h3 className="text-foreground font-semibold">New Event</h3>
+              <button onClick={() => setShowAddEvent(false)} className="text-muted-foreground hover:text-foreground"><X size={18} /></button>
             </div>
             <div>
-              <label className="text-gray-300 text-sm block mb-1">Subject</label>
+              <label className="text-foreground text-sm block mb-1">Subject</label>
               <input
                 value={newSubject}
                 onChange={(e) => setNewSubject(e.target.value)}
                 placeholder="Meeting with..."
                 autoFocus
-                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-600"
+                className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="text-gray-300 text-sm block mb-1">Date</label>
+                <label className="text-foreground text-sm block mb-1">Date</label>
                 <input
                   type="date"
                   value={newDate}
                   onChange={(e) => setNewDate(e.target.value)}
-                  className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600"
+                  className="w-full bg-secondary text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 />
               </div>
               <div>
-                <label className="text-gray-300 text-sm block mb-1">Start</label>
+                <label className="text-foreground text-sm block mb-1">Start</label>
                 <input
                   type="time"
                   value={newStartTime}
                   onChange={(e) => setNewStartTime(e.target.value)}
-                  className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600"
+                  className="w-full bg-secondary text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 />
               </div>
               <div>
-                <label className="text-gray-300 text-sm block mb-1">End</label>
+                <label className="text-foreground text-sm block mb-1">End</label>
                 <input
                   type="time"
                   value={newEndTime}
                   onChange={(e) => setNewEndTime(e.target.value)}
-                  className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600"
+                  className="w-full bg-secondary text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 />
               </div>
             </div>
             <div>
-              <label className="text-gray-300 text-sm block mb-1">Location (optional)</label>
+              <label className="text-foreground text-sm block mb-1">Location (optional)</label>
               <input
                 value={newLocation}
                 onChange={(e) => setNewLocation(e.target.value)}
                 placeholder="Office, Teams, etc."
-                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600"
+                className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
             <button
               onClick={addEvent}
               disabled={!newSubject.trim() || !newDate}
-              className="w-full bg-accent-600 text-white py-2.5 rounded-lg font-medium hover:bg-accent-700 transition-colors disabled:opacity-50"
+              className="w-full bg-primary text-foreground py-2.5 rounded-lg font-medium hover:bg-primary transition-colors disabled:opacity-50"
             >
               Create Event
             </button>

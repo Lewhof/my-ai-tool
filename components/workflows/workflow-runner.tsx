@@ -86,12 +86,12 @@ export default function WorkflowRunner({ workflowId }: WorkflowRunnerProps) {
           onChange={(e) => setInput(e.target.value)}
           rows={4}
           placeholder="Enter your input here..."
-          className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent-600 resize-none"
+          className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring resize-none"
         />
         <button
           onClick={runWorkflow}
           disabled={running || !input.trim()}
-          className="mt-2 bg-accent-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-accent-700 transition-colors disabled:opacity-50"
+          className="mt-2 bg-primary text-foreground px-6 py-2 rounded-lg font-medium hover:bg-primary transition-colors disabled:opacity-50"
         >
           {running ? 'Running...' : 'Run Workflow'}
         </button>
@@ -100,10 +100,10 @@ export default function WorkflowRunner({ workflowId }: WorkflowRunnerProps) {
       {stepOutputs.length > 0 && (
         <div className="space-y-3">
           {stepOutputs.map((step, i) => (
-            <div key={i} className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-              <div className="px-4 py-2 border-b border-gray-700 flex items-center gap-2">
+            <div key={i} className="bg-card border border-border rounded-lg overflow-hidden">
+              <div className="px-4 py-2 border-b border-border flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${step.done ? 'bg-green-400' : 'bg-yellow-400 animate-pulse'}`} />
-                <span className="text-white text-sm font-medium">{step.name}</span>
+                <span className="text-foreground text-sm font-medium">{step.name}</span>
               </div>
               <div className="p-4 prose prose-invert prose-sm max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{step.content || '...'}</ReactMarkdown>

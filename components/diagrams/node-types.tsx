@@ -16,7 +16,7 @@ export const RectangleNode = memo(({ data, selected }: NodeProps) => {
   const color = c(data, '#6b7280');
   return (
     <div
-      className="px-5 py-3 rounded-lg border-2 bg-gray-800 text-white text-sm font-medium min-w-[80px] min-h-[40px] text-center w-full h-full flex items-center justify-center"
+      className="px-5 py-3 rounded-lg border-2 bg-card text-foreground text-sm font-medium min-w-[80px] min-h-[40px] text-center w-full h-full flex items-center justify-center"
       style={{ borderColor: selected ? '#6366f1' : color }}
     >
       <NodeResizer isVisible={selected} minWidth={80} minHeight={40} lineStyle={{ borderColor: '#6366f1' }} handleStyle={{ background: '#6366f1', width: 8, height: 8 }} />
@@ -35,7 +35,7 @@ export const StartNode = memo(({ data, selected }: NodeProps) => {
   const color = c(data, '#22c55e');
   return (
     <div
-      className="px-5 py-3 rounded-full border-2 bg-gray-800 text-sm font-semibold min-w-[100px] text-center"
+      className="px-5 py-3 rounded-full border-2 bg-card text-sm font-semibold min-w-[100px] text-center"
       style={{ borderColor: selected ? color : `${color}cc`, color }}
     >
       <span>{String(data.label || 'Start')}</span>
@@ -51,7 +51,7 @@ export const EndNode = memo(({ data, selected }: NodeProps) => {
   const color = c(data, '#ef4444');
   return (
     <div
-      className="px-5 py-3 rounded-full border-2 bg-gray-800 text-sm font-semibold min-w-[100px] text-center"
+      className="px-5 py-3 rounded-full border-2 bg-card text-sm font-semibold min-w-[100px] text-center"
       style={{ borderColor: selected ? color : `${color}cc`, color }}
     >
       <Handle type="target" position={Position.Top} style={hs(color)} />
@@ -70,7 +70,7 @@ export const DecisionNode = memo(({ data, selected }: NodeProps) => {
       <Handle type="target" position={Position.Top} style={{ ...hs(color), top: -4 }} />
       <Handle type="target" position={Position.Left} style={{ ...hs(color), left: -4 }} />
       <div
-        className="absolute inset-0 flex items-center justify-center border-2 bg-gray-800 text-sm font-semibold"
+        className="absolute inset-0 flex items-center justify-center border-2 bg-card text-sm font-semibold"
         style={{ transform: 'rotate(45deg)', borderRadius: 4, borderColor: selected ? color : `${color}cc`, color }}
       >
         <span style={{ transform: 'rotate(-45deg)' }}>{String(data.label || 'Decision')}</span>
@@ -87,7 +87,7 @@ export const ProcessNode = memo(({ data, selected }: NodeProps) => {
   const color = c(data, '#a855f7');
   return (
     <div
-      className="px-5 py-3 rounded-lg border-2 bg-gray-800 text-sm font-medium min-w-[120px] text-center"
+      className="px-5 py-3 rounded-lg border-2 bg-card text-sm font-medium min-w-[120px] text-center"
       style={{ borderColor: selected ? color : `${color}cc`, color }}
     >
       <Handle type="target" position={Position.Top} style={hs(color)} />
@@ -108,7 +108,7 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
   const color = c(data, '#3b82f6');
   return (
     <div
-      className="px-5 py-3 rounded-lg border-2 bg-gray-800 text-sm font-medium min-w-[120px] text-center"
+      className="px-5 py-3 rounded-lg border-2 bg-card text-sm font-medium min-w-[120px] text-center"
       style={{ borderColor: selected ? color : `${color}cc`, color }}
     >
       <Handle type="target" position={Position.Top} style={hs(color)} />
@@ -129,7 +129,7 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
   const color = c(data, '#06b6d4');
   return (
     <div
-      className="px-6 py-3 rounded-2xl border-2 bg-gray-800 text-sm font-medium min-w-[120px] text-center"
+      className="px-6 py-3 rounded-2xl border-2 bg-card text-sm font-medium min-w-[120px] text-center"
       style={{ borderColor: selected ? color : `${color}cc`, color }}
     >
       <Handle type="target" position={Position.Top} style={hs(color)} />
@@ -150,7 +150,7 @@ export const ActorNode = memo(({ data, selected }: NodeProps) => {
   const color = c(data, '#f59e0b');
   return (
     <div
-      className="px-5 py-3 rounded-lg border-2 bg-gray-800 text-sm font-medium min-w-[100px] text-center"
+      className="px-5 py-3 rounded-lg border-2 bg-card text-sm font-medium min-w-[100px] text-center"
       style={{ borderColor: selected ? color : `${color}cc`, color }}
     >
       <Handle type="target" position={Position.Top} style={hs(color)} />
@@ -171,7 +171,7 @@ export const NoteNode = memo(({ data, selected }: NodeProps) => {
   const color = c(data, '#f97316');
   return (
     <div
-      className="px-5 py-3 rounded border-2 border-dashed bg-gray-800/50 text-sm min-w-[120px]"
+      className="px-5 py-3 rounded border-2 border-dashed bg-card/50 text-sm min-w-[120px]"
       style={{ borderColor: selected ? color : `${color}80`, color: `${color}cc` }}
     >
       <div className="flex items-start gap-2">
@@ -188,7 +188,7 @@ export const GroupNode = memo(({ data, selected }: NodeProps) => {
   const color = c(data, '#6b7280');
   return (
     <div
-      className="px-6 py-4 rounded-lg border-2 border-dashed bg-gray-800/30 text-sm font-medium min-w-[200px] min-h-[100px]"
+      className="px-6 py-4 rounded-lg border-2 border-dashed bg-card/30 text-sm font-medium min-w-[200px] min-h-[100px]"
       style={{ borderColor: selected ? color : `${color}80`, color }}
     >
       <div className="flex items-center gap-2 mb-2">

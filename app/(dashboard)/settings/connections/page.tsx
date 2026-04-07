@@ -75,8 +75,8 @@ export default function ConnectionsPage() {
         </>
       ) : (
         <>
-          <XCircle size={14} className="text-gray-500" />
-          <span className="text-gray-500 text-xs font-medium">Not connected</span>
+          <XCircle size={14} className="text-muted-foreground" />
+          <span className="text-muted-foreground text-xs font-medium">Not connected</span>
         </>
       )}
     </div>
@@ -85,22 +85,22 @@ export default function ConnectionsPage() {
   return (
     <div className="p-6 max-w-3xl space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-white">Connections</h2>
-        <p className="text-gray-500 text-sm mt-1">Manage connected accounts and services</p>
+        <h2 className="text-2xl font-bold text-foreground">Connections</h2>
+        <p className="text-muted-foreground text-sm mt-1">Manage connected accounts and services</p>
       </div>
 
       {loading ? (
-        <p className="text-gray-500">Loading connections...</p>
+        <p className="text-muted-foreground">Loading connections...</p>
       ) : (
         <>
           {/* ── Microsoft Calendar ── */}
-          <section className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-700 flex items-center justify-between">
+          <section className="bg-card border border-border rounded-lg overflow-hidden">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Calendar size={20} className="text-blue-400" />
                 <div>
-                  <h3 className="text-white font-semibold text-sm">Microsoft Calendar</h3>
-                  <p className="text-gray-500 text-xs">Outlook / Microsoft 365 calendars</p>
+                  <h3 className="text-foreground font-semibold text-sm">Microsoft Calendar</h3>
+                  <p className="text-muted-foreground text-xs">Outlook / Microsoft 365 calendars</p>
                 </div>
               </div>
               <StatusBadge connected={(status?.calendar?.length ?? 0) > 0} />
@@ -110,20 +110,20 @@ export default function ConnectionsPage() {
               {(status?.calendar ?? []).length > 0 && (
                 <div className="space-y-2">
                   {status!.calendar.map((acc) => (
-                    <div key={acc.id} className="flex items-center justify-between bg-gray-900 rounded-lg px-4 py-3">
+                    <div key={acc.id} className="flex items-center justify-between bg-background rounded-lg px-4 py-3">
                       <div className="flex items-center gap-3">
                         <span className="w-3 h-3 rounded-full" style={{ backgroundColor: acc.color }} />
                         <div>
-                          <p className="text-white text-sm font-medium">{acc.label}</p>
-                          <p className="text-gray-500 text-xs">{acc.email}</p>
+                          <p className="text-foreground text-sm font-medium">{acc.label}</p>
+                          <p className="text-muted-foreground text-xs">{acc.email}</p>
                         </div>
-                        {acc.is_default && <span className="text-xs px-2 py-0.5 rounded bg-accent-600/20 text-accent-400">Default</span>}
+                        {acc.is_default && <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary">Default</span>}
                       </div>
                       <div className="flex items-center gap-2">
                         {!acc.is_default && (
-                          <button onClick={() => setDefaultCal(acc.id)} className="text-gray-500 hover:text-white text-xs px-2 py-1 border border-gray-600 rounded transition-colors">Set default</button>
+                          <button onClick={() => setDefaultCal(acc.id)} className="text-muted-foreground hover:text-foreground text-xs px-2 py-1 border border-border rounded transition-colors">Set default</button>
                         )}
-                        <button onClick={() => removeCalAccount(acc.id)} className="text-gray-500 hover:text-red-400 p-1 transition-colors"><Trash2 size={14} /></button>
+                        <button onClick={() => removeCalAccount(acc.id)} className="text-muted-foreground hover:text-red-400 p-1 transition-colors"><Trash2 size={14} /></button>
                       </div>
                     </div>
                   ))}
@@ -136,11 +136,11 @@ export default function ConnectionsPage() {
                   value={calLabel}
                   onChange={(e) => setCalLabel(e.target.value)}
                   placeholder="Account label (e.g. Work, Personal)"
-                  className="flex-1 bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600"
+                  className="flex-1 bg-secondary text-foreground border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 />
                 <a
                   href={`/api/auth/microsoft?label=${encodeURIComponent(calLabel || 'Microsoft')}`}
-                  className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors flex items-center gap-2 shrink-0"
+                  className="bg-primary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary transition-colors flex items-center gap-2 shrink-0"
                 >
                   <Plus size={14} />
                   Add Account
@@ -150,20 +150,20 @@ export default function ConnectionsPage() {
           </section>
 
           {/* ── Spotify ── */}
-          <section className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-700 flex items-center justify-between">
+          <section className="bg-card border border-border rounded-lg overflow-hidden">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Music size={20} className="text-green-400" />
                 <div>
-                  <h3 className="text-white font-semibold text-sm">Spotify</h3>
-                  <p className="text-gray-500 text-xs">Music playback, playlists, and listening history</p>
+                  <h3 className="text-foreground font-semibold text-sm">Spotify</h3>
+                  <p className="text-muted-foreground text-xs">Music playback, playlists, and listening history</p>
                 </div>
               </div>
               <StatusBadge connected={status?.spotify ?? false} />
             </div>
             <div className="p-5">
               <div className="flex items-center justify-between">
-                <p className="text-gray-400 text-sm">
+                <p className="text-muted-foreground text-sm">
                   {status?.spotify ? 'Your Spotify account is connected. Playback controls require Spotify Premium.' : 'Connect your Spotify account to control music and see listening history.'}
                 </p>
                 <a
@@ -171,8 +171,8 @@ export default function ConnectionsPage() {
                   className={cn(
                     'px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shrink-0 transition-colors',
                     status?.spotify
-                      ? 'border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500'
-                      : 'bg-green-600 text-white hover:bg-green-700'
+                      ? 'border border-border text-foreground hover:text-foreground hover:border-white/15'
+                      : 'bg-green-600 text-foreground hover:bg-green-700'
                   )}
                 >
                   {status?.spotify ? <RefreshCw size={14} /> : <ExternalLink size={14} />}
@@ -183,13 +183,13 @@ export default function ConnectionsPage() {
           </section>
 
           {/* ── GitHub ── */}
-          <section className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-700 flex items-center justify-between">
+          <section className="bg-card border border-border rounded-lg overflow-hidden">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Github size={20} className="text-gray-300" />
+                <Github size={20} className="text-foreground" />
                 <div>
-                  <h3 className="text-white font-semibold text-sm">GitHub</h3>
-                  <p className="text-gray-500 text-xs">Repository access for the Telegram agent</p>
+                  <h3 className="text-foreground font-semibold text-sm">GitHub</h3>
+                  <p className="text-muted-foreground text-xs">Repository access for the Telegram agent</p>
                 </div>
               </div>
               <StatusBadge connected={status?.github?.connected ?? false} />
@@ -197,12 +197,12 @@ export default function ConnectionsPage() {
             <div className="p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-400 text-sm">
+                  <p className="text-muted-foreground text-sm">
                     {status?.github?.connected ? `Connected to ${status.github.repo}` : 'GitHub is configured via environment variables.'}
                   </p>
-                  <p className="text-gray-600 text-xs mt-1">Token managed in Vault → API Key → GITHUB_TOKEN</p>
+                  <p className="text-muted-foreground/60 text-xs mt-1">Token managed in Vault → API Key → GITHUB_TOKEN</p>
                 </div>
-                <a href="/vault" className="text-gray-500 hover:text-white text-xs px-3 py-1.5 border border-gray-600 rounded-lg transition-colors">Manage in Vault</a>
+                <a href="/vault" className="text-muted-foreground hover:text-foreground text-xs px-3 py-1.5 border border-border rounded-lg transition-colors">Manage in Vault</a>
               </div>
             </div>
           </section>

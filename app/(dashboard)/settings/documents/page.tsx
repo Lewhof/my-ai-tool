@@ -64,22 +64,22 @@ export default function DocumentSettingsPage() {
     const children = getChildren(folder.id);
     return (
       <>
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-700 hover:bg-gray-700/30 transition-colors" style={{ paddingLeft: `${20 + depth * 24}px` }}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border hover:bg-secondary/30 transition-colors" style={{ paddingLeft: `${20 + depth * 24}px` }}>
           <div className="flex items-center gap-3">
             <Folder size={16} style={{ color: folder.color }} />
-            <span className="text-white text-sm font-medium">{folder.name}</span>
+            <span className="text-foreground text-sm font-medium">{folder.name}</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => { setNewParent(folder.id); setShowAdd(true); }}
-              className="text-gray-500 hover:text-white p-1 transition-colors"
+              className="text-muted-foreground hover:text-foreground p-1 transition-colors"
               title="Add sub-folder"
             >
               <FolderPlus size={14} />
             </button>
             <button
               onClick={() => deleteFolder(folder.id)}
-              className="text-gray-500 hover:text-red-400 p-1 transition-colors"
+              className="text-muted-foreground hover:text-red-400 p-1 transition-colors"
               title="Delete folder"
             >
               <Trash2 size={14} />
@@ -96,20 +96,20 @@ export default function DocumentSettingsPage() {
   return (
     <div className="p-6 max-w-3xl space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-white">Documents</h2>
-        <p className="text-gray-500 text-sm mt-1">Manage folder structure and filing settings</p>
+        <h2 className="text-2xl font-bold text-foreground">Documents</h2>
+        <p className="text-muted-foreground text-sm mt-1">Manage folder structure and filing settings</p>
       </div>
 
       {/* Folder Structure */}
-      <section className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-700 flex items-center justify-between">
+      <section className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <div>
-            <h3 className="text-white font-semibold text-sm">Folder Structure</h3>
-            <p className="text-gray-500 text-xs mt-0.5">{folders.length} folders configured</p>
+            <h3 className="text-foreground font-semibold text-sm">Folder Structure</h3>
+            <p className="text-muted-foreground text-xs mt-0.5">{folders.length} folders configured</p>
           </div>
           <button
             onClick={() => { setShowAdd(!showAdd); setNewParent(null); }}
-            className="bg-accent-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-accent-700 transition-colors flex items-center gap-1.5"
+            className="bg-primary text-foreground px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-primary transition-colors flex items-center gap-1.5"
           >
             <FolderPlus size={14} />
             New Folder
@@ -118,27 +118,27 @@ export default function DocumentSettingsPage() {
 
         {/* Add folder form */}
         {showAdd && (
-          <div className="px-5 py-4 border-b border-gray-700 space-y-3 bg-gray-900/50">
+          <div className="px-5 py-4 border-b border-border space-y-3 bg-background/50">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-gray-300 text-xs block mb-1">Folder name</label>
+                <label className="text-foreground text-xs block mb-1">Folder name</label>
                 <input
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="e.g. Contracts"
                   autoFocus
                   onKeyDown={(e) => e.key === 'Enter' && createFolder()}
-                  className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600"
+                  className="w-full bg-secondary text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 />
               </div>
               <div>
-                <label className="text-gray-300 text-xs block mb-1">
+                <label className="text-foreground text-xs block mb-1">
                   Parent folder {newParent ? `(${folders.find((f) => f.id === newParent)?.name})` : '(root)'}
                 </label>
                 <select
                   value={newParent ?? ''}
                   onChange={(e) => setNewParent(e.target.value || null)}
-                  className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm"
+                  className="w-full bg-secondary text-foreground border border-border rounded-lg px-3 py-2 text-sm"
                 >
                   <option value="">Root level</option>
                   {folders.map((f) => (
@@ -148,7 +148,7 @@ export default function DocumentSettingsPage() {
               </div>
             </div>
             <div>
-              <label className="text-gray-300 text-xs block mb-1">Color</label>
+              <label className="text-foreground text-xs block mb-1">Color</label>
               <div className="flex gap-2">
                 {PRESET_COLORS.map((c) => (
                   <button
@@ -161,8 +161,8 @@ export default function DocumentSettingsPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <button onClick={createFolder} disabled={!newName.trim()} className="bg-accent-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-accent-700 disabled:opacity-50">Create</button>
-              <button onClick={() => { setShowAdd(false); setNewParent(null); }} className="text-gray-400 px-4 py-1.5 rounded-lg text-sm hover:text-white">Cancel</button>
+              <button onClick={createFolder} disabled={!newName.trim()} className="bg-primary text-foreground px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-primary disabled:opacity-50">Create</button>
+              <button onClick={() => { setShowAdd(false); setNewParent(null); }} className="text-muted-foreground px-4 py-1.5 rounded-lg text-sm hover:text-foreground">Cancel</button>
             </div>
           </div>
         )}
@@ -170,9 +170,9 @@ export default function DocumentSettingsPage() {
         {/* Folder tree */}
         {folders.length === 0 ? (
           <div className="p-8 text-center">
-            <Folder size={24} className="mx-auto text-gray-600 mb-2" />
-            <p className="text-gray-500 text-sm">No folders created yet</p>
-            <p className="text-gray-600 text-xs mt-1">AI will suggest default folders when you upload documents</p>
+            <Folder size={24} className="mx-auto text-muted-foreground/60 mb-2" />
+            <p className="text-muted-foreground text-sm">No folders created yet</p>
+            <p className="text-muted-foreground/60 text-xs mt-1">AI will suggest default folders when you upload documents</p>
           </div>
         ) : (
           rootFolders.map((folder) => (
@@ -182,25 +182,25 @@ export default function DocumentSettingsPage() {
       </section>
 
       {/* AI Classification */}
-      <section className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-700">
-          <h3 className="text-white font-semibold text-sm">AI Auto-Classification</h3>
-          <p className="text-gray-500 text-xs mt-0.5">How AI files your uploads</p>
+      <section className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="px-5 py-4 border-b border-border">
+          <h3 className="text-foreground font-semibold text-sm">AI Auto-Classification</h3>
+          <p className="text-muted-foreground text-xs mt-0.5">How AI files your uploads</p>
         </div>
         <div className="p-5 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-white text-sm">Auto-classify on upload</p>
-              <p className="text-gray-500 text-xs">AI reads document content and suggests a folder</p>
+              <p className="text-foreground text-sm">Auto-classify on upload</p>
+              <p className="text-muted-foreground text-xs">AI reads document content and suggests a folder</p>
             </div>
             <span className="text-green-400 text-xs font-medium">Enabled</span>
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-white text-sm">Model used</p>
-              <p className="text-gray-500 text-xs">Claude Haiku — fast, ~$0.001 per classification</p>
+              <p className="text-foreground text-sm">Model used</p>
+              <p className="text-muted-foreground text-xs">Claude Haiku — fast, ~$0.001 per classification</p>
             </div>
-            <span className="text-gray-400 text-xs">Haiku</span>
+            <span className="text-muted-foreground text-xs">Haiku</span>
           </div>
         </div>
       </section>

@@ -36,7 +36,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   };
 
   return (
-    <div className="border-t border-gray-700 p-3 sm:p-4 flex gap-3 shrink-0">
+    <div className="border-t border-border p-3 sm:p-4 flex gap-3 shrink-0">
       <textarea
         ref={textareaRef}
         value={input}
@@ -44,13 +44,13 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
         onKeyDown={handleKeyDown}
         placeholder="Type a message... (Shift+Enter for newline)"
         rows={1}
-        className="flex-1 bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-600 resize-none placeholder-gray-500"
+        className="flex-1 bg-secondary text-foreground border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none placeholder-muted-foreground"
         disabled={disabled}
       />
       <button
         onClick={handleSend}
         disabled={disabled || !input.trim()}
-        className="bg-accent-600 text-white p-2.5 rounded-lg hover:bg-accent-700 transition-colors disabled:opacity-30 self-end"
+        className="bg-primary text-foreground p-2.5 rounded-lg hover:bg-primary transition-colors disabled:opacity-30 self-end"
         title="Send message"
       >
         <Send size={18} />

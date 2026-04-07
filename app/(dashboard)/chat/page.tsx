@@ -47,8 +47,8 @@ export default function ChatPage() {
       <ThreadList threads={threads} onNewChat={handleNewChat} onDelete={handleDelete} loading={loading} />
       <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center">
         <div className="text-center">
-          <MessageSquare size={32} className="mx-auto text-gray-600 mb-3" />
-          <p className="text-gray-400 text-sm">Select a conversation or start a new one</p>
+          <MessageSquare size={32} className="mx-auto text-muted-foreground/60 mb-3" />
+          <p className="text-muted-foreground text-sm">Select a conversation or start a new one</p>
         </div>
       </div>
     </div>

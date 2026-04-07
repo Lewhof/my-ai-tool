@@ -48,16 +48,16 @@ export default function SocialPage() {
     <div className="p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-2xl font-bold text-white">Social</h2>
-          <p className="text-gray-500 text-sm mt-1">Your connected social and media widgets</p>
+          <h2 className="text-2xl font-bold text-foreground">Social</h2>
+          <p className="text-muted-foreground text-sm mt-1">Your connected social and media widgets</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={resetLayout} className="text-gray-500 hover:text-white p-1.5 rounded hover:bg-gray-800 transition-colors" title="Reset layout">
+          <button onClick={resetLayout} className="text-muted-foreground hover:text-foreground p-1.5 rounded hover:bg-card transition-colors" title="Reset layout">
             <RotateCcw size={15} />
           </button>
           <button
             onClick={() => setLocked(!locked)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${locked ? 'text-gray-500 border-gray-700 hover:border-gray-600' : 'text-accent-400 border-accent-600/50 bg-accent-600/10'}`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${locked ? 'text-muted-foreground border-border hover:border-border' : 'text-primary border-primary/50 bg-primary/10'}`}
           >
             {locked ? <Lock size={12} /> : <Unlock size={12} />}
             {locked ? 'Locked' : 'Editing'}
