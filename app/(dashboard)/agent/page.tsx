@@ -154,16 +154,35 @@ export default function AgentPage() {
           <p className="text-gray-500 text-xs">Claude Sonnet with access to all your tools</p>
         </div>
         {messages.length > 0 && (
-          <button
-            onClick={async () => {
-              if (!confirm('Clear conversation history?')) return;
-              await fetch('/api/agent/history', { method: 'DELETE' });
-              setMessages([]);
-            }}
-            className="ml-auto text-gray-500 hover:text-red-400 text-xs px-3 py-1.5 border border-gray-700 rounded-lg transition-colors"
-          >
-            Clear History
-          </button>
+          <div className="ml-auto flex gap-2">
+            <button
+              onClick={async () => {
+                const content = messages.map((m) => `**${m.role === 'user' ? 'You' : 'Cerebro'}:**\n${m.content}`).join('\n\n---\n\n');
+                const title = `Cerebro Archive — ${new Date().toLocaleDateString('en-ZA')}`;
+                await fetch('/api/kb', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ title, content, category: 'Reference', tags: ['cerebro', 'archive'] }),
+                });
+                await fetch('/api/agent/history', { method: 'DELETE' });
+                setMessages([]);
+                alert('Conversation archived to Knowledge Base');
+              }}
+              className="text-gray-500 hover:text-accent-400 text-xs px-3 py-1.5 border border-gray-700 rounded-lg transition-colors"
+            >
+              Archive & Clear
+            </button>
+            <button
+              onClick={async () => {
+                if (!confirm('Clear conversation history? This cannot be undone.')) return;
+                await fetch('/api/agent/history', { method: 'DELETE' });
+                setMessages([]);
+              }}
+              className="text-gray-500 hover:text-red-400 text-xs px-3 py-1.5 border border-gray-700 rounded-lg transition-colors"
+            >
+              Clear
+            </button>
+          </div>
         )}
       </div>
 
