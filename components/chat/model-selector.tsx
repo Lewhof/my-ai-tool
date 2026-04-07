@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Zap, Brain, Rocket, Search, ChevronDown } from 'lucide-react';
+import { Zap, Brain, Rocket, Search, Sparkles, ChevronDown } from 'lucide-react';
 
 export interface ModelOption {
   id: string;
@@ -18,6 +18,7 @@ const MODELS: ModelOption[] = [
   { id: 'claude-sonnet', name: 'Claude Sonnet', description: 'Smart & capable', icon: Brain, color: 'text-blue-400', costLabel: '~$0.01' },
   { id: 'groq-llama', name: 'Groq LLaMA 3', description: 'Instant responses', icon: Rocket, color: 'text-orange-400', costLabel: 'Free' },
   { id: 'perplexity', name: 'Perplexity', description: 'Web search built-in', icon: Search, color: 'text-cyan-400', costLabel: '~$0.005' },
+  { id: 'gemini', name: 'Gemini Flash', description: 'Google AI — fast & free', icon: Sparkles, color: 'text-blue-300', costLabel: 'Free' },
 ];
 
 interface ModelSelectorProps {

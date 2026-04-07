@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { createClaudeStream } from '@/lib/providers/claude';
 import { createGroqStream } from '@/lib/providers/groq';
 import { createPerplexityStream } from '@/lib/providers/perplexity';
+import { createGeminiStream } from '@/lib/providers/gemini';
 
 export async function POST(req: Request) {
   const { userId } = await auth();
@@ -88,6 +89,9 @@ export async function POST(req: Request) {
         break;
       case 'perplexity':
         result = createPerplexityStream(messages, systemPrompt);
+        break;
+      case 'gemini':
+        result = createGeminiStream(messages, systemPrompt);
         break;
       case 'claude-haiku':
       default:
