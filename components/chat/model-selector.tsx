@@ -49,17 +49,17 @@ export default function ModelSelector({ value, onChange, compact }: ModelSelecto
         className={cn(
           'flex items-center gap-2 rounded-lg border transition-colors',
           compact
-            ? 'px-2 py-1 text-xs border-gray-700 hover:border-gray-600'
-            : 'px-3 py-1.5 text-sm border-gray-700 hover:border-gray-600'
+            ? 'px-2 py-1 text-xs border-border hover:border-border'
+            : 'px-3 py-1.5 text-sm border-border hover:border-border'
         )}
       >
         <Icon size={compact ? 12 : 14} className={selected.color} />
-        <span className="text-white font-medium">{compact ? selected.name.split(' ').pop() : selected.name}</span>
-        <ChevronDown size={12} className={cn('text-gray-500 transition-transform', open && 'rotate-180')} />
+        <span className="text-foreground font-medium">{compact ? selected.name.split(' ').pop() : selected.name}</span>
+        <ChevronDown size={12} className={cn('text-muted-foreground transition-transform', open && 'rotate-180')} />
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 py-1">
+        <div className="absolute top-full left-0 mt-1 w-64 bg-card border border-border rounded-lg shadow-xl z-50 py-1">
           {MODELS.map((model) => {
             const MIcon = model.icon;
             const isActive = model.id === value;
@@ -69,18 +69,18 @@ export default function ModelSelector({ value, onChange, compact }: ModelSelecto
                 onClick={() => { onChange(model.id); setOpen(false); }}
                 className={cn(
                   'w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors',
-                  isActive ? 'bg-gray-700' : 'hover:bg-gray-700/50'
+                  isActive ? 'bg-secondary' : 'hover:bg-secondary/50'
                 )}
               >
                 <MIcon size={16} className={model.color} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="text-white text-sm font-medium">{model.name}</span>
-                    <span className="text-gray-500 text-xs">{model.costLabel}</span>
+                    <span className="text-foreground text-sm font-medium">{model.name}</span>
+                    <span className="text-muted-foreground text-xs">{model.costLabel}</span>
                   </div>
-                  <p className="text-gray-500 text-xs">{model.description}</p>
+                  <p className="text-muted-foreground text-xs">{model.description}</p>
                 </div>
-                {isActive && <span className="w-1.5 h-1.5 rounded-full bg-accent-600 shrink-0" />}
+                {isActive && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
               </button>
             );
           })}

@@ -80,14 +80,14 @@ export default function ChatThreadPage({ params }: { params: Promise<{ id: strin
       <ThreadList threads={threads} onNewChat={handleNewChat} onDelete={handleDelete} loading={loading} />
       <div className="flex-1 min-w-0 min-h-0 flex flex-col">
         {/* Model badge header */}
-        <div className="px-4 py-2 border-b border-gray-700 flex items-center gap-2 shrink-0">
+        <div className="px-4 py-2 border-b border-border flex items-center gap-2 shrink-0">
           <ModelIcon size={14} className={info.color} />
           <span className={`text-sm font-medium ${info.color}`}>{info.name}</span>
         </div>
 
         {messagesLoading ? (
           <div className="flex items-center justify-center flex-1">
-            <p className="text-gray-500 text-sm">Loading messages...</p>
+            <p className="text-muted-foreground text-sm">Loading messages...</p>
           </div>
         ) : (
           <ChatContainer threadId={id} initialMessages={messages} initialModel={threadModel} showModelSelector={false} />

@@ -25,20 +25,20 @@ export default function SharedDiagramPage({ params }: { params: Promise<{ id: st
   if (error) {
     return (
       <div className="h-full flex items-center justify-center">
-        <p className="text-gray-400">{error}</p>
+        <p className="text-muted-foreground">{error}</p>
       </div>
     );
   }
 
   if (!diagram) {
-    return <div className="p-6 text-gray-400">Loading shared diagram...</div>;
+    return <div className="p-6 text-muted-foreground">Loading shared diagram...</div>;
   }
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="h-12 bg-gray-900 border-b border-gray-700 flex items-center px-4 shrink-0">
-        <span className="text-white text-sm font-medium">{diagram.name}</span>
-        <span className="ml-3 text-gray-500 text-xs px-2 py-0.5 bg-gray-800 rounded">View Only</span>
+      <div className="h-12 bg-background border-b border-border flex items-center px-4 shrink-0">
+        <span className="text-foreground text-sm font-medium">{diagram.name}</span>
+        <span className="ml-3 text-muted-foreground text-xs px-2 py-0.5 bg-card rounded">View Only</span>
       </div>
       <div className="flex-1 min-h-0">
         <DiagramCanvas

@@ -39,13 +39,13 @@ export default function BriefingWidget() {
   useEffect(() => { fetchBriefing(); }, []);
 
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden h-full flex flex-col">
-      <div className="widget-handle px-5 py-3 border-b border-gray-700 flex items-center justify-between cursor-move">
+    <div className="bg-card border border-border rounded-lg overflow-hidden h-full flex flex-col">
+      <div className="widget-handle px-5 py-3 border-b border-border flex items-center justify-between cursor-move">
         <div className="flex items-center gap-2">
-          <Sparkles size={16} className="text-accent-500" />
-          <h3 className="text-white font-semibold text-sm">AI Daily Briefing</h3>
+          <Sparkles size={16} className="text-primary" />
+          <h3 className="text-foreground font-semibold text-sm">AI Daily Briefing</h3>
         </div>
-        <button onClick={fetchBriefing} disabled={loading} className="text-gray-500 hover:text-white p-1 rounded hover:bg-gray-700 transition-colors">
+        <button onClick={fetchBriefing} disabled={loading} className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-secondary transition-colors">
           {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
         </button>
       </div>
@@ -53,18 +53,18 @@ export default function BriefingWidget() {
       <div className="flex-1 overflow-auto">
         {loading && !data ? (
           <div className="flex items-center justify-center p-6 gap-2">
-            <Loader2 size={16} className="animate-spin text-accent-400" />
-            <p className="text-gray-500 text-sm">Generating briefing...</p>
+            <Loader2 size={16} className="animate-spin text-primary" />
+            <p className="text-muted-foreground text-sm">Generating briefing...</p>
           </div>
         ) : error ? (
           <p className="text-red-400 text-sm p-5">{error}</p>
         ) : data ? (
           <>
             {/* Quick stats */}
-            <div className="flex gap-3 px-5 py-3 border-b border-gray-700/50">
+            <div className="flex gap-3 px-5 py-3 border-b border-border">
               <div className="flex items-center gap-1.5 text-xs">
                 <CheckSquare size={12} className="text-blue-400" />
-                <span className="text-gray-400">{data.stats.activeTasks} tasks</span>
+                <span className="text-muted-foreground">{data.stats.activeTasks} tasks</span>
               </div>
               {data.stats.overdue > 0 && (
                 <div className="flex items-center gap-1.5 text-xs">
@@ -79,8 +79,8 @@ export default function BriefingWidget() {
                 </div>
               )}
               <div className="flex items-center gap-1.5 text-xs">
-                <ClipboardList size={12} className="text-accent-400" />
-                <span className="text-gray-400">{data.stats.whiteboardItems} backlog</span>
+                <ClipboardList size={12} className="text-primary" />
+                <span className="text-muted-foreground">{data.stats.whiteboardItems} backlog</span>
               </div>
             </div>
 

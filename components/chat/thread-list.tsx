@@ -50,12 +50,12 @@ export default function ThreadList({ threads, onNewChat, onDelete, loading }: Th
   }
 
   return (
-    <div className="w-full sm:w-72 border-b sm:border-b-0 sm:border-r border-gray-700 flex flex-col shrink-0 max-h-60 sm:max-h-none sm:h-full">
+    <div className="w-full sm:w-72 border-b sm:border-b-0 sm:border-r border-border flex flex-col shrink-0 max-h-60 sm:max-h-none sm:h-full">
       {/* New Chat button */}
-      <div className="p-3 border-b border-gray-700">
+      <div className="p-3 border-b border-border">
         <button
           onClick={() => setShowPicker(!showPicker)}
-          className="w-full bg-accent-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-accent-700 transition-colors text-sm flex items-center justify-center gap-2"
+          className="w-full bg-primary text-foreground px-4 py-2 rounded-lg font-medium hover:bg-primary transition-colors text-sm flex items-center justify-center gap-2"
         >
           <Plus size={16} />
           New Chat
@@ -64,20 +64,20 @@ export default function ThreadList({ threads, onNewChat, onDelete, loading }: Th
 
       {/* Model picker */}
       {showPicker && (
-        <div className="border-b border-gray-700 bg-gray-900/50">
-          <p className="px-4 py-2 text-gray-500 text-xs font-semibold uppercase tracking-wider">Choose AI</p>
+        <div className="border-b border-border bg-background/50">
+          <p className="px-4 py-2 text-muted-foreground text-xs font-semibold uppercase tracking-wider">Choose AI</p>
           {AI_PROVIDERS.map((provider) => {
             const Icon = provider.icon;
             return (
               <button
                 key={provider.id}
                 onClick={() => { onNewChat(provider.id); setShowPicker(false); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800 transition-colors text-left"
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-card transition-colors text-left"
               >
                 <Icon size={16} className={provider.color} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium">{provider.name}</p>
-                  <p className="text-gray-500 text-xs">{provider.description}</p>
+                  <p className="text-foreground text-sm font-medium">{provider.name}</p>
+                  <p className="text-muted-foreground text-xs">{provider.description}</p>
                 </div>
               </button>
             );
@@ -88,9 +88,9 @@ export default function ThreadList({ threads, onNewChat, onDelete, loading }: Th
       {/* Grouped thread list */}
       <div className="flex-1 overflow-auto">
         {loading ? (
-          <p className="text-gray-500 text-center p-4 text-sm">Loading...</p>
+          <p className="text-muted-foreground text-center p-4 text-sm">Loading...</p>
         ) : threads.length === 0 ? (
-          <p className="text-gray-500 text-center p-4 text-sm">No conversations yet</p>
+          <p className="text-muted-foreground text-center p-4 text-sm">No conversations yet</p>
         ) : (
           AI_PROVIDERS.map((provider) => {
             const providerThreads = threadsByModel[provider.id] ?? [];
@@ -105,14 +105,14 @@ export default function ThreadList({ threads, onNewChat, onDelete, loading }: Th
                 <button
                   onClick={() => toggleExpand(provider.id)}
                   className={cn(
-                    'w-full flex items-center gap-2 px-4 py-2 text-left transition-colors border-b border-gray-800',
+                    'w-full flex items-center gap-2 px-4 py-2 text-left transition-colors border-b border-border',
                     provider.bg
                   )}
                 >
                   <Icon size={14} className={provider.color} />
                   <span className={cn('text-xs font-semibold flex-1', provider.color)}>{provider.name}</span>
-                  <span className="text-gray-500 text-xs">{providerThreads.length}</span>
-                  <ChevronDown size={12} className={cn('text-gray-500 transition-transform', !isExpanded && '-rotate-90')} />
+                  <span className="text-muted-foreground text-xs">{providerThreads.length}</span>
+                  <ChevronDown size={12} className={cn('text-muted-foreground transition-transform', !isExpanded && '-rotate-90')} />
                 </button>
 
                 {/* Threads */}
@@ -122,17 +122,17 @@ export default function ThreadList({ threads, onNewChat, onDelete, loading }: Th
                     <div
                       key={thread.id}
                       className={cn(
-                        'group flex items-center border-b border-gray-800',
-                        isActive ? 'bg-gray-700' : 'hover:bg-gray-800'
+                        'group flex items-center border-b border-border',
+                        isActive ? 'bg-secondary' : 'hover:bg-card'
                       )}
                     >
                       <Link href={`/chat/${thread.id}`} className="flex-1 pl-9 pr-4 py-2.5 min-w-0">
-                        <p className="text-white text-sm truncate">{thread.title}</p>
-                        <p className="text-gray-500 text-xs">{formatRelativeDate(thread.updated_at)}</p>
+                        <p className="text-foreground text-sm truncate">{thread.title}</p>
+                        <p className="text-muted-foreground text-xs">{formatRelativeDate(thread.updated_at)}</p>
                       </Link>
                       <button
                         onClick={(e) => handleDelete(e, thread.id)}
-                        className="opacity-0 group-hover:opacity-100 px-3 text-gray-500 hover:text-red-400 transition-opacity"
+                        className="opacity-0 group-hover:opacity-100 px-3 text-muted-foreground hover:text-red-400 transition-opacity"
                       >
                         <Trash2 size={13} />
                       </button>

@@ -23,25 +23,25 @@ function modelColor(model: string): string {
   if (model.includes('haiku')) return 'bg-green-500';
   if (model.includes('sonnet')) return 'bg-blue-500';
   if (model.includes('opus')) return 'bg-purple-500';
-  return 'bg-gray-500';
+  return 'bg-muted-foreground';
 }
 
 function modelColorText(model: string): string {
   if (model.includes('haiku')) return 'text-green-400';
   if (model.includes('sonnet')) return 'text-blue-400';
   if (model.includes('opus')) return 'text-purple-400';
-  return 'text-gray-400';
+  return 'text-muted-foreground';
 }
 
 function StatusCard({ name, icon: Icon, status, detail }: { name: string; icon: typeof Zap; status: string; detail: string }) {
   const ok = status === 'connected';
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 flex items-center gap-3">
+    <div className="bg-card border border-border rounded-lg p-3 flex items-center gap-3">
       <span className={`w-2 h-2 rounded-full shrink-0 ${ok ? 'bg-green-400' : status === 'loading' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'}`} />
-      <Icon size={14} className="text-gray-500 shrink-0" />
+      <Icon size={14} className="text-muted-foreground shrink-0" />
       <div className="min-w-0">
-        <p className="text-white text-xs font-medium truncate">{name}</p>
-        <p className="text-gray-500 text-xs truncate">{detail}</p>
+        <p className="text-foreground text-xs font-medium truncate">{name}</p>
+        <p className="text-muted-foreground text-xs truncate">{detail}</p>
       </div>
     </div>
   );
@@ -88,8 +88,8 @@ export default function CreditsPage() {
   return (
     <div className="p-6 space-y-6 max-w-6xl">
       <div>
-        <h2 className="text-2xl font-bold text-white">AI Credits & Usage</h2>
-        <p className="text-gray-500 text-sm mt-1">Full stack metrics across all services</p>
+        <h2 className="text-2xl font-bold text-foreground">AI Credits & Usage</h2>
+        <p className="text-muted-foreground text-sm mt-1">Full stack metrics across all services</p>
       </div>
 
       {/* ── Service Status ── */}
@@ -103,26 +103,26 @@ export default function CreditsPage() {
 
       {/* ── AI Usage ── */}
       <div>
-        <h3 className="text-white font-semibold mb-3">AI Usage (Anthropic via Helicone)</h3>
+        <h3 className="text-foreground font-semibold mb-3">AI Usage (Anthropic via Helicone)</h3>
         <div className="flex gap-2 mb-4">
           {PERIOD_TABS.map((tab) => (
-            <button key={tab} onClick={() => setActivePeriod(tab)} className={cn('px-4 py-2 rounded-full text-sm font-medium border transition-colors', activePeriod === tab ? 'bg-white text-gray-900 border-white' : 'text-gray-400 border-gray-600 hover:border-gray-400')}>
+            <button key={tab} onClick={() => setActivePeriod(tab)} className={cn('px-4 py-2 rounded-full text-sm font-medium border transition-colors', activePeriod === tab ? 'bg-white text-background border-white' : 'text-muted-foreground border-border hover:border-white/15')}>
               {tab}
             </button>
           ))}
         </div>
 
         {loading ? (
-          <p className="text-gray-500 text-sm">Loading AI metrics...</p>
+          <p className="text-muted-foreground text-sm">Loading AI metrics...</p>
         ) : !hasPeriodData ? (
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 text-center space-y-3">
-            <Zap size={24} className="mx-auto text-gray-600 mb-2" />
-            <p className="text-gray-400 text-sm">AI usage data not available via API.</p>
-            <p className="text-gray-600 text-xs">Helicone free tier may not support API queries. View your usage directly:</p>
+          <div className="bg-card border border-border rounded-lg p-6 text-center space-y-3">
+            <Zap size={24} className="mx-auto text-muted-foreground/60 mb-2" />
+            <p className="text-muted-foreground text-sm">AI usage data not available via API.</p>
+            <p className="text-muted-foreground/60 text-xs">Helicone free tier may not support API queries. View your usage directly:</p>
             <a
               href="https://us.helicone.ai/requests"
               target="_blank"
-              className="inline-flex items-center gap-2 bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
+              className="inline-flex items-center gap-2 bg-primary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary transition-colors"
             >
               Open Helicone Dashboard
             </a>
@@ -131,52 +131,52 @@ export default function CreditsPage() {
           <div className="space-y-6">
             {/* Summary */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2"><DollarSign size={14} className="text-accent-500" /><p className="text-gray-400 text-xs">Spend</p></div>
-                <p className="text-white text-2xl font-bold">{formatCost(p!.totalCost)}</p>
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2"><DollarSign size={14} className="text-primary" /><p className="text-muted-foreground text-xs">Spend</p></div>
+                <p className="text-foreground text-2xl font-bold">{formatCost(p!.totalCost)}</p>
               </div>
-              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2"><Zap size={14} className="text-yellow-500" /><p className="text-gray-400 text-xs">Requests</p></div>
-                <p className="text-white text-2xl font-bold">{(p!.totalRequests).toLocaleString()}</p>
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2"><Zap size={14} className="text-yellow-500" /><p className="text-muted-foreground text-xs">Requests</p></div>
+                <p className="text-foreground text-2xl font-bold">{(p!.totalRequests).toLocaleString()}</p>
               </div>
-              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2"><BarChart3 size={14} className="text-blue-500" /><p className="text-gray-400 text-xs">Tokens</p></div>
-                <p className="text-white text-2xl font-bold">{formatTokens(p!.totalTokens)}</p>
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2"><BarChart3 size={14} className="text-blue-500" /><p className="text-muted-foreground text-xs">Tokens</p></div>
+                <p className="text-foreground text-2xl font-bold">{formatTokens(p!.totalTokens)}</p>
               </div>
-              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2"><DollarSign size={14} className="text-gray-500" /><p className="text-gray-400 text-xs">Avg/Req</p></div>
-                <p className="text-white text-2xl font-bold">{formatCost(p!.avgCostPerRequest)}</p>
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2"><DollarSign size={14} className="text-muted-foreground" /><p className="text-muted-foreground text-xs">Avg/Req</p></div>
+                <p className="text-foreground text-2xl font-bold">{formatCost(p!.avgCostPerRequest)}</p>
               </div>
-              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2"><Clock size={14} className="text-cyan-500" /><p className="text-gray-400 text-xs">Latency</p></div>
-                <p className="text-white text-2xl font-bold">{(p!.avgLatency) < 1000 ? `${p!.avgLatency}ms` : `${((p!.avgLatency) / 1000).toFixed(1)}s`}</p>
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2"><Clock size={14} className="text-cyan-500" /><p className="text-muted-foreground text-xs">Latency</p></div>
+                <p className="text-foreground text-2xl font-bold">{(p!.avgLatency) < 1000 ? `${p!.avgLatency}ms` : `${((p!.avgLatency) / 1000).toFixed(1)}s`}</p>
               </div>
-              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">{(p!.errorCount) > 0 ? <AlertTriangle size={14} className="text-red-500" /> : <CheckCircle size={14} className="text-green-500" />}<p className="text-gray-400 text-xs">Success</p></div>
-                <p className="text-white text-2xl font-bold">{p!.successRate}%</p>
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">{(p!.errorCount) > 0 ? <AlertTriangle size={14} className="text-red-500" /> : <CheckCircle size={14} className="text-green-500" />}<p className="text-muted-foreground text-xs">Success</p></div>
+                <p className="text-foreground text-2xl font-bold">{p!.successRate}%</p>
               </div>
             </div>
 
             {/* Model Table */}
             {p!.models && Object.keys(p!.models).length > 0 && (
-              <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-                <div className="px-5 py-3 border-b border-gray-700"><h4 className="text-white font-semibold text-sm">Cost by Model</h4></div>
+              <div className="bg-card border border-border rounded-lg overflow-hidden">
+                <div className="px-5 py-3 border-b border-border"><h4 className="text-foreground font-semibold text-sm">Cost by Model</h4></div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead><tr className="border-b border-gray-700">
+                    <thead><tr className="border-b border-border">
                       {['Model', 'Requests', 'Input', 'Output', 'Latency', 'Cost'].map((h, i) => (
-                        <th key={h} className={`text-gray-400 text-xs font-semibold uppercase tracking-wider px-5 py-3 ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
+                        <th key={h} className={`text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
                       ))}
                     </tr></thead>
-                    <tbody className="divide-y divide-gray-700">
+                    <tbody className="divide-y divide-border">
                       {Object.entries(p!.models).sort(([, a], [, b]) => b.cost - a.cost).map(([model, s]) => (
-                        <tr key={model} className="hover:bg-gray-700/30">
+                        <tr key={model} className="hover:bg-secondary/30">
                           <td className="px-5 py-3"><div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${modelColor(model)}`} /><span className={`text-sm font-mono ${modelColorText(model)}`}>{model}</span></div></td>
-                          <td className="px-5 py-3 text-right text-white text-sm">{s.requests.toLocaleString()}</td>
-                          <td className="px-5 py-3 text-right text-gray-400 text-sm">{formatTokens(s.inputTokens)}</td>
-                          <td className="px-5 py-3 text-right text-gray-400 text-sm">{formatTokens(s.outputTokens)}</td>
-                          <td className="px-5 py-3 text-right text-gray-400 text-sm">{s.avgLatency < 1000 ? `${s.avgLatency}ms` : `${(s.avgLatency / 1000).toFixed(1)}s`}</td>
-                          <td className="px-5 py-3 text-right text-white text-sm font-medium">{formatCost(s.cost)}</td>
+                          <td className="px-5 py-3 text-right text-foreground text-sm">{s.requests.toLocaleString()}</td>
+                          <td className="px-5 py-3 text-right text-muted-foreground text-sm">{formatTokens(s.inputTokens)}</td>
+                          <td className="px-5 py-3 text-right text-muted-foreground text-sm">{formatTokens(s.outputTokens)}</td>
+                          <td className="px-5 py-3 text-right text-muted-foreground text-sm">{s.avgLatency < 1000 ? `${s.avgLatency}ms` : `${(s.avgLatency / 1000).toFixed(1)}s`}</td>
+                          <td className="px-5 py-3 text-right text-foreground text-sm font-medium">{formatCost(s.cost)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -190,93 +190,93 @@ export default function CreditsPage() {
 
       {/* ── Infrastructure ── */}
       <div>
-        <h3 className="text-white font-semibold mb-3">Infrastructure</h3>
+        <h3 className="text-foreground font-semibold mb-3">Infrastructure</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Vercel */}
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-5">
+          <div className="bg-card border border-border rounded-lg p-5">
             <div className="flex items-center gap-2 mb-3">
-              <Server size={16} className="text-gray-400" />
-              <h4 className="text-white font-semibold text-sm">Vercel</h4>
-              <span className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 ml-auto">{vercel?.plan || 'Free'}</span>
+              <Server size={16} className="text-muted-foreground" />
+              <h4 className="text-foreground font-semibold text-sm">Vercel</h4>
+              <span className="text-xs px-2 py-0.5 rounded bg-secondary text-muted-foreground ml-auto">{vercel?.plan || 'Free'}</span>
             </div>
             {vercel?.totalDeployments !== undefined ? (
               <div className="space-y-2">
-                <div className="flex justify-between"><span className="text-gray-400 text-xs">Deployments</span><span className="text-white text-sm">{vercel.totalDeployments}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400 text-xs">Successful</span><span className="text-green-400 text-sm">{vercel.successfulDeployments}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400 text-xs">Failed</span><span className={`text-sm ${Number(vercel.failedDeployments) > 0 ? 'text-red-400' : 'text-gray-400'}`}>{vercel.failedDeployments}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400 text-xs">Success Rate</span><span className="text-white text-sm">{vercel.successRate}%</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground text-xs">Deployments</span><span className="text-foreground text-sm">{vercel.totalDeployments}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground text-xs">Successful</span><span className="text-green-400 text-sm">{vercel.successfulDeployments}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground text-xs">Failed</span><span className={`text-sm ${Number(vercel.failedDeployments) > 0 ? 'text-red-400' : 'text-muted-foreground'}`}>{vercel.failedDeployments}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground text-xs">Success Rate</span><span className="text-foreground text-sm">{vercel.successRate}%</span></div>
               </div>
-            ) : <p className="text-gray-500 text-sm">{vercel?.status === 'error' ? 'Could not connect' : 'Loading...'}</p>}
+            ) : <p className="text-muted-foreground text-sm">{vercel?.status === 'error' ? 'Could not connect' : 'Loading...'}</p>}
           </div>
 
           {/* Supabase */}
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-5">
+          <div className="bg-card border border-border rounded-lg p-5">
             <div className="flex items-center gap-2 mb-3">
-              <Database size={16} className="text-gray-400" />
-              <h4 className="text-white font-semibold text-sm">Supabase</h4>
-              <span className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 ml-auto">{supabase?.plan || 'Free'}</span>
+              <Database size={16} className="text-muted-foreground" />
+              <h4 className="text-foreground font-semibold text-sm">Supabase</h4>
+              <span className="text-xs px-2 py-0.5 rounded bg-secondary text-muted-foreground ml-auto">{supabase?.plan || 'Free'}</span>
             </div>
             {supabase?.tableBreakdown ? (
               <div className="space-y-1.5">
                 {supabase.dbSize && (
                   <div className="mb-3 space-y-1.5">
                     <div className="flex justify-between">
-                      <span className="text-gray-400 text-xs">Database Size</span>
-                      <span className="text-white text-xs">{supabase.dbSize} / {supabase.dbSizeLimit}</span>
+                      <span className="text-muted-foreground text-xs">Database Size</span>
+                      <span className="text-foreground text-xs">{supabase.dbSize} / {supabase.dbSizeLimit}</span>
                     </div>
-                    <div className="w-full bg-gray-900 rounded-full h-2">
+                    <div className="w-full bg-background rounded-full h-2">
                       <div className="h-full bg-blue-500/60 rounded-full" style={{ width: `${Math.min(((supabase.dbSizeBytes ?? 0) / (500 * 1024 * 1024)) * 100, 100)}%` }} />
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-400 text-xs">File Storage</span>
-                      <span className="text-white text-xs">{supabase.storageFiles ?? 0} files ({(supabase.storageBytes ?? 0) > 1024 * 1024 ? `${((supabase.storageBytes ?? 0) / 1024 / 1024).toFixed(1)} MB` : `${((supabase.storageBytes ?? 0) / 1024).toFixed(0)} KB`}) / {supabase.storageLimit}</span>
+                      <span className="text-muted-foreground text-xs">File Storage</span>
+                      <span className="text-foreground text-xs">{supabase.storageFiles ?? 0} files ({(supabase.storageBytes ?? 0) > 1024 * 1024 ? `${((supabase.storageBytes ?? 0) / 1024 / 1024).toFixed(1)} MB` : `${((supabase.storageBytes ?? 0) / 1024).toFixed(0)} KB`}) / {supabase.storageLimit}</span>
                     </div>
-                    <div className="w-full bg-gray-900 rounded-full h-2">
+                    <div className="w-full bg-background rounded-full h-2">
                       <div className="h-full bg-green-500/60 rounded-full" style={{ width: `${Math.min(((supabase.storageBytes ?? 0) / (1024 * 1024 * 1024)) * 100, 100)}%` }} />
                     </div>
-                    <div className="border-b border-gray-700 my-2" />
+                    <div className="border-b border-border my-2" />
                   </div>
                 )}
                 {supabase.tableBreakdown.map((t) => (
                   <div key={t.table} className="flex justify-between">
-                    <span className="text-gray-400 text-xs font-mono">{t.table}</span>
-                    <span className="text-white text-xs">{Number(t.rows).toLocaleString()} rows</span>
+                    <span className="text-muted-foreground text-xs font-mono">{t.table}</span>
+                    <span className="text-foreground text-xs">{Number(t.rows).toLocaleString()} rows</span>
                   </div>
                 ))}
-                <div className="flex justify-between border-t border-gray-700 pt-1.5 mt-1.5">
-                  <span className="text-gray-300 text-xs font-semibold">Total</span>
-                  <span className="text-white text-xs font-semibold">{(supabase?.totalRows ?? 0).toLocaleString()} rows</span>
+                <div className="flex justify-between border-t border-border pt-1.5 mt-1.5">
+                  <span className="text-foreground text-xs font-semibold">Total</span>
+                  <span className="text-foreground text-xs font-semibold">{(supabase?.totalRows ?? 0).toLocaleString()} rows</span>
                 </div>
               </div>
-            ) : <p className="text-gray-500 text-sm">{supabase?.status === 'error' ? 'Could not connect' : 'Loading...'}</p>}
+            ) : <p className="text-muted-foreground text-sm">{supabase?.status === 'error' ? 'Could not connect' : 'Loading...'}</p>}
           </div>
 
           {/* GitHub */}
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-5">
+          <div className="bg-card border border-border rounded-lg p-5">
             <div className="flex items-center gap-2 mb-3">
-              <GitBranch size={16} className="text-gray-400" />
-              <h4 className="text-white font-semibold text-sm">GitHub</h4>
+              <GitBranch size={16} className="text-muted-foreground" />
+              <h4 className="text-foreground font-semibold text-sm">GitHub</h4>
             </div>
             {github?.repo ? (
               <div className="space-y-2">
-                <div className="flex justify-between"><span className="text-gray-400 text-xs">Repository</span><span className="text-white text-sm">{github.repo}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400 text-xs">Commits</span><span className="text-white text-sm">{github.commits}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400 text-xs">Size</span><span className="text-white text-sm">{github.size ? `${(Number(github.size) / 1024).toFixed(1)} MB` : '...'}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400 text-xs">Branch</span><span className="text-white text-sm">{github.defaultBranch}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground text-xs">Repository</span><span className="text-foreground text-sm">{github.repo}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground text-xs">Commits</span><span className="text-foreground text-sm">{github.commits}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground text-xs">Size</span><span className="text-foreground text-sm">{github.size ? `${(Number(github.size) / 1024).toFixed(1)} MB` : '...'}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground text-xs">Branch</span><span className="text-foreground text-sm">{github.defaultBranch}</span></div>
               </div>
-            ) : <p className="text-gray-500 text-sm">{github?.status === 'error' ? 'Could not connect' : 'Loading...'}</p>}
+            ) : <p className="text-muted-foreground text-sm">{github?.status === 'error' ? 'Could not connect' : 'Loading...'}</p>}
           </div>
 
           {/* Clerk */}
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-5">
+          <div className="bg-card border border-border rounded-lg p-5">
             <div className="flex items-center gap-2 mb-3">
-              <Users size={16} className="text-gray-400" />
-              <h4 className="text-white font-semibold text-sm">Clerk</h4>
-              <span className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 ml-auto">{clerk?.plan || 'Free'}</span>
+              <Users size={16} className="text-muted-foreground" />
+              <h4 className="text-foreground font-semibold text-sm">Clerk</h4>
+              <span className="text-xs px-2 py-0.5 rounded bg-secondary text-muted-foreground ml-auto">{clerk?.plan || 'Free'}</span>
             </div>
             <div className="space-y-2">
-              <div className="flex justify-between"><span className="text-gray-400 text-xs">Total Users</span><span className="text-white text-sm">{clerk?.totalUsers ?? '...'}</span></div>
-              <div className="flex justify-between"><span className="text-gray-400 text-xs">Status</span><span className="text-green-400 text-sm">Active</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground text-xs">Total Users</span><span className="text-foreground text-sm">{clerk?.totalUsers ?? '...'}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground text-xs">Status</span><span className="text-green-400 text-sm">Active</span></div>
             </div>
           </div>
         </div>

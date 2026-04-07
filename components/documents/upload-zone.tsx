@@ -61,20 +61,20 @@ export default function UploadZone({ onUpload, comment, folderId }: UploadZonePr
         {...getRootProps()}
         className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
           isDragActive
-            ? 'border-accent-500 bg-accent-600/10'
-            : 'border-gray-600 hover:border-gray-500'
+            ? 'border-primary bg-primary/10'
+            : 'border-border hover:border-white/15'
         }`}
       >
         <input {...getInputProps()} />
         {uploading ? (
-          <p className="text-gray-400">Uploading...</p>
+          <p className="text-muted-foreground">Uploading...</p>
         ) : isDragActive ? (
-          <p className="text-accent-400">Drop files here</p>
+          <p className="text-primary">Drop files here</p>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <Upload size={20} className="text-gray-500" />
-            <p className="text-gray-300 text-sm">Drop files here or click to browse</p>
-            <p className="text-gray-500 text-xs">PDF, Word, Excel, images — any format</p>
+            <Upload size={20} className="text-muted-foreground" />
+            <p className="text-foreground text-sm">Drop files here or click to browse</p>
+            <p className="text-muted-foreground text-xs">PDF, Word, Excel, images — any format</p>
           </div>
         )}
       </div>

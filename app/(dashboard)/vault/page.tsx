@@ -177,15 +177,15 @@ export default function VaultPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">Vault</h2>
-          <p className="text-gray-500 text-sm mt-1">Securely store passwords, keys, cards, and secrets</p>
+          <h2 className="text-2xl font-bold text-foreground">Vault</h2>
+          <p className="text-muted-foreground text-sm mt-1">Securely store passwords, keys, cards, and secrets</p>
         </div>
         <div className="flex gap-2">
           <input ref={scanInputRef} type="file" accept="image/*" capture="environment" onChange={handleScan} className="hidden" />
           <button
             onClick={() => scanInputRef.current?.click()}
             disabled={scanning}
-            className="text-gray-400 hover:text-accent-400 px-3 py-2 rounded-lg text-sm border border-gray-700 hover:border-accent-600/50 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            className="text-muted-foreground hover:text-primary px-3 py-2 rounded-lg text-sm border border-border hover:border-primary/50 transition-colors flex items-center gap-1.5 disabled:opacity-50"
             title="Scan photo to auto-fill"
           >
             {scanning ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
@@ -193,7 +193,7 @@ export default function VaultPage() {
           </button>
           <button
             onClick={() => setShowAdd(!showAdd)}
-            className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
+            className="bg-primary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary transition-colors"
           >
             {showAdd ? 'Cancel' : '+ Add Entry'}
           </button>
@@ -202,12 +202,12 @@ export default function VaultPage() {
 
       {/* Search */}
       <div className="relative">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search entries..."
-          className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent-600 placeholder-gray-500"
+          className="w-full bg-card text-foreground border border-border rounded-lg pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
         />
       </div>
 
@@ -218,8 +218,8 @@ export default function VaultPage() {
           className={cn(
             'px-4 py-2 rounded-full text-sm font-medium border transition-colors',
             activeCategory === 'All'
-              ? 'bg-white text-gray-900 border-white'
-              : 'text-gray-400 border-gray-600 hover:border-gray-400'
+              ? 'bg-white text-background border-white'
+              : 'text-muted-foreground border-border hover:border-white/15'
           )}
         >
           All ({entries.length})
@@ -235,8 +235,8 @@ export default function VaultPage() {
               className={cn(
                 'px-3 py-2 rounded-full text-sm font-medium border transition-colors flex items-center gap-1.5',
                 activeCategory === cat.key
-                  ? 'bg-white text-gray-900 border-white'
-                  : 'text-gray-400 border-gray-600 hover:border-gray-400'
+                  ? 'bg-white text-background border-white'
+                  : 'text-muted-foreground border-border hover:border-white/15'
               )}
             >
               <Icon size={14} />
@@ -248,23 +248,23 @@ export default function VaultPage() {
 
       {/* Add form */}
       {showAdd && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-5 space-y-4">
+        <div className="bg-card border border-border rounded-lg p-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-gray-300 text-sm block mb-1">Name</label>
+              <label className="text-foreground text-sm block mb-1">Name</label>
               <input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Entry name"
-                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-600"
+                className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             <div>
-              <label className="text-gray-300 text-sm block mb-1">Category</label>
+              <label className="text-foreground text-sm block mb-1">Category</label>
               <select
                 value={addCategory}
                 onChange={(e) => { setAddCategory(e.target.value); setNewFields({}); }}
-                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 text-sm"
+                className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2 text-sm"
               >
                 {categories.map((c) => (
                   <option key={c.key} value={c.key}>{c.label}</option>
@@ -275,17 +275,17 @@ export default function VaultPage() {
 
           {/* Dynamic fields */}
           {selectedCatDef && (
-            <div className="space-y-3 border-t border-gray-700 pt-4">
+            <div className="space-y-3 border-t border-border pt-4">
               {selectedCatDef.fields.map((field) => (
                 <div key={field.key}>
-                  <label className="text-gray-300 text-sm block mb-1">{field.label}</label>
+                  <label className="text-foreground text-sm block mb-1">{field.label}</label>
                   {field.type === 'textarea' ? (
                     <textarea
                       value={newFields[field.key] || ''}
                       onChange={(e) => setNewFields({ ...newFields, [field.key]: e.target.value })}
                       rows={3}
                       placeholder={field.placeholder}
-                      className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600 resize-none"
+                      className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
                     />
                   ) : (
                     <input
@@ -293,7 +293,7 @@ export default function VaultPage() {
                       value={newFields[field.key] || ''}
                       onChange={(e) => setNewFields({ ...newFields, [field.key]: e.target.value })}
                       placeholder={field.placeholder}
-                      className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600 font-mono"
+                      className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring font-mono"
                     />
                   )}
                 </div>
@@ -304,7 +304,7 @@ export default function VaultPage() {
           <button
             onClick={addEntry}
             disabled={!newName.trim()}
-            className="bg-accent-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-accent-700 transition-colors disabled:opacity-50"
+            className="bg-primary text-foreground px-6 py-2 rounded-lg font-medium hover:bg-primary transition-colors disabled:opacity-50"
           >
             Save Entry
           </button>
@@ -313,8 +313,8 @@ export default function VaultPage() {
 
       {/* Entries */}
       {Object.keys(grouped).length === 0 ? (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
-          <p className="text-gray-500">
+        <div className="bg-card border border-border rounded-lg p-8 text-center">
+          <p className="text-muted-foreground">
             {search || activeCategory !== 'All' ? 'No entries match your filter.' : 'No entries yet. Click "+ Add Entry" to get started.'}
           </p>
         </div>
@@ -323,8 +323,8 @@ export default function VaultPage() {
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([categoryLabel, catEntries]) => (
             <div key={categoryLabel} className="space-y-2">
-              <h3 className="text-gray-500 text-xs font-semibold uppercase tracking-widest">{categoryLabel}</h3>
-              <div className="bg-gray-800 border border-gray-700 rounded-lg divide-y divide-gray-700">
+              <h3 className="text-muted-foreground text-xs font-semibold uppercase tracking-widest">{categoryLabel}</h3>
+              <div className="bg-card border border-border rounded-lg divide-y divide-border">
                 {catEntries.map((entry) => {
                   const Icon = CATEGORY_ICONS[entry.category] || Key;
                   const catDef = categories.find((c) => c.key === entry.category);
@@ -334,26 +334,26 @@ export default function VaultPage() {
                     <div key={entry.id} className="px-5 py-4">
                       <div className="flex items-start justify-between">
                         <div className="flex items-start gap-3 min-w-0 flex-1">
-                          <Icon size={18} className="text-gray-500 mt-0.5 shrink-0" />
+                          <Icon size={18} className="text-muted-foreground mt-0.5 shrink-0" />
                           <div className="min-w-0 flex-1">
-                            <p className="text-white font-medium text-sm">{entry.name}</p>
-                            <p className="text-gray-500 text-xs mt-0.5">{entry.masked_value}</p>
+                            <p className="text-foreground font-medium text-sm">{entry.name}</p>
+                            <p className="text-muted-foreground text-xs mt-0.5">{entry.masked_value}</p>
 
                             {/* Revealed fields */}
                             {isRevealed && catDef && (
-                              <div className="mt-3 space-y-2 bg-gray-900 rounded-lg p-3">
+                              <div className="mt-3 space-y-2 bg-background rounded-lg p-3">
                                 {catDef.fields.map((field) => {
                                   const val = revealedFields[field.key];
                                   if (!val) return null;
                                   return (
                                     <div key={field.key} className="flex items-center justify-between">
                                       <div>
-                                        <p className="text-gray-500 text-xs">{field.label}</p>
-                                        <p className="text-white text-sm font-mono">{val}</p>
+                                        <p className="text-muted-foreground text-xs">{field.label}</p>
+                                        <p className="text-foreground text-sm font-mono">{val}</p>
                                       </div>
                                       <button
                                         onClick={() => copyField(val, `${entry.id}-${field.key}`)}
-                                        className="text-gray-500 hover:text-white transition-colors"
+                                        className="text-muted-foreground hover:text-foreground transition-colors"
                                         title="Copy"
                                       >
                                         {copied === `${entry.id}-${field.key}` ? (
@@ -373,21 +373,21 @@ export default function VaultPage() {
                         <div className="flex items-center gap-1 ml-3 shrink-0">
                           <button
                             onClick={() => revealEntry(entry.id)}
-                            className="text-gray-500 hover:text-white p-1.5 rounded hover:bg-gray-700 transition-colors"
+                            className="text-muted-foreground hover:text-foreground p-1.5 rounded hover:bg-secondary transition-colors"
                             title={isRevealed ? 'Hide' : 'Reveal'}
                           >
                             {isRevealed ? <EyeOff size={15} /> : <Eye size={15} />}
                           </button>
                           <button
                             onClick={() => deleteEntry(entry.id)}
-                            className="text-gray-500 hover:text-red-400 p-1.5 rounded hover:bg-gray-700 transition-colors"
+                            className="text-muted-foreground hover:text-red-400 p-1.5 rounded hover:bg-secondary transition-colors"
                             title="Delete"
                           >
                             <Trash2 size={15} />
                           </button>
                         </div>
                       </div>
-                      <p className="text-gray-600 text-xs mt-2">{formatRelativeDate(entry.created_at)}</p>
+                      <p className="text-muted-foreground/60 text-xs mt-2">{formatRelativeDate(entry.created_at)}</p>
                     </div>
                   );
                 })}

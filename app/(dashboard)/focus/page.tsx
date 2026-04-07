@@ -79,7 +79,7 @@ export default function FocusPage() {
             onClick={() => selectPreset(p)}
             className={cn(
               'px-4 py-2 rounded-lg text-sm font-medium border transition-colors',
-              workDuration === p.work ? 'bg-accent-600/15 border-accent-600/50 text-accent-400' : 'border-gray-700 text-gray-400 hover:border-gray-600'
+              workDuration === p.work ? 'bg-primary/15 border-primary/50 text-primary' : 'border-border text-muted-foreground hover:border-border'
             )}
           >
             {p.name}
@@ -102,8 +102,8 @@ export default function FocusPage() {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <p className="text-white text-5xl font-bold font-mono">{formatTime(timeLeft)}</p>
-          <p className="text-gray-500 text-sm mt-2">
+          <p className="text-foreground text-5xl font-bold font-mono">{formatTime(timeLeft)}</p>
+          <p className="text-muted-foreground text-sm mt-2">
             {isBreak ? 'Break time' : isRunning ? 'Focus' : 'Ready'}
           </p>
           {isBreak && <Coffee size={16} className="text-green-400 mt-1" />}
@@ -115,14 +115,14 @@ export default function FocusPage() {
         value={task}
         onChange={(e) => setTask(e.target.value)}
         placeholder="What are you working on?"
-        className="bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-center w-64 focus:outline-none focus:ring-2 focus:ring-accent-600 placeholder-gray-500"
+        className="bg-card text-foreground border border-border rounded-lg px-4 py-2.5 text-sm text-center w-64 focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
       />
 
       {/* Controls */}
       <div className="flex items-center gap-4">
         <button
           onClick={reset}
-          className="p-3 rounded-full bg-gray-800 text-gray-400 hover:text-white border border-gray-700 transition-colors"
+          className="p-3 rounded-full bg-card text-muted-foreground hover:text-foreground border border-border transition-colors"
           title="Reset"
         >
           <RotateCcw size={20} />
@@ -130,13 +130,13 @@ export default function FocusPage() {
         <button
           onClick={() => setIsRunning(!isRunning)}
           className={cn(
-            'p-5 rounded-full text-white transition-colors',
-            isRunning ? 'bg-gray-700 hover:bg-gray-600' : 'bg-accent-600 hover:bg-accent-700'
+            'p-5 rounded-full text-foreground transition-colors',
+            isRunning ? 'bg-secondary hover:bg-secondary' : 'bg-primary hover:bg-primary'
           )}
         >
           {isRunning ? <Pause size={28} /> : <Play size={28} className="ml-1" />}
         </button>
-        <div className="p-3 rounded-full bg-gray-800 text-gray-400 border border-gray-700 flex items-center gap-1.5">
+        <div className="p-3 rounded-full bg-card text-muted-foreground border border-border flex items-center gap-1.5">
           <Timer size={16} />
           <span className="text-sm font-medium">{sessions}</span>
         </div>
@@ -145,16 +145,16 @@ export default function FocusPage() {
       {/* Session log */}
       {sessionLog.length > 0 && (
         <div className="w-full max-w-md">
-          <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">Today&apos;s Sessions</p>
+          <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">Today&apos;s Sessions</p>
           <div className="space-y-1">
             {sessionLog.map((s, i) => (
-              <div key={i} className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-2">
-                <span className="text-white text-sm">{s.task}</span>
-                <span className="text-gray-500 text-xs">{s.duration}min</span>
+              <div key={i} className="flex items-center justify-between bg-card rounded-lg px-4 py-2">
+                <span className="text-foreground text-sm">{s.task}</span>
+                <span className="text-muted-foreground text-xs">{s.duration}min</span>
               </div>
             ))}
           </div>
-          <p className="text-gray-600 text-xs mt-2 text-center">
+          <p className="text-muted-foreground/60 text-xs mt-2 text-center">
             Total: {sessionLog.reduce((sum, s) => sum + s.duration, 0)} minutes focused
           </p>
         </div>

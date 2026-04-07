@@ -26,33 +26,33 @@ export default function HealthWidget() {
   useEffect(() => { fetchHealth(); }, []);
 
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden h-full flex flex-col">
-      <div className="widget-handle px-5 py-3 border-b border-gray-700 flex items-center justify-between cursor-move">
+    <div className="bg-card border border-border rounded-lg overflow-hidden h-full flex flex-col">
+      <div className="widget-handle px-5 py-3 border-b border-border flex items-center justify-between cursor-move">
         <div className="flex items-center gap-2">
           <Activity size={16} className={health?.status === 'healthy' ? 'text-green-400' : 'text-yellow-400'} />
-          <h3 className="text-white font-semibold text-sm">System Health</h3>
+          <h3 className="text-foreground font-semibold text-sm">System Health</h3>
         </div>
-        <button onClick={fetchHealth} disabled={loading} className="text-gray-500 hover:text-white p-1 rounded hover:bg-gray-700 transition-colors">
+        <button onClick={fetchHealth} disabled={loading} className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-secondary transition-colors">
           {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
         </button>
       </div>
       <div className="flex-1 overflow-auto p-3">
         {!health ? (
-          <p className="text-gray-500 text-sm">Checking...</p>
+          <p className="text-muted-foreground text-sm">Checking...</p>
         ) : (
           <div className="space-y-1.5">
             {Object.entries(health.services).map(([name, svc]) => (
               <div key={name} className="flex items-center justify-between py-1">
                 <div className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${svc.status === 'ok' ? 'bg-green-400' : svc.status === 'not_configured' ? 'bg-gray-500' : 'bg-red-400'}`} />
-                  <span className="text-white text-xs capitalize">{name}</span>
+                  <span className={`w-2 h-2 rounded-full ${svc.status === 'ok' ? 'bg-green-400' : svc.status === 'not_configured' ? 'bg-muted-foreground' : 'bg-red-400'}`} />
+                  <span className="text-foreground text-xs capitalize">{name}</span>
                 </div>
-                <span className="text-gray-500 text-xs">{svc.latency}ms</span>
+                <span className="text-muted-foreground text-xs">{svc.latency}ms</span>
               </div>
             ))}
-            <div className="border-t border-gray-700 pt-1.5 mt-1.5 flex justify-between">
-              <span className="text-gray-400 text-xs">{health.status === 'healthy' ? 'All systems go' : 'Issues detected'}</span>
-              <span className="text-gray-500 text-xs">{health.totalLatency}ms total</span>
+            <div className="border-t border-border pt-1.5 mt-1.5 flex justify-between">
+              <span className="text-muted-foreground text-xs">{health.status === 'healthy' ? 'All systems go' : 'Issues detected'}</span>
+              <span className="text-muted-foreground text-xs">{health.totalLatency}ms total</span>
             </div>
           </div>
         )}

@@ -177,7 +177,7 @@ export default function DiagramViewPage({ params }: { params: Promise<{ id: stri
     }
   }, [id]);
 
-  if (!diagram) return <div className="p-6 text-gray-400">Loading diagram...</div>;
+  if (!diagram) return <div className="p-6 text-muted-foreground">Loading diagram...</div>;
 
   return (
     <div className="h-full flex flex-col min-h-0">

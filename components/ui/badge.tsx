@@ -6,8 +6,8 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: 'border-gray-700 bg-gray-800 text-gray-300',
-        accent: 'border-accent-600/30 bg-accent-600/15 text-accent-400',
+        default: 'border-border bg-card text-foreground',
+        accent: 'border-primary/30 bg-primary/15 text-primary',
         success: 'border-green-600/30 bg-green-600/15 text-green-400',
         warning: 'border-yellow-600/30 bg-yellow-600/15 text-yellow-400',
         destructive: 'border-red-600/30 bg-red-600/15 text-red-400',

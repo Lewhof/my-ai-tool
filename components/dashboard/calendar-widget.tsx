@@ -58,24 +58,24 @@ export default function CalendarWidget() {
 
   if (connected === null) {
     return (
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-5 h-full">
-        <p className="text-gray-500 text-sm">Loading calendar...</p>
+      <div className="bg-card border border-border rounded-lg p-5 h-full">
+        <p className="text-muted-foreground text-sm">Loading calendar...</p>
       </div>
     );
   }
 
   if (!connected) {
     return (
-      <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden h-full flex flex-col">
-        <div className="widget-handle px-5 py-3 border-b border-gray-700 cursor-move">
-          <h3 className="text-white font-semibold text-sm">Calendar</h3>
+      <div className="bg-card border border-border rounded-lg overflow-hidden h-full flex flex-col">
+        <div className="widget-handle px-5 py-3 border-b border-border cursor-move">
+          <h3 className="text-foreground font-semibold text-sm">Calendar</h3>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center p-5 gap-3">
-          <Calendar size={32} className="text-gray-600" />
-          <p className="text-gray-500 text-sm text-center">Connect your Microsoft account to see your calendar</p>
+          <Calendar size={32} className="text-muted-foreground/60" />
+          <p className="text-muted-foreground text-sm text-center">Connect your Microsoft account to see your calendar</p>
           <a
             href="/settings/connections"
-            className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors flex items-center gap-2"
+            className="bg-primary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary transition-colors flex items-center gap-2"
           >
             <ExternalLink size={14} />
             Connect in Settings
@@ -94,46 +94,46 @@ export default function CalendarWidget() {
   }, {});
 
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden h-full flex flex-col">
-      <div className="widget-handle px-5 py-3 border-b border-gray-700 flex items-center justify-between cursor-move">
-        <h3 className="text-white font-semibold text-sm">Calendar</h3>
+    <div className="bg-card border border-border rounded-lg overflow-hidden h-full flex flex-col">
+      <div className="widget-handle px-5 py-3 border-b border-border flex items-center justify-between cursor-move">
+        <h3 className="text-foreground font-semibold text-sm">Calendar</h3>
         <div className="flex items-center gap-2">
           <a
             href="https://outlook.live.com/calendar/0/deeplink/compose"
             target="_blank"
-            className="text-gray-500 hover:text-accent-400 transition-colors"
+            className="text-muted-foreground hover:text-primary transition-colors"
             title="Add event"
           >
             <Plus size={16} />
           </a>
-          <span className="text-gray-500 text-xs">Next 7 days</span>
+          <span className="text-muted-foreground text-xs">Next 7 days</span>
         </div>
       </div>
       <div className="flex-1 overflow-auto">
         {events.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-5 gap-2">
-            <Calendar size={24} className="text-gray-600" />
-            <p className="text-gray-500 text-sm">No upcoming events</p>
+            <Calendar size={24} className="text-muted-foreground/60" />
+            <p className="text-muted-foreground text-sm">No upcoming events</p>
           </div>
         ) : (
           Object.entries(grouped).map(([dateLabel, dayEvents]) => (
             <div key={dateLabel}>
-              <div className="px-5 py-1.5 bg-gray-900/50">
-                <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider">{dateLabel}</p>
+              <div className="px-5 py-1.5 bg-background/50">
+                <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">{dateLabel}</p>
               </div>
               {dayEvents.map((event) => (
-                <div key={event.id} className="px-5 py-2.5 border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
+                <div key={event.id} className="px-5 py-2.5 border-b border-border hover:bg-secondary/30 transition-colors">
                   <div className="flex items-start gap-2.5">
                     <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${statusColor(event.showAs)}`} />
                     <div className="min-w-0 flex-1">
-                      <p className="text-white text-sm font-medium truncate">{event.subject}</p>
+                      <p className="text-foreground text-sm font-medium truncate">{event.subject}</p>
                       <div className="flex items-center gap-3 mt-0.5">
-                        <span className="text-gray-500 text-xs flex items-center gap-1">
+                        <span className="text-muted-foreground text-xs flex items-center gap-1">
                           <Clock size={10} />
                           {formatEventTime(event.start, event.end, event.isAllDay)}
                         </span>
                         {event.location && (
-                          <span className="text-gray-500 text-xs flex items-center gap-1 truncate">
+                          <span className="text-muted-foreground text-xs flex items-center gap-1 truncate">
                             <MapPin size={10} />
                             {event.location}
                           </span>

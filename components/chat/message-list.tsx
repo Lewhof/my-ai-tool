@@ -63,7 +63,7 @@ export default function MessageList({ messages, streamingContent }: MessageListP
   if (messages.length === 0 && !streamingContent) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-gray-500">Start a conversation</p>
+        <p className="text-muted-foreground">Start a conversation</p>
       </div>
     );
   }
@@ -79,8 +79,8 @@ export default function MessageList({ messages, streamingContent }: MessageListP
             className={cn(
               'max-w-2xl px-4 py-3 rounded-lg',
               msg.role === 'user'
-                ? 'bg-accent-600 text-white'
-                : 'bg-gray-700 text-gray-100'
+                ? 'bg-primary text-foreground'
+                : 'bg-secondary text-foreground'
             )}
           >
             {msg.role === 'assistant' ? (
@@ -98,21 +98,21 @@ export default function MessageList({ messages, streamingContent }: MessageListP
               {actionDone[`${msg.id}-task`] ? (
                 <span className="text-green-400 text-xs flex items-center gap-1"><Check size={10} />{actionDone[`${msg.id}-task`]}</span>
               ) : (
-                <button onClick={() => quickAction('task', msg.content, msg.id)} className="text-gray-600 hover:text-accent-400 text-xs flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-gray-800 transition-colors">
+                <button onClick={() => quickAction('task', msg.content, msg.id)} className="text-muted-foreground/60 hover:text-primary text-xs flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-card transition-colors">
                   <CheckSquare size={11} /> Task
                 </button>
               )}
               {actionDone[`${msg.id}-whiteboard`] ? (
                 <span className="text-green-400 text-xs flex items-center gap-1"><Check size={10} />{actionDone[`${msg.id}-whiteboard`]}</span>
               ) : (
-                <button onClick={() => quickAction('whiteboard', msg.content, msg.id)} className="text-gray-600 hover:text-accent-400 text-xs flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-gray-800 transition-colors">
+                <button onClick={() => quickAction('whiteboard', msg.content, msg.id)} className="text-muted-foreground/60 hover:text-primary text-xs flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-card transition-colors">
                   <ClipboardList size={11} /> Whiteboard
                 </button>
               )}
               {actionDone[`${msg.id}-note`] ? (
                 <span className="text-green-400 text-xs flex items-center gap-1"><Check size={10} />{actionDone[`${msg.id}-note`]}</span>
               ) : (
-                <button onClick={() => quickAction('note', msg.content, msg.id)} className="text-gray-600 hover:text-accent-400 text-xs flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-gray-800 transition-colors">
+                <button onClick={() => quickAction('note', msg.content, msg.id)} className="text-muted-foreground/60 hover:text-primary text-xs flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-card transition-colors">
                   <StickyNote size={11} /> Note
                 </button>
               )}
@@ -122,7 +122,7 @@ export default function MessageList({ messages, streamingContent }: MessageListP
       ))}
       {streamingContent && (
         <div className="flex justify-start">
-          <div className="max-w-2xl px-4 py-3 rounded-lg bg-gray-700 text-gray-100">
+          <div className="max-w-2xl px-4 py-3 rounded-lg bg-secondary text-foreground">
             <div className="prose prose-invert prose-sm max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
             </div>

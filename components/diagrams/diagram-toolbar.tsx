@@ -55,11 +55,11 @@ export default function DiagramToolbar({
     setEditing(false);
   };
 
-  const iconBtn = 'p-2 text-gray-400 hover:text-white disabled:opacity-30 transition-colors rounded hover:bg-gray-800';
-  const textBtn = 'px-3 py-1.5 text-xs font-medium text-gray-300 hover:text-white border border-gray-600 rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-1.5';
+  const iconBtn = 'p-2 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors rounded hover:bg-card';
+  const textBtn = 'px-3 py-1.5 text-xs font-medium text-foreground hover:text-foreground border border-border rounded-lg hover:bg-card transition-colors flex items-center gap-1.5';
 
   return (
-    <div className="h-12 bg-gray-900 border-b border-gray-700 flex items-center justify-between px-4 shrink-0">
+    <div className="h-12 bg-background border-b border-border flex items-center justify-between px-4 shrink-0">
       {/* Left — name + save status */}
       <div className="flex items-center gap-4">
         {editing ? (
@@ -69,19 +69,19 @@ export default function DiagramToolbar({
             onBlur={submitName}
             onKeyDown={(e) => e.key === 'Enter' && submitName()}
             autoFocus
-            className="bg-gray-800 text-white border border-gray-600 rounded px-2 py-1 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-accent-600"
+            className="bg-card text-foreground border border-border rounded px-2 py-1 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-ring"
           />
         ) : (
           <button
             onClick={() => { setEditName(name); setEditing(true); }}
-            className="text-white text-sm font-medium hover:text-accent-400 transition-colors"
+            className="text-foreground text-sm font-medium hover:text-primary transition-colors"
           >
             {name}
           </button>
         )}
         <div className="flex items-center gap-1.5">
           <span className={`w-2 h-2 rounded-full ${isSaved ? 'bg-green-400' : 'bg-yellow-400'}`} />
-          <span className="text-gray-500 text-xs">{isSaved ? 'Saved' : 'Unsaved'}</span>
+          <span className="text-muted-foreground text-xs">{isSaved ? 'Saved' : 'Unsaved'}</span>
         </div>
       </div>
 
@@ -97,7 +97,7 @@ export default function DiagramToolbar({
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         </button>
 
-        <div className="w-px h-5 bg-gray-700 mx-1" />
+        <div className="w-px h-5 bg-secondary mx-1" />
 
         {/* Undo */}
         <button onClick={onUndo} disabled={!canUndo} className={iconBtn} title="Undo (Ctrl+Z)">
@@ -108,14 +108,14 @@ export default function DiagramToolbar({
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016.69 3L21 13"/></svg>
         </button>
 
-        <div className="w-px h-5 bg-gray-700 mx-1" />
+        <div className="w-px h-5 bg-secondary mx-1" />
 
         {/* Auto Layout */}
         <button onClick={onAutoLayout} className={iconBtn} title="Auto Layout">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="9" y="15" width="6" height="6" rx="1"/><path d="M6 9v3h12V9"/><path d="M12 12v3"/></svg>
         </button>
 
-        <div className="w-px h-5 bg-gray-700 mx-1" />
+        <div className="w-px h-5 bg-secondary mx-1" />
 
         {/* Save */}
         <button onClick={onSave} className={textBtn}>
@@ -131,10 +131,10 @@ export default function DiagramToolbar({
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           {exportOpen && (
-            <div className="absolute right-0 top-full mt-1 w-36 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-50 py-1">
-              <button onClick={() => { onExportPNG(); setExportOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">PNG Image</button>
-              <button onClick={() => { onExportSVG(); setExportOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">SVG Vector</button>
-              <button onClick={() => { onExportJSON(); setExportOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">JSON Data</button>
+            <div className="absolute right-0 top-full mt-1 w-36 bg-card border border-border rounded-lg shadow-xl z-50 py-1">
+              <button onClick={() => { onExportPNG(); setExportOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-secondary hover:text-foreground">PNG Image</button>
+              <button onClick={() => { onExportSVG(); setExportOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-secondary hover:text-foreground">SVG Vector</button>
+              <button onClick={() => { onExportJSON(); setExportOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-secondary hover:text-foreground">JSON Data</button>
             </div>
           )}
         </div>

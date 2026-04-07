@@ -32,7 +32,7 @@ const SLASH_COMMANDS = [
 const SUGGESTED_PROMPTS = [
   { icon: Calendar, text: "What's on my calendar today?", color: 'text-blue-400' },
   { icon: CheckSquare, text: 'Show me my pending tasks', color: 'text-green-400' },
-  { icon: ClipboardList, text: 'What items are on my whiteboard?', color: 'text-accent-400' },
+  { icon: ClipboardList, text: 'What items are on my whiteboard?', color: 'text-primary' },
   { icon: FileText, text: 'Search my documents for contracts', color: 'text-purple-400' },
   { icon: Cloud, text: "What's the weather like?", color: 'text-cyan-400' },
   { icon: CreditCard, text: 'How much have I spent on AI this month?', color: 'text-yellow-400' },
@@ -193,13 +193,13 @@ export default function AgentPage() {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
-      <div className="px-6 py-3 border-b border-gray-700 flex items-center gap-3 shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-accent-600 flex items-center justify-center">
-          <Bot size={18} className="text-white" />
+      <div className="px-6 py-3 border-b border-border flex items-center gap-3 shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+          <Bot size={18} className="text-foreground" />
         </div>
         <div>
-          <h2 className="text-white font-semibold text-sm">Cerebro</h2>
-          <p className="text-gray-500 text-xs">Claude Sonnet with access to all your tools</p>
+          <h2 className="text-foreground font-semibold text-sm">Cerebro</h2>
+          <p className="text-muted-foreground text-xs">Claude Sonnet with access to all your tools</p>
         </div>
         {messages.length > 0 && (
           <div className="ml-auto flex gap-2">
@@ -216,7 +216,7 @@ export default function AgentPage() {
                 setMessages([]);
                 alert('Conversation archived to Knowledge Base');
               }}
-              className="text-gray-500 hover:text-accent-400 text-xs px-3 py-1.5 border border-gray-700 rounded-lg transition-colors"
+              className="text-muted-foreground hover:text-primary text-xs px-3 py-1.5 border border-border rounded-lg transition-colors"
             >
               Archive & Clear
             </button>
@@ -226,7 +226,7 @@ export default function AgentPage() {
                 await fetch('/api/agent/history', { method: 'DELETE' });
                 setMessages([]);
               }}
-              className="text-gray-500 hover:text-red-400 text-xs px-3 py-1.5 border border-gray-700 rounded-lg transition-colors"
+              className="text-muted-foreground hover:text-red-400 text-xs px-3 py-1.5 border border-border rounded-lg transition-colors"
             >
               Clear
             </button>
@@ -266,9 +266,9 @@ export default function AgentPage() {
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-6">
             <div className="text-center">
-              <Sparkles size={32} className="mx-auto text-accent-500 mb-3" />
-              <h3 className="text-white text-lg font-semibold mb-1">What can I help you with?</h3>
-              <p className="text-gray-500 text-sm max-w-md">I can access your calendar, tasks, documents, notes, whiteboard, and more. Just ask.</p>
+              <Sparkles size={32} className="mx-auto text-primary mb-3" />
+              <h3 className="text-foreground text-lg font-semibold mb-1">What can I help you with?</h3>
+              <p className="text-muted-foreground text-sm max-w-md">I can access your calendar, tasks, documents, notes, whiteboard, and more. Just ask.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg w-full">
@@ -278,10 +278,10 @@ export default function AgentPage() {
                   <button
                     key={prompt.text}
                     onClick={() => sendMessage(prompt.text)}
-                    className="flex items-center gap-3 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg hover:border-gray-600 transition-colors text-left"
+                    className="flex items-center gap-3 px-4 py-3 bg-card border border-border rounded-lg hover:border-border transition-colors text-left"
                   >
                     <Icon size={16} className={prompt.color} />
-                    <span className="text-gray-300 text-sm">{prompt.text}</span>
+                    <span className="text-foreground text-sm">{prompt.text}</span>
                   </button>
                 );
               })}
@@ -291,15 +291,15 @@ export default function AgentPage() {
           messages.map((msg, i) => (
             <div key={i} className={cn('flex gap-3 group', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
               {msg.role === 'assistant' && (
-                <div className="w-7 h-7 rounded-lg bg-accent-600/20 flex items-center justify-center shrink-0 mt-1">
-                  <Bot size={14} className="text-accent-400" />
+                <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center shrink-0 mt-1">
+                  <Bot size={14} className="text-primary" />
                 </div>
               )}
               <div className={cn(
                 'max-w-2xl rounded-lg px-4 py-3',
                 msg.role === 'user'
-                  ? 'bg-accent-600 text-white'
-                  : 'bg-gray-800 border border-gray-700'
+                  ? 'bg-primary text-foreground'
+                  : 'bg-card border border-border'
               )}>
                 {msg.role === 'assistant' ? (
                   <div>
@@ -312,8 +312,8 @@ export default function AgentPage() {
                         <>
                           {imageUrl && (
                             <div className="mb-3">
-                              <img src={imageUrl} alt="Generated image" className="max-w-full rounded-lg border border-gray-700" />
-                              <a href={imageUrl} target="_blank" download className="text-accent-400 text-xs hover:underline mt-1 inline-block">Download image</a>
+                              <img src={imageUrl} alt="Generated image" className="max-w-full rounded-lg border border-border" />
+                              <a href={imageUrl} target="_blank" download className="text-primary text-xs hover:underline mt-1 inline-block">Download image</a>
                             </div>
                           )}
                           {textContent && (
@@ -335,14 +335,14 @@ export default function AgentPage() {
                 )}
                 {/* Forward actions for assistant messages */}
                 {msg.role === 'assistant' && msg.content.length > 10 && (
-                  <div className="flex gap-1 mt-2 pt-2 border-t border-gray-700/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-1 mt-2 pt-2 border-t border-border opacity-0 group-hover:opacity-100 transition-opacity">
                     {[
                       { label: 'Task', action: async () => { await fetch('/api/todos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: msg.content.replace(/[#*`>\-]/g, '').trim().slice(0, 100) }) }); } },
                       { label: 'Note', action: async () => { await fetch('/api/notes-v2', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Cerebro Note' }) }).then((r) => r.json()).then(async (n) => { if (n.id) await fetch(`/api/notes-v2/${n.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: msg.content }) }); }); } },
                       { label: 'KB', action: async () => { await fetch('/api/kb', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: `Cerebro — ${new Date().toLocaleDateString()}`, content: msg.content, category: 'Reference', tags: ['cerebro'] }) }); } },
                       { label: 'Board', action: async () => { await fetch('/api/whiteboard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: msg.content.replace(/[#*`>\-]/g, '').trim().slice(0, 80), description: msg.content }) }); } },
                     ].map((fwd) => (
-                      <button key={fwd.label} onClick={async () => { await fwd.action(); alert(`Saved to ${fwd.label}`); }} className="text-gray-600 hover:text-accent-400 text-[10px] px-1.5 py-0.5 rounded hover:bg-gray-700/50 transition-colors">
+                      <button key={fwd.label} onClick={async () => { await fwd.action(); alert(`Saved to ${fwd.label}`); }} className="text-muted-foreground/60 hover:text-primary text-[10px] px-1.5 py-0.5 rounded hover:bg-secondary/50 transition-colors">
                         → {fwd.label}
                       </button>
                     ))}
@@ -352,14 +352,14 @@ export default function AgentPage() {
               {/* Reply button */}
               <button
                 onClick={() => setReplyTo({ index: i, content: msg.content, role: msg.role })}
-                className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-accent-400 p-1 self-start mt-1 transition-opacity shrink-0"
+                className="opacity-0 group-hover:opacity-100 text-muted-foreground/60 hover:text-primary p-1 self-start mt-1 transition-opacity shrink-0"
                 title="Reply"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 17H4V12"/><path d="M4 17L13 8C14.66 6.34 17.34 6.34 19 8C20.66 9.66 20.66 12.34 19 14L15 18"/></svg>
               </button>
               {msg.role === 'user' && (
-                <div className="w-7 h-7 rounded-lg bg-gray-700 flex items-center justify-center shrink-0 mt-1">
-                  <User size={14} className="text-gray-400" />
+                <div className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center shrink-0 mt-1">
+                  <User size={14} className="text-muted-foreground" />
                 </div>
               )}
             </div>
@@ -368,11 +368,11 @@ export default function AgentPage() {
 
         {loading && (
           <div className="flex gap-3">
-            <div className="w-7 h-7 rounded-lg bg-accent-600/20 flex items-center justify-center shrink-0">
-              <Loader2 size={14} className="text-accent-400 animate-spin" />
+            <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+              <Loader2 size={14} className="text-primary animate-spin" />
             </div>
-            <div className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-3">
-              <p className="text-gray-400 text-sm">Thinking and using tools...</p>
+            <div className="bg-card border border-border rounded-lg px-4 py-3">
+              <p className="text-muted-foreground text-sm">Thinking and using tools...</p>
             </div>
           </div>
         )}
@@ -383,18 +383,18 @@ export default function AgentPage() {
       {/* Input */}
       {/* Slash command autocomplete */}
       {input.startsWith('/') && !loading && (
-        <div className="px-4 py-2 border-t border-gray-700 bg-gray-800 shrink-0 max-h-48 overflow-auto">
+        <div className="px-4 py-2 border-t border-border bg-card shrink-0 max-h-48 overflow-auto">
           {SLASH_COMMANDS.filter((c) => c.cmd.startsWith(input.split(' ')[0])).map((cmd) => (
             <button
               key={cmd.cmd}
               onClick={() => setInput(cmd.cmd + ' ')}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors text-left"
+              className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-secondary transition-colors text-left"
             >
               <div>
-                <span className="text-accent-400 text-sm font-mono">{cmd.cmd}</span>
-                <span className="text-gray-500 text-xs ml-2">{cmd.desc}</span>
+                <span className="text-primary text-sm font-mono">{cmd.cmd}</span>
+                <span className="text-muted-foreground text-xs ml-2">{cmd.desc}</span>
               </div>
-              <span className="text-gray-600 text-xs">{cmd.example}</span>
+              <span className="text-muted-foreground/60 text-xs">{cmd.example}</span>
             </button>
           ))}
         </div>
@@ -402,19 +402,19 @@ export default function AgentPage() {
 
       {/* Reply preview */}
       {replyTo && (
-        <div className="px-4 py-2 bg-gray-800 border-t border-gray-700 flex items-start gap-2 shrink-0">
-          <div className="border-l-2 border-accent-600 pl-3 flex-1 min-w-0">
-            <p className="text-accent-400 text-xs font-medium mb-0.5">
+        <div className="px-4 py-2 bg-card border-t border-border flex items-start gap-2 shrink-0">
+          <div className="border-l-2 border-primary pl-3 flex-1 min-w-0">
+            <p className="text-primary text-xs font-medium mb-0.5">
               Replying to {replyTo.role === 'user' ? 'yourself' : 'Cerebro'}
             </p>
-            <p className="text-gray-400 text-xs truncate">{replyTo.content.slice(0, 100)}</p>
+            <p className="text-muted-foreground text-xs truncate">{replyTo.content.slice(0, 100)}</p>
           </div>
-          <button onClick={() => setReplyTo(null)} className="text-gray-500 hover:text-white shrink-0 p-1">
+          <button onClick={() => setReplyTo(null)} className="text-muted-foreground hover:text-foreground shrink-0 p-1">
             <X size={14} />
           </button>
         </div>
       )}
-      <div className="border-t border-gray-700 p-3 sm:p-4 shrink-0">
+      <div className="border-t border-border p-3 sm:p-4 shrink-0">
         <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} className="hidden" />
         <div className="flex gap-2 max-w-3xl mx-auto">
           {/* Voice button */}
@@ -422,7 +422,7 @@ export default function AgentPage() {
             onClick={toggleVoice}
             className={cn(
               'p-3 rounded-lg transition-colors self-end shrink-0',
-              listening ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
+              listening ? 'bg-red-500 text-foreground animate-pulse' : 'bg-card text-muted-foreground hover:text-foreground border border-border'
             )}
             title={listening ? 'Stop listening' : 'Voice input'}
           >
@@ -431,7 +431,7 @@ export default function AgentPage() {
           {/* Camera button */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-3 rounded-lg bg-gray-800 text-gray-400 hover:text-white border border-gray-700 transition-colors self-end shrink-0"
+            className="p-3 rounded-lg bg-card text-muted-foreground hover:text-foreground border border-border transition-colors self-end shrink-0"
             title="Upload image / Take photo"
           >
             <Camera size={18} />
@@ -443,13 +443,13 @@ export default function AgentPage() {
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
             placeholder={listening ? 'Listening...' : 'Ask anything — voice, camera, or type...'}
             rows={1}
-            className="flex-1 bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent-600 resize-none placeholder-gray-500"
+            className="flex-1 bg-card text-foreground border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none placeholder-muted-foreground"
             disabled={loading}
           />
           <button
             onClick={() => sendMessage()}
             disabled={loading || !input.trim()}
-            className="bg-accent-600 text-white p-3 rounded-lg hover:bg-accent-700 transition-colors disabled:opacity-30 self-end"
+            className="bg-primary text-foreground p-3 rounded-lg hover:bg-primary transition-colors disabled:opacity-30 self-end"
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
           </button>
