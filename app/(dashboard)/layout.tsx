@@ -11,11 +11,11 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-screen bg-gray-900">
+    <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Desktop sidebar — hidden on mobile */}
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Desktop header — hidden on mobile */}
         <Header />
 
@@ -23,7 +23,7 @@ export default function DashboardLayout({
         <MobileHeader />
 
         {/* Main content — add bottom padding on mobile for tab bar */}
-        <main className="flex-1 overflow-auto min-h-0 pb-16 lg:pb-0">{children}</main>
+        <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">{children}</main>
       </div>
 
       {/* Mobile bottom tab bar — hidden on desktop */}
