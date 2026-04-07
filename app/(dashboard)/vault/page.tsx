@@ -80,9 +80,12 @@ export default function VaultPage() {
       if (addCategory) formData.append('category', addCategory);
 
       const res = await fetch('/api/vault/scan', { method: 'POST', body: formData });
-      if (!res.ok) throw new Error('Scan failed');
-
       const data = await res.json();
+
+      if (!res.ok || data.error) {
+        alert(data.error || 'Scan failed. Try again.');
+        return;
+      }
 
       // Auto-fill fields from scan result
       if (data.suggested_category && !addCategory) {

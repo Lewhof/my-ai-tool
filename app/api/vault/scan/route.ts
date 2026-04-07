@@ -50,20 +50,35 @@ Extract what you can see. Return JSON only.`
     );
 
     if (!res.ok) {
-      return Response.json({ error: `Gemini API error (${res.status})` }, { status: res.status });
+      const errText = await res.text().catch(() => '');
+      if (res.status === 429) {
+        return Response.json({ error: 'Gemini quota exceeded. Please wait a minute and try again.' }, { status: 429 });
+      }
+      return Response.json({ error: `Gemini API error (${res.status}): ${errText.slice(0, 100)}` }, { status: res.status });
     }
 
     const data = await res.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    // Parse JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return Response.json(parsed);
+    if (!text) {
+      return Response.json({ error: 'AI could not read the image. Try a different angle or clearer photo.' }, { status: 400 });
     }
 
-    return Response.json({ error: 'Could not extract data from image', raw: text }, { status: 400 });
+    // Parse JSON from response — handle markdown code blocks
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return Response.json(parsed);
+      } catch {
+        // JSON parse failed — return raw text as fields
+        return Response.json({ suggested_category: 'secure_note', name: 'Scanned Entry', fields: { content: text } });
+      }
+    }
+
+    // No JSON found — return as a secure note with the extracted text
+    return Response.json({ suggested_category: 'secure_note', name: 'Scanned Entry', fields: { content: text } });
   } catch (err) {
     return Response.json({ error: err instanceof Error ? err.message : 'Scan failed' }, { status: 500 });
   }
