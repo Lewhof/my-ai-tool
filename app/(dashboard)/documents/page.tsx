@@ -84,10 +84,20 @@ export default function DocumentsPage() {
   const reviewDocument = async (docId: string) => {
     setReviewingId(docId);
     setReviewResult(null);
-    const res = await fetch(`/api/documents/${docId}/review`, { method: 'POST' });
-    const data = await res.json();
-    setReviewResult(data);
-    setReviewingId(null);
+    try {
+      const res = await fetch(`/api/documents/${docId}/review`, { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.text().catch(() => 'Review failed');
+        setReviewResult({ suggested_folder_name: 'Error', confidence: 'low', reason: `API error: ${err}` });
+        return;
+      }
+      const data = await res.json();
+      setReviewResult(data);
+    } catch (err) {
+      setReviewResult({ suggested_folder_name: 'Error', confidence: 'low', reason: err instanceof Error ? err.message : 'Network error' });
+    } finally {
+      setReviewingId(null);
+    }
   };
 
   // Handle paste for screenshots
@@ -104,7 +114,7 @@ export default function DocumentsPage() {
         const formData = new FormData();
         formData.append('file', renamedFile);
         if (uploadComment) formData.append('comment', uploadComment);
-        if (activeFolder) formData.append('folder_id', activeFolder);
+        if (activeFolder && activeFolder !== 'unfiled') formData.append('folder_id', activeFolder);
         await fetch('/api/documents', { method: 'POST', body: formData });
         fetchDocs();
         return;
@@ -291,9 +301,9 @@ export default function DocumentsPage() {
                   <DocumentCard
                     doc={doc}
                     onDelete={() => handleDelete(doc.id)}
-                    folder={doc.folder}
+                    folder={folders.find((f) => f.id === doc.folder_id)?.name || doc.folder}
                     onMoveToFolder={(folderId) => moveToFolder(doc.id, folderId)}
-                    folders={folders.map((f) => f.name)}
+                    folderOptions={folders.map((f) => ({ id: f.id, name: f.name }))}
                   />
                   {/* AI Review button */}
                   <button

@@ -6,12 +6,17 @@ import { formatRelativeDate } from '@/lib/utils';
 import { Folder } from 'lucide-react';
 import type { Document } from '@/lib/types';
 
+interface FolderOption {
+  id: string;
+  name: string;
+}
+
 interface DocumentCardProps {
   doc: Document;
   onDelete: (id: string) => void;
   folder?: string;
-  onMoveToFolder?: (folder: string) => void;
-  folders?: string[];
+  onMoveToFolder?: (folderId: string) => void;
+  folderOptions?: FolderOption[];
 }
 
 function formatFileSize(bytes: number): string {
@@ -28,7 +33,7 @@ function fileIcon(type: string): string {
   return '\u{1F4C4}';
 }
 
-export default function DocumentCard({ doc, onDelete, folder, onMoveToFolder, folders }: DocumentCardProps) {
+export default function DocumentCard({ doc, onDelete, folder, onMoveToFolder, folderOptions }: DocumentCardProps) {
   const [showMove, setShowMove] = useState(false);
 
   return (
@@ -48,9 +53,8 @@ export default function DocumentCard({ doc, onDelete, folder, onMoveToFolder, fo
         )}
       </Link>
 
-      {/* Actions */}
       <div className="flex gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        {folders && onMoveToFolder && (
+        {folderOptions && onMoveToFolder && (
           <div className="relative">
             <button
               onClick={() => setShowMove(!showMove)}
@@ -59,14 +63,14 @@ export default function DocumentCard({ doc, onDelete, folder, onMoveToFolder, fo
               Move
             </button>
             {showMove && (
-              <div className="absolute bottom-6 left-0 bg-gray-900 border border-gray-700 rounded-lg py-1 z-10 min-w-[120px] shadow-lg">
-                {folders.map((f) => (
+              <div className="absolute bottom-6 left-0 bg-gray-900 border border-gray-700 rounded-lg py-1 z-10 min-w-[140px] shadow-lg">
+                {folderOptions.map((f) => (
                   <button
-                    key={f}
-                    onClick={() => { onMoveToFolder(f); setShowMove(false); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-800 transition-colors ${f === folder ? 'text-accent-400' : 'text-gray-300'}`}
+                    key={f.id}
+                    onClick={() => { onMoveToFolder(f.id); setShowMove(false); }}
+                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-800 transition-colors text-gray-300"
                   >
-                    {f}
+                    {f.name}
                   </button>
                 ))}
               </div>

@@ -44,12 +44,13 @@ export default function ChatContainer({
   const sendMessage = useCallback(
     async (message: string) => {
       if (isStreaming) return;
-      if (!threadId) return; // Don't send without a thread
+      // For /api/chat, require threadId. For custom endpoints (doc chat), allow without.
+      if (!threadId && apiEndpoint === '/api/chat') return;
       setError(null);
 
       const userMsg: ChatMessage = {
         id: crypto.randomUUID(),
-        thread_id: threadId,
+        thread_id: threadId ?? '',
         role: 'user',
         content: message,
         model: null,
@@ -131,7 +132,7 @@ export default function ChatContainer({
           <p className="text-red-400 text-xs">{error}</p>
         </div>
       )}
-      <ChatInput onSend={sendMessage} disabled={isStreaming || !threadId} />
+      <ChatInput onSend={sendMessage} disabled={isStreaming || (!threadId && apiEndpoint === '/api/chat')} />
     </div>
   );
 }
