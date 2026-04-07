@@ -115,10 +115,17 @@ export default function CreditsPage() {
         {loading ? (
           <p className="text-gray-500 text-sm">Loading AI metrics...</p>
         ) : !hasPeriodData ? (
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 text-center">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 text-center space-y-3">
             <Zap size={24} className="mx-auto text-gray-600 mb-2" />
-            <p className="text-gray-400 text-sm">No AI usage for this period.</p>
-            <p className="text-gray-600 text-xs mt-1">Send a message in Chat to start tracking costs.</p>
+            <p className="text-gray-400 text-sm">AI usage data not available via API.</p>
+            <p className="text-gray-600 text-xs">Helicone free tier may not support API queries. View your usage directly:</p>
+            <a
+              href="https://us.helicone.ai/requests"
+              target="_blank"
+              className="inline-flex items-center gap-2 bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
+            >
+              Open Helicone Dashboard
+            </a>
           </div>
         ) : (
           <div className="space-y-6">
