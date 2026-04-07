@@ -27,6 +27,39 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Push notifications
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  try {
+    const data = event.data.json();
+    const options = {
+      body: data.body || '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: data.tag || 'default',
+      data: { url: data.url || '/' },
+    };
+    event.waitUntil(self.registration.showNotification(data.title || 'Lewhof AI', options));
+  } catch { /* ignore malformed push */ }
+});
+
+// Notification click — open the app
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      const existing = clients.find(c => c.url.includes(self.location.origin));
+      if (existing) {
+        existing.focus();
+        existing.navigate(url);
+      } else {
+        self.clients.openWindow(url);
+      }
+    })
+  );
+});
+
 // Fetch — network first, fallback to cache, then offline page
 self.addEventListener('fetch', (event) => {
   // Skip non-GET and API requests
