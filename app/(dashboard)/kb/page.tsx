@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn, formatRelativeDate } from '@/lib/utils';
-import { List, LayoutGrid, ChevronLeft, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { List, LayoutGrid, ChevronLeft, Trash2, GitFork, Loader2 } from 'lucide-react';
 
 interface KBEntry {
   id: string;
@@ -19,7 +20,9 @@ interface KBEntry {
 const DEFAULT_CATEGORIES = ['All', 'AI Tools', 'Architecture', 'Decisions', 'How-To', 'Reference', 'General'];
 
 export default function KnowledgeBasePage() {
+  const router = useRouter();
   const [entries, setEntries] = useState<KBEntry[]>([]);
+  const [generatingDiagram, setGeneratingDiagram] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -73,6 +76,18 @@ export default function KnowledgeBasePage() {
     setEntries((prev) => prev.filter((e) => e.id !== id));
     if (selectedId === id) setSelectedId(null);
     if (expandedGridId === id) setExpandedGridId(null);
+  };
+
+  const generateDiagram = async (entryId: string) => {
+    setGeneratingDiagram(entryId);
+    try {
+      const res = await fetch(`/api/kb/${entryId}/diagram`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.diagramId) router.push(`/diagrams/${data.diagramId}`);
+      }
+    } catch { /* silent */ }
+    finally { setGeneratingDiagram(null); }
   };
 
   const categories = [...new Set([...DEFAULT_CATEGORIES, ...entries.map((e) => e.category)])];
@@ -152,7 +167,15 @@ export default function KnowledgeBasePage() {
                         <span className="text-gray-600 text-xs">{formatRelativeDate(entry.updated_at)}</span>
                       </div>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); deleteEntry(entry.id); }} className="text-gray-600 hover:text-red-400 transition-colors ml-2"><Trash2 size={14} /></button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); generateDiagram(entry.id); }}
+                      disabled={generatingDiagram === entry.id}
+                      className="text-gray-600 hover:text-accent-400 transition-colors ml-2 disabled:animate-pulse"
+                      title="Generate diagram"
+                    >
+                      {generatingDiagram === entry.id ? <Loader2 size={14} className="animate-spin" /> : <GitFork size={14} />}
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); deleteEntry(entry.id); }} className="text-gray-600 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
                   </div>
                   {/* Expanded content with rendered markdown */}
                   {expandedGridId === entry.id && (
@@ -211,6 +234,14 @@ export default function KnowledgeBasePage() {
                 </div>
               </div>
               <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={() => generateDiagram(selected.id)}
+                  disabled={generatingDiagram === selected.id}
+                  className="text-gray-400 hover:text-accent-400 text-xs px-3 py-1.5 border border-gray-600 rounded-lg transition-colors disabled:animate-pulse flex items-center gap-1.5"
+                >
+                  {generatingDiagram === selected.id ? <Loader2 size={12} className="animate-spin" /> : <GitFork size={12} />}
+                  Diagram
+                </button>
                 <button onClick={() => setEditingId(editingId === selected.id ? null : selected.id)} className="text-gray-400 hover:text-white text-xs px-3 py-1.5 border border-gray-600 rounded-lg transition-colors">{editingId === selected.id ? 'Preview' : 'Edit'}</button>
                 <button onClick={() => deleteEntry(selected.id)} className="text-gray-400 hover:text-red-400 text-xs px-3 py-1.5 border border-gray-600 rounded-lg transition-colors">Delete</button>
               </div>

@@ -23,6 +23,7 @@ import {
   Link2,
   Brain,
   FolderCog,
+  Image as ImageIcon,
   ChevronDown,
   type LucideIcon,
 } from 'lucide-react';
@@ -59,6 +60,7 @@ const navGroups: NavGroup[] = [
     label: 'Build',
     items: [
       { name: 'Diagrams', href: '/diagrams', icon: GitFork },
+      { name: 'Image Lab', href: '/images', icon: ImageIcon },
       { name: 'Workflows', href: '/workflows', icon: Zap },
       { name: 'Whiteboard', href: '/whiteboard', icon: ClipboardList },
     ],
