@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 
 export const anthropic = new Anthropic({
-  baseURL: 'https://anthropic.helicone.ai',
+  baseURL: 'https://anthropic.helicone.ai/v1',
   defaultHeaders: {
     'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`,
   },
