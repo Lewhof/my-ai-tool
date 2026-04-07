@@ -165,8 +165,9 @@ export default function VaultPage() {
         >
           All ({entries.length})
         </button>
-        {categories.filter((c) => usedCategories.includes(c.key)).map((cat) => {
+        {categories.map((cat) => {
           const count = entries.filter((e) => e.category === cat.key).length;
+          if (count === 0 && activeCategory !== cat.key) return null;
           const Icon = CATEGORY_ICONS[cat.key] || Key;
           return (
             <button
