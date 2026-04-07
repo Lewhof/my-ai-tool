@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import MessageList from './message-list';
 import ChatInput from './chat-input';
@@ -19,27 +19,37 @@ export default function ChatContainer({
   initialMessages = [],
   initialModel = 'claude-haiku',
   apiEndpoint = '/api/chat',
-  showModelSelector = true,
 }: ChatContainerProps) {
   const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [streamingContent, setStreamingContent] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [model, setModel] = useState(initialModel);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     setMessages(initialMessages);
   }, [initialMessages]);
 
+  // Cleanup on unmount — abort any active stream
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
+    };
+  }, []);
+
   const sendMessage = useCallback(
     async (message: string) => {
       if (isStreaming) return;
+      if (!threadId) return; // Don't send without a thread
       setError(null);
 
       const userMsg: ChatMessage = {
         id: crypto.randomUUID(),
-        thread_id: threadId ?? '',
+        thread_id: threadId,
         role: 'user',
         content: message,
         model: null,
@@ -50,19 +60,21 @@ export default function ChatContainer({
       setIsStreaming(true);
       setStreamingContent('');
 
+      const abort = new AbortController();
+      abortRef.current = abort;
+
       try {
         const res = await fetch(apiEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ threadId, message, model }),
+          body: JSON.stringify({ threadId, message, model: initialModel }),
+          signal: abort.signal,
         });
 
         if (!res.ok) {
           const errData = await res.text().catch(() => 'Unknown error');
           throw new Error(`API error ${res.status}: ${errData}`);
         }
-
-        const newThreadId = res.headers.get('X-Thread-Id');
 
         const reader = res.body?.getReader();
         if (!reader) throw new Error('No response body');
@@ -76,34 +88,26 @@ export default function ChatContainer({
           accumulated += decoder.decode(value, { stream: true });
           setStreamingContent(accumulated);
         }
-        // Flush decoder
         accumulated += decoder.decode(undefined, { stream: false });
-        if (accumulated !== streamingContent) {
-          setStreamingContent(accumulated);
-        }
 
         const assistantMsg: ChatMessage = {
           id: crypto.randomUUID(),
-          thread_id: newThreadId ?? threadId ?? '',
+          thread_id: threadId,
           role: 'assistant',
           content: accumulated,
-          model: null,
+          model: initialModel,
           tokens_used: null,
           created_at: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, assistantMsg]);
         setStreamingContent('');
-
-        // Navigate to new thread if created
-        if (newThreadId && !threadId) {
-          router.push(`/chat/${newThreadId}`);
-        }
       } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return; // Navigated away
         setStreamingContent('');
         setError(err instanceof Error ? err.message : 'Something went wrong');
         const errorMsg: ChatMessage = {
           id: crypto.randomUUID(),
-          thread_id: threadId ?? '',
+          thread_id: threadId,
           role: 'assistant',
           content: `Error: ${err instanceof Error ? err.message : 'Something went wrong. Please try again.'}`,
           model: null,
@@ -113,9 +117,10 @@ export default function ChatContainer({
         setMessages((prev) => [...prev, errorMsg]);
       } finally {
         setIsStreaming(false);
+        abortRef.current = null;
       }
     },
-    [threadId, apiEndpoint, router, isStreaming, model]
+    [threadId, apiEndpoint, isStreaming, initialModel]
   );
 
   return (
@@ -126,7 +131,7 @@ export default function ChatContainer({
           <p className="text-red-400 text-xs">{error}</p>
         </div>
       )}
-      <ChatInput onSend={sendMessage} disabled={isStreaming} />
+      <ChatInput onSend={sendMessage} disabled={isStreaming || !threadId} />
     </div>
   );
 }
