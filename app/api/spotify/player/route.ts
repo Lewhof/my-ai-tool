@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       res = await fetch(`${base}/play${device_id ? `?device_id=${device_id}` : ''}`, {
         method: 'PUT',
         headers,
-        body: uri ? JSON.stringify({ uris: [uri] }) : '{}',
+        ...(uri ? { body: JSON.stringify(uri.startsWith('spotify:playlist:') || uri.startsWith('spotify:album:') ? { context_uri: uri } : { uris: [uri] }) } : {}),
       });
       break;
     case 'pause':
