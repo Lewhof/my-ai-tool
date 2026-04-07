@@ -74,11 +74,11 @@ export default function CalendarWidget() {
           <Calendar size={32} className="text-gray-600" />
           <p className="text-gray-500 text-sm text-center">Connect your Microsoft account to see your calendar</p>
           <a
-            href="/api/auth/microsoft"
+            href="/settings/connections"
             className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors flex items-center gap-2"
           >
             <ExternalLink size={14} />
-            Connect Microsoft
+            Connect in Settings
           </a>
         </div>
       </div>

@@ -190,18 +190,10 @@ export default function CalendarPage() {
       <div className="flex-1 flex flex-col items-center justify-center p-8 gap-4">
         <CalIcon size={48} className="text-gray-600" />
         <p className="text-gray-400 text-lg">Connect a Microsoft account to view your calendar</p>
-        <div className="flex gap-2 items-center">
-          <input
-            value={addLabel}
-            onChange={(e) => setAddLabel(e.target.value)}
-            placeholder="Account label (e.g. Work)"
-            className="bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-600"
-          />
-          <a href={`/api/auth/microsoft?label=${encodeURIComponent(addLabel || 'Microsoft')}`} className="bg-accent-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-accent-700 transition-colors flex items-center gap-2 text-sm">
-            <ExternalLink size={14} />
-            Connect
-          </a>
-        </div>
+        <a href="/settings/connections" className="bg-accent-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-accent-700 transition-colors flex items-center gap-2">
+          <ExternalLink size={16} />
+          Connect in Settings
+        </a>
       </div>
     );
   }

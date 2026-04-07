@@ -20,6 +20,9 @@ import {
   Settings,
   Palette,
   Globe,
+  Link2,
+  Brain,
+  FolderCog,
   ChevronDown,
   type LucideIcon,
 } from 'lucide-react';
@@ -78,6 +81,9 @@ const navGroups: NavGroup[] = [
     label: 'Settings',
     items: [
       { name: 'General', href: '/settings', icon: Settings },
+      { name: 'Connections', href: '/settings/connections', icon: Link2 },
+      { name: 'AI & Models', href: '/settings/ai', icon: Brain },
+      { name: 'Documents', href: '/settings/documents', icon: FolderCog },
       { name: 'Theme', href: '/settings/theme', icon: Palette },
     ],
   },
