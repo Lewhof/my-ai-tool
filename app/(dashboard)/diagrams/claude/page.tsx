@@ -18,7 +18,7 @@ export default function ClaudeDiagramsPage() {
   return (
     <div className="flex h-full min-h-0">
       {/* Sidebar */}
-      <div className="w-56 border-r border-gray-700 flex flex-col shrink-0">
+      <div className="hidden md:flex md:w-56 border-r border-gray-700 flex-col shrink-0">
         <div className="px-4 py-3 border-b border-gray-700">
           <Link href="/diagrams" className="text-gray-400 text-sm hover:text-white transition-colors">
             &larr; All Diagrams

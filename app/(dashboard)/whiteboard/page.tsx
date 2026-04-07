@@ -323,7 +323,7 @@ export default function WhiteboardPage() {
       {/* Edit Modal */}
       {editingItemId && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setEditingItemId(null)}>
-          <div className="bg-gray-800 border border-gray-700 rounded-xl w-full max-w-lg p-6 space-y-4" onClick={(e) => e.stopPropagation()} onPaste={(e) => handlePaste(e, editingItemId)}>
+          <div className="bg-gray-800 border border-gray-700 rounded-xl w-full max-w-lg p-4 sm:p-6 space-y-3 sm:space-y-4 mx-3 sm:mx-0" onClick={(e) => e.stopPropagation()} onPaste={(e) => handlePaste(e, editingItemId)}>
             <h3 className="text-white font-semibold">Edit Item</h3>
             <div>
               <label className="text-gray-300 text-sm block mb-1">Title</label>

@@ -212,7 +212,7 @@ export default function AgentPage() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-700 p-4 shrink-0">
+      <div className="border-t border-gray-700 p-3 sm:p-4 shrink-0">
         <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} className="hidden" />
         <div className="flex gap-2 max-w-3xl mx-auto">
           {/* Voice button */}

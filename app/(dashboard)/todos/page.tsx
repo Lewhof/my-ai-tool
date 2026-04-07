@@ -151,11 +151,11 @@ export default function TodosPage() {
 
   // ── Planner View (Kanban) ──
   const PlannerView = () => (
-    <div className="flex gap-4 h-full min-h-0 overflow-x-auto pb-4">
+    <div className="flex flex-col sm:flex-row gap-4 h-full min-h-0 overflow-y-auto sm:overflow-x-auto pb-4">
       {STATUS_COLUMNS.map((col) => {
         const colTodos = todos.filter((t) => t.status === col.key);
         return (
-          <div key={col.key} className="flex-1 min-w-[280px] flex flex-col min-h-0">
+          <div key={col.key} className="flex-1 sm:min-w-[240px] flex flex-col min-h-0">
             {/* Column header */}
             <div className={cn('flex items-center justify-between px-3 py-2 rounded-t-lg border-t-2', col.color, col.bg)}>
               <div className="flex items-center gap-2">
