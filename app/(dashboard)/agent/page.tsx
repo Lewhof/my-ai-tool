@@ -15,6 +15,20 @@ interface Message {
   content: string;
 }
 
+const SLASH_COMMANDS = [
+  { cmd: '/task', desc: 'Create a task', example: '/task Review contracts' },
+  { cmd: '/note', desc: 'Save a note', example: '/note Meeting recap' },
+  { cmd: '/image', desc: 'Generate image', example: '/image A futuristic city' },
+  { cmd: '/search', desc: 'Web search', example: '/search Latest Next.js features' },
+  { cmd: '/whiteboard', desc: 'Add to backlog', example: '/whiteboard New feature idea' },
+  { cmd: '/kb', desc: 'Search knowledge base', example: '/kb AI stack' },
+  { cmd: '/calendar', desc: 'Check calendar', example: '/calendar' },
+  { cmd: '/todos', desc: 'Show tasks', example: '/todos' },
+  { cmd: '/email', desc: 'Check email', example: '/email' },
+  { cmd: '/weather', desc: 'Get weather', example: '/weather' },
+  { cmd: '/credits', desc: 'AI usage', example: '/credits' },
+];
+
 const SUGGESTED_PROMPTS = [
   { icon: Calendar, text: "What's on my calendar today?", color: 'text-blue-400' },
   { icon: CheckSquare, text: 'Show me my pending tasks', color: 'text-green-400' },
@@ -118,9 +132,27 @@ export default function AgentPage() {
     e.target.value = '';
   };
 
+  // Slash command handler
+  const processSlashCommand = (msg: string): string => {
+    if (msg.startsWith('/task ')) return `Create a task: "${msg.slice(6)}"`;
+    if (msg.startsWith('/note ')) return `Save a note titled "${msg.slice(6)}" with relevant content`;
+    if (msg.startsWith('/image ')) return `Generate an image: ${msg.slice(7)}`;
+    if (msg.startsWith('/search ')) return `Search the web for: ${msg.slice(8)}`;
+    if (msg.startsWith('/whiteboard ')) return `Add to whiteboard: "${msg.slice(12)}"`;
+    if (msg.startsWith('/kb ')) return `Search the knowledge base for: ${msg.slice(4)}`;
+    if (msg.startsWith('/calendar')) return 'Show me my calendar events for today and tomorrow';
+    if (msg.startsWith('/weather')) return "What's the current weather?";
+    if (msg.startsWith('/credits')) return 'Show me my AI usage and credits';
+    if (msg.startsWith('/todos')) return 'Show me my pending tasks';
+    if (msg.startsWith('/email')) return 'Show me my recent unread emails';
+    return msg;
+  };
+
   const sendMessage = async (text?: string) => {
-    const msg = text || input.trim();
-    if (!msg || loading) return;
+    const rawMsg = text || input.trim();
+    if (!rawMsg || loading) return;
+
+    const msg = processSlashCommand(rawMsg);
 
     // Build message with quote if replying
     const fullMsg = replyTo
@@ -203,7 +235,34 @@ export default function AgentPage() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-auto px-6 py-4 space-y-4">
+      <div
+        className="flex-1 overflow-auto px-6 py-4 space-y-4"
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+        onDrop={async (e) => {
+          e.preventDefault();
+          const file = e.dataTransfer.files?.[0];
+          if (!file) return;
+          if (file.type.startsWith('image/')) {
+            // Send to vision analysis
+            const fakeEvent = { target: { files: [file], value: '' } } as unknown as React.ChangeEvent<HTMLInputElement>;
+            handleImageUpload(fakeEvent);
+          } else {
+            // Upload doc and ask to analyze
+            setLoading(true);
+            setMessages((prev) => [...prev, { role: 'user', content: `📎 [File uploaded: ${file.name}]` }]);
+            const formData = new FormData();
+            formData.append('file', file);
+            const uploadRes = await fetch('/api/documents', { method: 'POST', body: formData });
+            if (uploadRes.ok) {
+              const doc = await uploadRes.json();
+              sendMessage(`I just uploaded a document called "${file.name}". Can you analyze it? Document ID: ${doc.id}`);
+            } else {
+              setMessages((prev) => [...prev, { role: 'assistant', content: 'Failed to upload file. Please try again.' }]);
+              setLoading(false);
+            }
+          }
+        }}
+      >
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-6">
             <div className="text-center">
@@ -274,6 +333,21 @@ export default function AgentPage() {
                 ) : (
                   <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                 )}
+                {/* Forward actions for assistant messages */}
+                {msg.role === 'assistant' && msg.content.length > 10 && (
+                  <div className="flex gap-1 mt-2 pt-2 border-t border-gray-700/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {[
+                      { label: 'Task', action: async () => { await fetch('/api/todos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: msg.content.replace(/[#*`>\-]/g, '').trim().slice(0, 100) }) }); } },
+                      { label: 'Note', action: async () => { await fetch('/api/notes-v2', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Cerebro Note' }) }).then((r) => r.json()).then(async (n) => { if (n.id) await fetch(`/api/notes-v2/${n.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: msg.content }) }); }); } },
+                      { label: 'KB', action: async () => { await fetch('/api/kb', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: `Cerebro — ${new Date().toLocaleDateString()}`, content: msg.content, category: 'Reference', tags: ['cerebro'] }) }); } },
+                      { label: 'Board', action: async () => { await fetch('/api/whiteboard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: msg.content.replace(/[#*`>\-]/g, '').trim().slice(0, 80), description: msg.content }) }); } },
+                    ].map((fwd) => (
+                      <button key={fwd.label} onClick={async () => { await fwd.action(); alert(`Saved to ${fwd.label}`); }} className="text-gray-600 hover:text-accent-400 text-[10px] px-1.5 py-0.5 rounded hover:bg-gray-700/50 transition-colors">
+                        → {fwd.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               {/* Reply button */}
               <button
@@ -307,6 +381,25 @@ export default function AgentPage() {
       </div>
 
       {/* Input */}
+      {/* Slash command autocomplete */}
+      {input.startsWith('/') && !loading && (
+        <div className="px-4 py-2 border-t border-gray-700 bg-gray-800 shrink-0 max-h-48 overflow-auto">
+          {SLASH_COMMANDS.filter((c) => c.cmd.startsWith(input.split(' ')[0])).map((cmd) => (
+            <button
+              key={cmd.cmd}
+              onClick={() => setInput(cmd.cmd + ' ')}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors text-left"
+            >
+              <div>
+                <span className="text-accent-400 text-sm font-mono">{cmd.cmd}</span>
+                <span className="text-gray-500 text-xs ml-2">{cmd.desc}</span>
+              </div>
+              <span className="text-gray-600 text-xs">{cmd.example}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Reply preview */}
       {replyTo && (
         <div className="px-4 py-2 bg-gray-800 border-t border-gray-700 flex items-start gap-2 shrink-0">
