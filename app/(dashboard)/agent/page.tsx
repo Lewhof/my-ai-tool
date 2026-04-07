@@ -150,7 +150,7 @@ export default function AgentPage() {
           <Bot size={18} className="text-white" />
         </div>
         <div>
-          <h2 className="text-white font-semibold text-sm">Master Agent</h2>
+          <h2 className="text-white font-semibold text-sm">Cerebro</h2>
           <p className="text-gray-500 text-xs">Claude Sonnet with access to all your tools</p>
         </div>
         {messages.length > 0 && (
