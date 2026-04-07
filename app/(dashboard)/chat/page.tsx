@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import ThreadList from '@/components/chat/thread-list';
-import ChatContainer from '@/components/chat/chat-container';
+import { MessageSquare } from 'lucide-react';
 import type { ChatThread } from '@/lib/types';
 
 export default function ChatPage() {
@@ -25,7 +25,6 @@ export default function ChatPage() {
   useEffect(() => { fetchThreads(); }, [fetchThreads]);
 
   const handleNewChat = async (model: string) => {
-    // Create thread with selected model, navigate to it
     const res = await fetch('/api/chat/threads', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -46,8 +45,11 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col sm:flex-row h-full min-h-0">
       <ThreadList threads={threads} onNewChat={handleNewChat} onDelete={handleDelete} loading={loading} />
-      <div className="flex-1 min-w-0 min-h-0">
-        <ChatContainer />
+      <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center">
+        <div className="text-center">
+          <MessageSquare size={32} className="mx-auto text-gray-600 mb-3" />
+          <p className="text-gray-400 text-sm">Select a conversation or start a new one</p>
+        </div>
       </div>
     </div>
   );
