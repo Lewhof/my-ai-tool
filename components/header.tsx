@@ -27,6 +27,8 @@ const pageTitles: Record<string, string> = {
   '/settings/ai': 'AI & Models',
   '/settings/documents': 'Documents',
   '/settings/theme': 'Theme & Colours',
+  '/settings/privacy': 'Privacy',
+  '/focus': 'Focus Mode',
 };
 
 interface HeaderProps {
