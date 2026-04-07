@@ -19,12 +19,12 @@ export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
-  const { title } = await req.json().catch(() => ({ title: 'New Chat' }));
+  const { title, model } = await req.json().catch(() => ({ title: 'New Chat', model: 'claude-haiku' }));
 
   const { data, error } = await supabaseAdmin
     .from('chat_threads')
-    .insert({ user_id: userId, title: title || 'New Chat' })
-    .select('id, title')
+    .insert({ user_id: userId, title: title || 'New Chat', model: model || 'claude-haiku' })
+    .select('id, title, model')
     .single();
 
   if (error) return Response.json({ error: error.message }, { status: 500 });

@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import MessageList from './message-list';
 import ChatInput from './chat-input';
-import ModelSelector from './model-selector';
 import type { ChatMessage } from '@/lib/types';
 
 interface ChatContainerProps {
@@ -121,11 +120,6 @@ export default function ChatContainer({
 
   return (
     <div className="flex flex-col h-full">
-      {showModelSelector && (
-        <div className="px-4 py-2 border-b border-gray-700 flex items-center justify-between shrink-0">
-          <ModelSelector value={model} onChange={setModel} compact />
-        </div>
-      )}
       <MessageList messages={messages} streamingContent={streamingContent || undefined} />
       {error && (
         <div className="px-4 py-2 bg-red-500/10 border-t border-red-500/30">
