@@ -19,6 +19,9 @@ const pageTitles: Record<string, string> = {
   '/kb': 'Knowledge Base',
   '/vault': 'Vault',
   '/settings': 'General',
+  '/settings/connections': 'Connections',
+  '/settings/ai': 'AI & Models',
+  '/settings/documents': 'Documents',
   '/settings/theme': 'Theme & Colours',
 };
 
