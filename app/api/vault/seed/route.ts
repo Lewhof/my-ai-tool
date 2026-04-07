@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { encrypt, maskValue } from '@/lib/crypto';
 
 const SEED_KEYS = [
   { name: 'ANTHROPIC_API_KEY', service: 'Anthropic', category: 'API Key', value: process.env.ANTHROPIC_API_KEY },
@@ -36,8 +37,9 @@ export async function POST() {
         name: k.name,
         service: k.service,
         category: k.category,
-        value: val,
-        masked_value: val.length > 16 ? val.slice(0, 8) + '...' + val.slice(-4) : '****',
+        value: encrypt(val),
+        masked_value: maskValue(val, 'default'),
+        fields: { value: encrypt(val) },
       };
     });
 
