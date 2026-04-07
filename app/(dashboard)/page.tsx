@@ -7,6 +7,7 @@ import { MessageSquare, FileText, Zap, Lock, Unlock, RotateCcw, Plus } from 'luc
 import { formatRelativeDate, truncate } from '@/lib/utils';
 import WeatherWidget from '@/components/dashboard/weather-widget';
 import CalendarWidget from '@/components/dashboard/calendar-widget';
+import BriefingWidget from '@/components/dashboard/briefing-widget';
 import type { Layout } from 'react-grid-layout';
 
 const ResponsiveGridLayout = dynamic(
@@ -49,7 +50,8 @@ function formatTokens(tokens: number): string {
 const DEFAULT_LAYOUTS: Record<string, Layout[]> = {
   lg: [
     { i: 'quick-actions', x: 0, y: 0, w: 12, h: 2, isResizable: false },
-    { i: 'credits', x: 0, y: 2, w: 8, h: 7 },
+    { i: 'briefing', x: 0, y: 2, w: 8, h: 8 },
+    { i: 'credits', x: 8, y: 10, w: 4, h: 7 },
     { i: 'weather', x: 8, y: 2, w: 4, h: 7 },
     { i: 'notepad', x: 0, y: 9, w: 4, h: 5 },
     { i: 'chats', x: 4, y: 9, w: 4, h: 5 },
@@ -187,6 +189,11 @@ export default function DashboardPage() {
         </div>
 
         {/* AI Credits */}
+        {/* AI Briefing */}
+        <div key="briefing">
+          <BriefingWidget />
+        </div>
+
         <div key="credits" className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden flex flex-col">
           <div className="widget-handle px-5 py-3 border-b border-gray-700 cursor-move">
             <h3 className="text-white font-semibold text-sm">AI Credits & Usage</h3>

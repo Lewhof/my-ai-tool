@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { cn, formatRelativeDate } from '@/lib/utils';
-import { Pencil, Check, Play, Trash2, X } from 'lucide-react';
+import { Pencil, Check, Play, Trash2, X, Sparkles } from 'lucide-react';
 
 interface WhiteboardItem {
   id: string;
@@ -358,6 +358,17 @@ export default function WhiteboardPage() {
               Seed Items
             </button>
           )}
+          <button
+            onClick={async () => {
+              const res = await fetch('/api/whiteboard/prioritize', { method: 'POST' });
+              if (res.ok) fetchItems();
+            }}
+            className="text-gray-400 hover:text-accent-400 px-3 py-2 rounded-lg text-sm border border-gray-600 hover:border-accent-600/50 transition-colors flex items-center gap-1.5"
+            title="AI auto-prioritize"
+          >
+            <Sparkles size={14} />
+            Prioritize
+          </button>
           <button
             onClick={() => setShowAdd(!showAdd)}
             className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
