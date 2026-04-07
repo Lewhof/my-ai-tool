@@ -11,18 +11,30 @@ export default function ChatThreadPage({ params }: { params: Promise<{ id: strin
   const router = useRouter();
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(true);
 
   const fetchThreads = useCallback(async () => {
-    const res = await fetch('/api/chat/threads');
-    const data = await res.json();
-    setThreads(data.threads ?? []);
+    try {
+      const res = await fetch('/api/chat/threads');
+      if (res.ok) {
+        const data = await res.json();
+        setThreads(data.threads ?? []);
+      }
+    } catch { /* silent */ }
+    finally { setLoading(false); }
   }, []);
 
   const fetchMessages = useCallback(async () => {
-    const res = await fetch(`/api/chat/threads/${id}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    setMessages(data.messages ?? []);
+    setMessagesLoading(true);
+    try {
+      const res = await fetch(`/api/chat/threads/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data.messages ?? []);
+      }
+    } catch { /* silent */ }
+    finally { setMessagesLoading(false); }
   }, [id]);
 
   useEffect(() => {
@@ -42,9 +54,15 @@ export default function ChatThreadPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="flex flex-col sm:flex-row h-full min-h-0">
-      <ThreadList threads={threads} onNewChat={handleNewChat} onDelete={handleDelete} />
+      <ThreadList threads={threads} onNewChat={handleNewChat} onDelete={handleDelete} loading={loading} />
       <div className="flex-1 min-w-0 min-h-0">
-        <ChatContainer threadId={id} initialMessages={messages} />
+        {messagesLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-gray-500 text-sm">Loading messages...</p>
+          </div>
+        ) : (
+          <ChatContainer threadId={id} initialMessages={messages} />
+        )}
       </div>
     </div>
   );

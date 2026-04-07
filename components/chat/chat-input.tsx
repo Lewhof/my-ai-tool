@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { Send } from 'lucide-react';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -21,7 +22,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !disabled) {
       e.preventDefault();
       handleSend();
     }
@@ -29,14 +30,13 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
-    // Auto-resize
     const el = e.target;
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 200) + 'px';
   };
 
   return (
-    <div className="border-t border-gray-700 p-4 flex gap-3">
+    <div className="border-t border-gray-700 p-3 sm:p-4 flex gap-3 shrink-0">
       <textarea
         ref={textareaRef}
         value={input}
@@ -44,15 +44,16 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
         onKeyDown={handleKeyDown}
         placeholder="Type a message... (Shift+Enter for newline)"
         rows={1}
-        className="flex-1 bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent-600 resize-none"
+        className="flex-1 bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-600 resize-none placeholder-gray-500"
         disabled={disabled}
       />
       <button
         onClick={handleSend}
         disabled={disabled || !input.trim()}
-        className="bg-accent-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-accent-700 transition-colors disabled:opacity-50 self-end"
+        className="bg-accent-600 text-white p-2.5 rounded-lg hover:bg-accent-700 transition-colors disabled:opacity-30 self-end"
+        title="Send message"
       >
-        {disabled ? 'Thinking...' : 'Send'}
+        <Send size={18} />
       </button>
     </div>
   );
