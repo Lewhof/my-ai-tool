@@ -2,12 +2,14 @@
 
 import { UserButton } from '@clerk/nextjs';
 import { usePathname } from 'next/navigation';
+import { Bell, Search } from 'lucide-react';
+import { toast } from 'sonner';
 
 const pageTitles: Record<string, string> = {
   '/': 'Dashboard',
   '/agent': 'Cerebro',
   '/chat': 'Chat',
-  '/todos': 'To-Do',
+  '/todos': 'Tasks',
   '/email': 'Email',
   '/calendar': 'Calendar',
   '/agents': 'Agents',
@@ -17,11 +19,11 @@ const pageTitles: Record<string, string> = {
   '/documents': 'Documents',
   '/workflows': 'Workflows',
   '/whiteboard': 'Whiteboard',
-  '/social': 'Social',
+  '/social': 'Social Hub',
   '/credits': 'AI Credits',
   '/kb': 'Knowledge Base',
   '/vault': 'Vault',
-  '/settings': 'General',
+  '/settings': 'Settings',
   '/settings/connections': 'Connections',
   '/settings/ai': 'AI & Models',
   '/settings/documents': 'Documents',
@@ -38,9 +40,27 @@ export default function Header() {
     'Dashboard';
 
   return (
-    <header className="h-12 bg-gray-900 border-b border-gray-800 hidden lg:flex items-center justify-between px-4 shrink-0">
-      <p className="text-white text-sm font-medium">{title}</p>
-      <UserButton />
+    <header
+      className="h-14 border-b border-border hidden lg:flex items-center justify-between px-4 shrink-0"
+      style={{ background: 'var(--color-sidebar)' }}
+    >
+      <h1 className="text-[15px] font-semibold text-foreground">{title}</h1>
+      <div className="flex items-center gap-2">
+        <button
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors"
+          onClick={() => toast('Search — coming soon')}
+        >
+          <Search size={16} />
+        </button>
+        <button
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors relative"
+          onClick={() => toast('Notifications — coming soon')}
+        >
+          <Bell size={16} />
+          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full status-dot-orange" />
+        </button>
+        <UserButton />
+      </div>
     </header>
   );
 }

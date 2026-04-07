@@ -1,12 +1,13 @@
 {
   "name": "Lewhof AI",
   "short_name": "Lewhof",
-  "description": "Personal AI-powered productivity dashboard",
+  "description": "Your personal AI-powered command centre",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0d1b2a",
-  "theme_color": "#ea580c",
+  "background_color": "#2E2318",
+  "theme_color": "#2E2318",
   "orientation": "portrait-primary",
+  "categories": ["productivity", "utilities"],
   "icons": [
     {
       "src": "/icon-192.png",

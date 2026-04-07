@@ -3,185 +3,166 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { UserButton } from '@clerk/nextjs';
 import {
-  LayoutDashboard,
-  Bot,
-  CheckSquare,
-  MessageSquare,
-  CalendarDays,
-  StickyNote,
-  Mail,
-  Focus,
-  CreditCard,
-  GitFork,
-  FileText,
-  Zap,
-  ClipboardList,
-  BookOpen,
-  KeyRound,
-  Settings,
-  Palette,
-  Globe,
-  Link2,
-  Brain,
-  FolderCog,
-  ShieldCheck,
-  Image as ImageIcon,
-  ChevronDown,
-  type LucideIcon,
+  LayoutDashboard, Bot, CheckSquare, FileText,
+  Calendar, Mail, KeyRound, Settings, MessageSquare,
+  Zap, BookOpen, Image as ImageIcon, Focus, StickyNote, GitFork,
+  ClipboardList, CreditCard, ChevronLeft, ChevronRight, Globe,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-interface NavItem {
-  name: string;
-  href: string;
-  icon: LucideIcon;
-}
-
-interface NavGroup {
-  label: string;
-  items: NavItem[];
-}
-
-const navGroups: NavGroup[] = [
+const SIDEBAR_GROUPS = [
   {
     label: 'Home',
     items: [
       { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-      { name: 'Cerebro', href: '/agent', icon: Bot },
+      { name: 'Cerebro', href: '/agent', icon: Bot, isBrand: true },
     ],
   },
   {
     label: 'Productivity',
     items: [
-      { name: 'To-Do', href: '/todos', icon: CheckSquare },
-      { name: 'Calendar', href: '/calendar', icon: CalendarDays },
-      { name: 'Chat', href: '/chat', icon: MessageSquare },
+      { name: 'Tasks', href: '/todos', icon: CheckSquare },
+      { name: 'Calendar', href: '/calendar', icon: Calendar },
       { name: 'Email', href: '/email', icon: Mail },
-      { name: 'Focus', href: '/focus', icon: Focus },
+      { name: 'Chat', href: '/chat', icon: MessageSquare },
       { name: 'Notes', href: '/notes', icon: StickyNote },
       { name: 'Documents', href: '/documents', icon: FileText },
+      { name: 'Focus', href: '/focus', icon: Focus },
     ],
   },
   {
     label: 'Build',
     items: [
       { name: 'Diagrams', href: '/diagrams', icon: GitFork },
-      { name: 'Agents', href: '/agents', icon: Bot },
       { name: 'Image Lab', href: '/images', icon: ImageIcon },
       { name: 'Workflows', href: '/workflows', icon: Zap },
       { name: 'Whiteboard', href: '/whiteboard', icon: ClipboardList },
     ],
   },
   {
-    label: 'Social',
-    items: [
-      { name: 'Social Hub', href: '/social', icon: Globe },
-    ],
-  },
-  {
     label: 'System',
     items: [
-      { name: 'AI Credits', href: '/credits', icon: CreditCard },
-      { name: 'Knowledge Base', href: '/kb', icon: BookOpen },
       { name: 'Vault', href: '/vault', icon: KeyRound },
-    ],
-  },
-  {
-    label: 'Settings',
-    items: [
-      { name: 'General', href: '/settings', icon: Settings },
-      { name: 'Connections', href: '/settings/connections', icon: Link2 },
-      { name: 'AI & Models', href: '/settings/ai', icon: Brain },
-      { name: 'Documents', href: '/settings/documents', icon: FolderCog },
-      { name: 'Theme', href: '/settings/theme', icon: Palette },
-      { name: 'Privacy', href: '/settings/privacy', icon: ShieldCheck },
+      { name: 'Knowledge Base', href: '/kb', icon: BookOpen },
+      { name: 'AI Credits', href: '/credits', icon: CreditCard },
+      { name: 'Social', href: '/social', icon: Globe },
+      { name: 'Settings', href: '/settings', icon: Settings },
     ],
   },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
 
-  const getInitialExpanded = () => {
-    const expanded: Record<string, boolean> = {};
-    navGroups.forEach((group) => {
-      const hasActive = group.items.some((item) =>
-        item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
-      );
-      expanded[group.label] = hasActive || group.label === 'Home';
-    });
-    return expanded;
-  };
-
-  const [expanded, setExpanded] = useState<Record<string, boolean>>(getInitialExpanded);
-
-  const toggleGroup = (label: string) => {
-    setExpanded((prev) => ({ ...prev, [label]: !prev[label] }));
+  const isActive = (href: string) => {
+    if (href === '/') return pathname === '/';
+    return pathname.startsWith(href);
   };
 
   return (
-      <aside className="hidden lg:flex bg-gray-900 border-r border-gray-700/40 flex-col w-56">
-        {/* Logo */}
-        <div className="h-12 flex items-center justify-between px-4 border-b border-gray-700/40">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-accent-600 flex items-center justify-center">
-              <span className="text-white text-xs font-bold">L</span>
+    <aside
+      className={cn(
+        'hidden lg:flex flex-col border-r border-border transition-all duration-300 ease-in-out shrink-0',
+        collapsed ? 'w-16' : 'w-60'
+      )}
+      style={{ background: 'var(--color-sidebar)' }}
+    >
+      {/* Logo */}
+      <div className="flex items-center justify-between px-4 h-14 border-b border-border shrink-0">
+        {!collapsed && (
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 cerebro-pulse"
+              style={{ background: 'var(--color-brand)' }}
+            >
+              <span className="text-white text-xs font-bold font-mono">L</span>
             </div>
-            <h1 className="text-base font-bold text-slate-100 tracking-tight">Lewhof AI</h1>
+            <span className="text-sm font-semibold text-foreground truncate" style={{ fontFamily: 'var(--font-display)' }}>
+              Lewhof AI
+            </span>
+          </div>
+        )}
+        {collapsed && (
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center mx-auto cerebro-pulse"
+            style={{ background: 'var(--color-brand)' }}
+          >
+            <span className="text-white text-xs font-bold font-mono">L</span>
+          </div>
+        )}
+        {!collapsed && (
+          <button
+            onClick={() => setCollapsed(true)}
+            className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded"
+          >
+            <ChevronLeft size={14} />
+          </button>
+        )}
+      </div>
+
+      {/* Expand button when collapsed */}
+      {collapsed && (
+        <button
+          onClick={() => setCollapsed(false)}
+          className="flex items-center justify-center h-8 mt-2 mx-2 rounded text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors"
+        >
+          <ChevronRight size={14} />
+        </button>
+      )}
+
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
+        {SIDEBAR_GROUPS.map((group) => (
+          <div key={group.label}>
+            {!collapsed && (
+              <p className="px-2 mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                {group.label}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-2 py-2 rounded-lg text-[13px] font-medium transition-all duration-150',
+                      collapsed ? 'justify-center' : '',
+                      active
+                        ? 'text-white'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-surface-2'
+                    )}
+                    style={active ? {
+                      background: (item as { isBrand?: boolean }).isBrand
+                        ? 'var(--color-brand)'
+                        : 'var(--color-brand-dim)',
+                      color: (item as { isBrand?: boolean }).isBrand ? 'white' : 'var(--color-brand)',
+                    } : {}}
+                    title={collapsed ? item.name : undefined}
+                  >
+                    <Icon size={16} strokeWidth={active ? 2 : 1.5} className="shrink-0" />
+                    {!collapsed && <span className="truncate">{item.name}</span>}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      {/* User */}
+      {!collapsed && (
+        <div className="border-t border-border p-3 shrink-0">
+          <div className="flex items-center gap-2.5 px-2 py-1.5">
+            <UserButton />
           </div>
         </div>
-
-        {/* Nav groups */}
-        <nav className="flex-1 py-2 overflow-auto">
-          {navGroups.map((group) => {
-            const isExpanded = expanded[group.label] ?? true;
-            return (
-              <div key={group.label} className="mb-1">
-                <button
-                  onClick={() => toggleGroup(group.label)}
-                  className="w-full flex items-center justify-between px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
-                >
-                  <span>{group.label}</span>
-                  <ChevronDown
-                    size={12}
-                    className={cn(
-                      'transition-transform duration-200',
-                      !isExpanded && '-rotate-90'
-                    )}
-                  />
-                </button>
-
-                {isExpanded && (
-                  <div className="mt-0.5 px-2 space-y-0.5">
-                    {group.items.map((item) => {
-                      const isActive =
-                        item.href === '/'
-                          ? pathname === '/'
-                          : pathname.startsWith(item.href);
-                      const Icon = item.icon;
-                      return (
-                        <Link
-                          key={item.name}
-                          href={item.href}
-                          className={cn(
-                            'flex items-center gap-3 px-3 py-2 rounded-md text-[13px] transition-all duration-150',
-                            isActive
-                              ? 'bg-accent-600/10 text-accent-500 border-l-2 border-accent-600 pl-[10px]'
-                              : 'text-gray-400 hover:bg-gray-800/80 hover:text-gray-200'
-                          )}
-                        >
-                          <Icon size={16} strokeWidth={isActive ? 2 : 1.5} />
-                          <span className="font-medium">{item.name}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </nav>
-      </aside>
+      )}
+    </aside>
   );
 }

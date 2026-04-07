@@ -2,12 +2,14 @@
 
 import { UserButton } from '@clerk/nextjs';
 import { usePathname } from 'next/navigation';
+import { Bell, Search } from 'lucide-react';
+import { toast } from 'sonner';
 
 const pageTitles: Record<string, string> = {
   '/': 'Dashboard',
   '/agent': 'Cerebro',
   '/chat': 'Chat',
-  '/todos': 'To-Do',
+  '/todos': 'Tasks',
   '/email': 'Email',
   '/calendar': 'Calendar',
   '/focus': 'Focus',
@@ -17,7 +19,7 @@ const pageTitles: Record<string, string> = {
   '/images': 'Image Lab',
   '/workflows': 'Workflows',
   '/whiteboard': 'Whiteboard',
-  '/social': 'Social',
+  '/social': 'Social Hub',
   '/credits': 'AI Credits',
   '/kb': 'Knowledge Base',
   '/vault': 'Vault',
@@ -33,15 +35,36 @@ export default function MobileHeader() {
     'Lewhof AI';
 
   return (
-    <header className="sticky top-0 z-20 bg-gray-900 border-b border-gray-800 lg:hidden safe-top">
-      <div className="flex items-center justify-between px-4 h-12">
+    <header
+      className="sticky top-0 z-20 border-b border-border lg:hidden safe-top"
+      style={{ background: 'var(--color-sidebar)' }}
+    >
+      <div className="flex items-center justify-between px-4 h-14">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded bg-accent-600 flex items-center justify-center">
-            <span className="text-white text-xs font-bold">L</span>
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center cerebro-pulse"
+            style={{ background: 'var(--color-brand)' }}
+          >
+            <span className="text-white text-xs font-bold font-mono">L</span>
           </div>
-          <p className="text-white text-sm font-semibold">{title}</p>
+          <p className="text-[15px] font-semibold text-foreground">{title}</p>
         </div>
-        <UserButton />
+        <div className="flex items-center gap-2">
+          <button
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors"
+            onClick={() => toast('Search — coming soon')}
+          >
+            <Search size={16} />
+          </button>
+          <button
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors relative"
+            onClick={() => toast('Notifications — coming soon')}
+          >
+            <Bell size={16} />
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full status-dot-orange" />
+          </button>
+          <UserButton />
+        </div>
       </div>
     </header>
   );
