@@ -95,15 +95,24 @@ export default function AgentPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Upload to notes storage for a URL
-    const formData = new FormData();
-    formData.append('file', file);
-    const uploadRes = await fetch('/api/notes-v2/upload', { method: 'POST', body: formData });
-    const uploadData = await uploadRes.json();
+    setLoading(true);
+    setMessages((prev) => [...prev, { role: 'user', content: '📷 [Photo uploaded for analysis]' }]);
 
-    if (uploadData.url) {
-      const msg = `I'm sharing an image with you: ${uploadData.url}\n\nPlease analyze this image and tell me what you see.`;
-      sendMessage(msg);
+    try {
+      // Send image to Gemini Vision for analysis
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('prompt', input.trim() || 'Analyze this image in detail. Describe what you see.');
+
+      const res = await fetch('/api/agent/vision', { method: 'POST', body: formData });
+      const data = await res.json();
+
+      setMessages((prev) => [...prev, { role: 'assistant', content: data.analysis || data.error || 'Could not analyze image.' }]);
+    } catch {
+      setMessages((prev) => [...prev, { role: 'assistant', content: 'Error analyzing image. Please try again.' }]);
+    } finally {
+      setLoading(false);
+      setInput('');
     }
     e.target.value = '';
   };
