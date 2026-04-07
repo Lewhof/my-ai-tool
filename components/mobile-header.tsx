@@ -10,37 +10,39 @@ const pageTitles: Record<string, string> = {
   '/todos': 'To-Do',
   '/email': 'Email',
   '/calendar': 'Calendar',
-  '/agents': 'Agents',
-  '/diagrams': 'Diagrams',
-  '/images': 'Image Lab',
+  '/focus': 'Focus',
   '/notes': 'Notes',
   '/documents': 'Documents',
+  '/diagrams': 'Diagrams',
+  '/images': 'Image Lab',
   '/workflows': 'Workflows',
   '/whiteboard': 'Whiteboard',
   '/social': 'Social',
   '/credits': 'AI Credits',
   '/kb': 'Knowledge Base',
   '/vault': 'Vault',
-  '/settings': 'General',
-  '/settings/connections': 'Connections',
-  '/settings/ai': 'AI & Models',
-  '/settings/documents': 'Documents',
-  '/settings/theme': 'Theme & Colours',
-  '/settings/privacy': 'Privacy',
-  '/focus': 'Focus Mode',
+  '/settings': 'Settings',
+  '/agents': 'Agents',
 };
 
-export default function Header() {
+export default function MobileHeader() {
   const pathname = usePathname();
   const title =
     pageTitles[pathname] ??
     Object.entries(pageTitles).find(([k]) => k !== '/' && pathname.startsWith(k))?.[1] ??
-    'Dashboard';
+    'Lewhof AI';
 
   return (
-    <header className="h-12 bg-gray-900 border-b border-gray-800 hidden lg:flex items-center justify-between px-4 shrink-0">
-      <p className="text-white text-sm font-medium">{title}</p>
-      <UserButton />
+    <header className="sticky top-0 z-20 bg-gray-900 border-b border-gray-800 lg:hidden safe-top">
+      <div className="flex items-center justify-between px-4 h-12">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded bg-accent-600 flex items-center justify-center">
+            <span className="text-white text-xs font-bold">L</span>
+          </div>
+          <p className="text-white text-sm font-semibold">{title}</p>
+        </div>
+        <UserButton />
+      </div>
     </header>
   );
 }

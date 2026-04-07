@@ -100,12 +100,7 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-interface SidebarProps {
-  mobileOpen?: boolean;
-  onClose?: () => void;
-}
-
-export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
+export default function Sidebar() {
   const pathname = usePathname();
 
   const getInitialExpanded = () => {
@@ -126,22 +121,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   };
 
   return (
-    <>
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 z-40 lg:hidden"
-          onClick={onClose}
-        />
-      )}
-
-      <aside
-        className={cn(
-          'bg-gray-900 border-r border-gray-700/40 flex-col z-50',
-          mobileOpen
-            ? 'flex fixed inset-y-0 left-0 w-56 lg:relative'
-            : 'hidden lg:flex lg:w-56 lg:relative'
-        )}
-      >
+      <aside className="hidden lg:flex bg-gray-900 border-r border-gray-700/40 flex-col w-56">
         {/* Logo */}
         <div className="h-12 flex items-center justify-between px-4 border-b border-gray-700/40">
           <div className="flex items-center gap-2">
@@ -150,12 +130,6 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             </div>
             <h1 className="text-base font-bold text-slate-100 tracking-tight">Lewhof AI</h1>
           </div>
-          <button
-            onClick={onClose}
-            className="lg:hidden text-gray-500 hover:text-white transition-colors"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-          </button>
         </div>
 
         {/* Nav groups */}
@@ -190,7 +164,6 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
                         <Link
                           key={item.name}
                           href={item.href}
-                          onClick={onClose}
                           className={cn(
                             'flex items-center gap-3 px-3 py-2 rounded-md text-[13px] transition-all duration-150',
                             isActive
@@ -210,6 +183,5 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
           })}
         </nav>
       </aside>
-    </>
   );
 }
