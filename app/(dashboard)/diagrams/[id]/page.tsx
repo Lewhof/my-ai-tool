@@ -105,7 +105,7 @@ export default function DiagramViewPage({ params }: { params: Promise<{ id: stri
       a.download = `${diagram?.name || 'diagram'}.png`;
       a.click();
     } catch (e) {
-      console.error('PNG export failed', e);
+      alert('PNG export failed. Please try again.');
     }
   }, [diagram]);
 
@@ -119,7 +119,7 @@ export default function DiagramViewPage({ params }: { params: Promise<{ id: stri
       a.download = `${diagram?.name || 'diagram'}.svg`;
       a.click();
     } catch (e) {
-      console.error('SVG export failed', e);
+      alert('SVG export failed. Please try again.');
     }
   }, [diagram]);
 
@@ -155,7 +155,7 @@ export default function DiagramViewPage({ params }: { params: Promise<{ id: stri
         setIsSaved(false);
       }
     } catch (e) {
-      console.error('AI generation failed', e);
+      alert('AI generation failed. Please try again.');
     } finally {
       setAILoading(false);
     }
@@ -173,7 +173,7 @@ export default function DiagramViewPage({ params }: { params: Promise<{ id: stri
         alert(`Share requires a DB migration. Run this SQL in Supabase:\n\n${data.sql}`);
       }
     } catch (e) {
-      console.error('Share failed', e);
+      alert('Share failed. Please try again.');
     }
   }, [id]);
 
