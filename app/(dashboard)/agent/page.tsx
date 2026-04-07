@@ -36,6 +36,21 @@ export default function AgentPage() {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Load conversation history on mount
+  useEffect(() => {
+    fetch('/api/agent/history')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.messages?.length) {
+          setMessages(data.messages.map((m: { role: string; content: string }) => ({
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+          })));
+        }
+      })
+      .catch(() => { /* no history yet */ });
+  }, []);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
@@ -138,6 +153,18 @@ export default function AgentPage() {
           <h2 className="text-white font-semibold text-sm">Master Agent</h2>
           <p className="text-gray-500 text-xs">Claude Sonnet with access to all your tools</p>
         </div>
+        {messages.length > 0 && (
+          <button
+            onClick={async () => {
+              if (!confirm('Clear conversation history?')) return;
+              await fetch('/api/agent/history', { method: 'DELETE' });
+              setMessages([]);
+            }}
+            className="ml-auto text-gray-500 hover:text-red-400 text-xs px-3 py-1.5 border border-gray-700 rounded-lg transition-colors"
+          >
+            Clear History
+          </button>
+        )}
       </div>
 
       {/* Messages */}
