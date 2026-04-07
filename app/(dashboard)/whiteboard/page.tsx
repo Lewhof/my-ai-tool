@@ -16,6 +16,18 @@ interface WhiteboardItem {
 }
 
 const STATUSES = ['All', 'idea', 'scoped', 'in-progress', 'done', 'parked'];
+const SPRINTS = ['All Sprints', 'Sprint 1', 'Sprint 2', 'Sprint 3', 'Sprint 4', 'Sprint 5', 'Sprint 6', 'Backlog'];
+
+function getSprintFromTags(tags: string[]): string | null {
+  const t = tags.find(t => t.startsWith('sprint-'));
+  if (!t) return null;
+  const num = t.replace('sprint-', '');
+  return `Sprint ${num}`;
+}
+
+function getDisplayTags(tags: string[]): string[] {
+  return tags.filter(t => !t.startsWith('sprint-'));
+}
 
 const STATUS_COLORS: Record<string, string> = {
   idea: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
@@ -41,6 +53,7 @@ export default function WhiteboardPage() {
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newTags, setNewTags] = useState('');
+  const [newSprint, setNewSprint] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -62,7 +75,10 @@ export default function WhiteboardPage() {
       body: JSON.stringify({
         title: newTitle,
         description: newDesc || null,
-        tags: newTags ? newTags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+        tags: [
+        ...(newTags ? newTags.split(',').map((t) => t.trim()).filter(Boolean) : []),
+        ...(newSprint ? [`sprint-${newSprint}`] : []),
+      ],
       }),
     });
     setNewTitle('');
@@ -88,6 +104,7 @@ export default function WhiteboardPage() {
     setItems((prev) => prev.filter((i) => i.id !== id));
   };
 
+  const [sprintFilter, setSprintFilter] = useState('All Sprints');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
@@ -161,9 +178,13 @@ export default function WhiteboardPage() {
     fetchItems();
   };
 
-  const filtered = activeFilter === 'All'
-    ? items
-    : items.filter((i) => i.status === activeFilter);
+  const filtered = items.filter((i) => {
+    const statusMatch = activeFilter === 'All' || i.status === activeFilter;
+    if (!statusMatch) return false;
+    if (sprintFilter === 'All Sprints') return true;
+    if (sprintFilter === 'Backlog') return !getSprintFromTags(i.tags);
+    return getSprintFromTags(i.tags) === sprintFilter;
+  });
 
   const seedWhiteboard = async () => {
     await fetch('/api/whiteboard/seed', { method: 'POST' });
@@ -209,6 +230,7 @@ export default function WhiteboardPage() {
           <tr className="border-b border-border">
             <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 w-12">#</th>
             <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3">Item</th>
+            <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 w-24">Sprint</th>
             <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 w-32">Tags</th>
             <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 w-36">Status</th>
             <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 w-24">Added</th>
@@ -225,8 +247,18 @@ export default function WhiteboardPage() {
                 <td className="px-5 py-3 text-muted-foreground text-sm font-mono">{item.priority}</td>
                 <td className="px-5 py-3 text-foreground text-sm font-medium">{item.title}</td>
                 <td className="px-5 py-3">
+                  {(() => {
+                    const sprint = getSprintFromTags(item.tags);
+                    return sprint ? (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30 font-medium">{sprint}</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground/40">—</span>
+                    );
+                  })()}
+                </td>
+                <td className="px-5 py-3">
                   <div className="flex gap-1 flex-wrap">
-                    {item.tags.map((tag) => (
+                    {getDisplayTags(item.tags).map((tag) => (
                       <span key={tag} className="text-xs px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{tag}</span>
                     ))}
                   </div>
@@ -253,7 +285,7 @@ export default function WhiteboardPage() {
               </tr>
               {expandedId === item.id && item.description && (
                 <tr key={`${item.id}-desc`}>
-                  <td colSpan={6} className="px-5 py-4 bg-background/50">
+                  <td colSpan={7} className="px-5 py-4 bg-background/50">
                     <pre className="text-foreground text-sm whitespace-pre-wrap font-sans leading-relaxed">{item.description}</pre>
                   </td>
                 </tr>
@@ -285,7 +317,12 @@ export default function WhiteboardPage() {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <StatusBadge item={item} />
-                  {item.tags.map((tag) => (
+                  {getSprintFromTags(item.tags) && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30 font-medium">
+                      {getSprintFromTags(item.tags)}
+                    </span>
+                  )}
+                  {getDisplayTags(item.tags).map((tag) => (
                     <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">{tag}</span>
                   ))}
                   <span className="text-muted-foreground/60 text-xs">{formatRelativeDate(item.created_at)}</span>
@@ -426,6 +463,31 @@ export default function WhiteboardPage() {
         </div>
       </div>
 
+      {/* Sprint Filter */}
+      <div className="flex gap-2 flex-wrap">
+        {SPRINTS.map((sprint) => {
+          const count = sprint === 'All Sprints'
+            ? items.length
+            : sprint === 'Backlog'
+              ? items.filter(i => !getSprintFromTags(i.tags)).length
+              : items.filter(i => getSprintFromTags(i.tags) === sprint).length;
+          return (
+            <button
+              key={sprint}
+              onClick={() => setSprintFilter(sprint)}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
+                sprintFilter === sprint
+                  ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                  : 'text-muted-foreground border-border hover:border-white/15 hover:text-foreground'
+              )}
+            >
+              {sprint} ({count})
+            </button>
+          );
+        })}
+      </div>
+
       {/* Add Form */}
       {showAdd && (
         <div className="bg-card border border-border rounded-lg p-5 space-y-4">
@@ -448,14 +510,32 @@ export default function WhiteboardPage() {
               className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring resize-none"
             />
           </div>
-          <div>
-            <label className="text-foreground text-sm block mb-1">Tags (comma separated)</label>
-            <input
-              value={newTags}
-              onChange={(e) => setNewTags(e.target.value)}
-              placeholder="feature, chat, agent"
-              className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-ring"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-foreground text-sm block mb-1">Sprint</label>
+              <select
+                value={newSprint}
+                onChange={(e) => setNewSprint(e.target.value)}
+                className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Backlog</option>
+                <option value="1">Sprint 1</option>
+                <option value="2">Sprint 2</option>
+                <option value="3">Sprint 3</option>
+                <option value="4">Sprint 4</option>
+                <option value="5">Sprint 5</option>
+                <option value="6">Sprint 6</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-foreground text-sm block mb-1">Tags (comma separated)</label>
+              <input
+                value={newTags}
+                onChange={(e) => setNewTags(e.target.value)}
+                placeholder="feature, chat, agent"
+                className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
           </div>
           <button
             onClick={addItem}
