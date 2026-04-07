@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { cn, formatRelativeDate } from '@/lib/utils';
+import { Pencil, Check, Play, Trash2, X } from 'lucide-react';
 
 interface WhiteboardItem {
   id: string;
@@ -87,7 +88,58 @@ export default function WhiteboardPage() {
     setItems((prev) => prev.filter((i) => i.id !== id));
   };
 
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDesc, setEditDesc] = useState('');
   const [pushedIds, setPushedIds] = useState<Set<string>>(new Set());
+
+  const startEdit = (item: WhiteboardItem) => {
+    setEditingItemId(item.id);
+    setEditTitle(item.title);
+    setEditDesc(item.description || '');
+  };
+
+  const saveEdit = async () => {
+    if (!editingItemId || !editTitle.trim()) return;
+    await fetch(`/api/whiteboard/${editingItemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: editTitle, description: editDesc }),
+    });
+    setEditingItemId(null);
+    fetchItems();
+  };
+
+  const markComplete = async (id: string) => {
+    await updateStatus(id, 'done');
+  };
+
+  const handlePaste = async (e: React.ClipboardEvent, itemId: string) => {
+    const items_list = e.clipboardData?.items;
+    if (!items_list) return;
+    for (const item of items_list) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch('/api/notes-v2/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.url) {
+          const existing = items.find((i) => i.id === itemId);
+          const newDesc = (existing?.description || '') + `\n![screenshot](${data.url})`;
+          await fetch(`/api/whiteboard/${itemId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ description: newDesc }),
+          });
+          fetchItems();
+        }
+        return;
+      }
+    }
+  };
 
   const pushToClaude = async (item: WhiteboardItem) => {
     await fetch('/api/tasks', {
@@ -184,20 +236,19 @@ export default function WhiteboardPage() {
                 <td className="px-5 py-3 text-gray-500 text-xs">{formatRelativeDate(item.created_at)}</td>
                 <td className="px-3 py-3">
                   <div className="flex items-center gap-1">
+                    {item.status !== 'done' && (
+                      <button onClick={(e) => { e.stopPropagation(); markComplete(item.id); }} className="text-gray-600 hover:text-green-400 p-1 transition-colors rounded hover:bg-gray-700" title="Mark complete"><Check size={13} /></button>
+                    )}
+                    <button onClick={(e) => { e.stopPropagation(); startEdit(item); }} className="text-gray-600 hover:text-accent-400 p-1 transition-colors rounded hover:bg-gray-700" title="Edit"><Pencil size={13} /></button>
                     <button
                       onClick={(e) => { e.stopPropagation(); pushToClaude(item); }}
                       disabled={pushedIds.has(item.id) || item.status === 'in-progress'}
-                      className="text-gray-600 hover:text-accent-400 text-xs transition-colors disabled:opacity-30"
+                      className="text-gray-600 hover:text-accent-400 p-1 transition-colors rounded hover:bg-gray-700 disabled:opacity-30"
                       title="Push to Claude Code"
                     >
-                      {pushedIds.has(item.id) ? '✓' : '▶'}
+                      {pushedIds.has(item.id) ? <Check size={13} /> : <Play size={13} />}
                     </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }}
-                      className="text-gray-600 hover:text-red-400 text-sm transition-colors"
-                    >
-                      x
-                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} className="text-gray-600 hover:text-red-400 p-1 transition-colors rounded hover:bg-gray-700"><Trash2 size={13} /></button>
                   </div>
                 </td>
               </tr>
@@ -242,20 +293,19 @@ export default function WhiteboardPage() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                {item.status !== 'done' && (
+                  <button onClick={(e) => { e.stopPropagation(); markComplete(item.id); }} className="text-gray-600 hover:text-green-400 p-1 rounded hover:bg-gray-700 transition-colors" title="Mark complete"><Check size={14} /></button>
+                )}
+                <button onClick={(e) => { e.stopPropagation(); startEdit(item); }} className="text-gray-600 hover:text-accent-400 p-1 rounded hover:bg-gray-700 transition-colors" title="Edit"><Pencil size={14} /></button>
                 <button
                   onClick={(e) => { e.stopPropagation(); pushToClaude(item); }}
                   disabled={pushedIds.has(item.id) || item.status === 'in-progress'}
-                  className="text-gray-600 hover:text-accent-400 text-xs px-2 py-1 border border-gray-700 rounded transition-colors disabled:opacity-30"
+                  className="text-gray-600 hover:text-accent-400 p-1 rounded hover:bg-gray-700 transition-colors disabled:opacity-30"
                   title="Push to Claude Code"
                 >
-                  {pushedIds.has(item.id) ? 'Queued' : '▶ Claude'}
+                  {pushedIds.has(item.id) ? <Check size={14} /> : <Play size={14} />}
                 </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }}
-                  className="text-gray-600 hover:text-red-400 text-sm transition-colors"
-                >
-                  x
-                </button>
+                <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} className="text-gray-600 hover:text-red-400 p-1 rounded hover:bg-gray-700 transition-colors"><Trash2 size={14} /></button>
               </div>
             </div>
           </div>
@@ -271,6 +321,28 @@ export default function WhiteboardPage() {
 
   return (
     <div className="p-6 max-w-5xl space-y-6">
+      {/* Edit Modal */}
+      {editingItemId && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setEditingItemId(null)}>
+          <div className="bg-gray-800 border border-gray-700 rounded-xl w-full max-w-lg p-6 space-y-4" onClick={(e) => e.stopPropagation()} onPaste={(e) => handlePaste(e, editingItemId)}>
+            <h3 className="text-white font-semibold">Edit Item</h3>
+            <div>
+              <label className="text-gray-300 text-sm block mb-1">Title</label>
+              <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-600" />
+            </div>
+            <div>
+              <label className="text-gray-300 text-sm block mb-1">Description / Scope</label>
+              <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={8} className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent-600 resize-none" placeholder="Paste screenshots with Ctrl+V" />
+            </div>
+            <p className="text-gray-600 text-xs">Tip: Paste screenshots directly (Ctrl+V) — they'll be uploaded and added to the description.</p>
+            <div className="flex gap-2">
+              <button onClick={saveEdit} className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700">Save</button>
+              <button onClick={() => setEditingItemId(null)} className="text-gray-400 px-4 py-2 rounded-lg text-sm hover:text-white">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

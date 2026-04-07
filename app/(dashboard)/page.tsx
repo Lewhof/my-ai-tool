@@ -86,6 +86,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [credits, setCredits] = useState<CreditsData | null>(null);
   const [notepad, setNotepad] = useState('');
+  const [noteId, setNoteId] = useState<string | null>(null);
   const [noteSaved, setNoteSaved] = useState(true);
   const [locked, setLocked] = useState(true);
   const [layouts, setLayouts] = useState<Record<string, Layout[]>>(DEFAULT_LAYOUTS);
@@ -111,7 +112,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboard();
-    fetch('/api/notes').then((r) => r.json()).then((d) => setNotepad(d?.content ?? ''));
+    fetch('/api/notes').then((r) => r.json()).then((d) => { setNotepad(d?.content ?? ''); setNoteId(d?.id ?? null); });
     fetch('/api/dashboard/credits').then((r) => r.json()).then(setCredits);
 
     // Load saved layout
@@ -241,9 +242,14 @@ export default function DashboardPage() {
         <div key="notepad" className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden flex flex-col">
           <div className="widget-handle px-5 py-3 border-b border-gray-700 flex items-center justify-between cursor-move">
             <h3 className="text-white font-semibold text-sm">Notepad</h3>
-            <div className="flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${noteSaved ? 'bg-green-400' : 'bg-yellow-400'}`} />
-              <span className="text-gray-500 text-xs">{noteSaved ? 'Saved' : '...'}</span>
+            <div className="flex items-center gap-3">
+              <Link href="/notes" className="text-gray-500 hover:text-accent-400 transition-colors" title="New note">
+                <Plus size={14} />
+              </Link>
+              <div className="flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${noteSaved ? 'bg-green-400' : 'bg-yellow-400'}`} />
+                <span className="text-gray-500 text-xs">{noteSaved ? 'Saved' : '...'}</span>
+              </div>
             </div>
           </div>
           <textarea
@@ -256,7 +262,7 @@ export default function DashboardPage() {
                 await fetch('/api/notes', {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ content: e.target.value }),
+                  body: JSON.stringify({ id: noteId, content: e.target.value }),
                 });
                 setNoteSaved(true);
               }, 1000);
