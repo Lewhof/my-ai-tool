@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
+  Bot,
   CheckSquare,
   MessageSquare,
   CalendarDays,
@@ -44,6 +45,7 @@ const navGroups: NavGroup[] = [
     label: 'Home',
     items: [
       { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+      { name: 'Master Agent', href: '/agent', icon: Bot },
     ],
   },
   {
