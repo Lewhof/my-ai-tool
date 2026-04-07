@@ -166,4 +166,25 @@ export const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
       required: ['query'],
     },
   },
+  {
+    name: 'get_emails',
+    description: 'Get recent emails from Outlook inbox. Can check for unread emails.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        folder: { type: 'string', enum: ['inbox', 'sent', 'drafts'], description: 'Email folder. Default inbox.' },
+        limit: { type: 'number', description: 'Number of emails to return. Default 10.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'triage_emails',
+    description: 'AI-powered triage of unread emails. Categorizes as IMPORTANT, CAN_WAIT, or FYI with summaries.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
 ];

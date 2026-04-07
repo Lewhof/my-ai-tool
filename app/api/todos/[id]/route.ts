@@ -7,7 +7,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
 
   const updates = await req.json();
-  const allowed = ['title', 'description', 'status', 'priority', 'due_date', 'bucket', 'tags'];
+  const allowed = ['title', 'description', 'status', 'priority', 'due_date', 'bucket', 'tags', 'recurrence'];
   const filtered = Object.fromEntries(
     Object.entries(updates).filter(([k]) => allowed.includes(k))
   );

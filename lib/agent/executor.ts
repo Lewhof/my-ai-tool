@@ -195,6 +195,31 @@ export async function executeTool(
         return text || 'No results found.';
       }
 
+      case 'get_emails': {
+        const folder = (input.folder as string) || 'inbox';
+        const limit = (input.limit as number) || 10;
+        const { data: accounts } = await supabaseAdmin.from('calendar_accounts').select('access_token').eq('user_id', userId).eq('is_default', true).limit(1);
+        const token = accounts?.[0]?.access_token;
+        if (!token) return 'No Microsoft account connected. Go to Settings > Connections.';
+
+        const folderMap: Record<string, string> = { inbox: 'inbox', sent: 'sentitems', drafts: 'drafts' };
+        const res = await fetch(
+          `https://graph.microsoft.com/v1.0/me/mailFolders/${folderMap[folder] || 'inbox'}/messages?$top=${limit}&$orderby=receivedDateTime desc&$select=subject,from,receivedDateTime,isRead,bodyPreview`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!res.ok) return `Failed to fetch emails (${res.status}).`;
+        const data = await res.json();
+        const emails = (data.value ?? []).map((e: Record<string, unknown>) => {
+          const from = (e.from as Record<string, Record<string, string>>)?.emailAddress;
+          return `- ${e.isRead ? '' : '[UNREAD] '}${e.subject} — from ${from?.name || from?.address || 'unknown'} (${(e.bodyPreview as string)?.slice(0, 80)})`;
+        });
+        return emails.length > 0 ? `Emails (${folder}):\n${emails.join('\n')}` : 'No emails found.';
+      }
+
+      case 'triage_emails': {
+        return 'Email triage requires the AI triage endpoint. Go to the Email page and click "AI Triage" for a categorized view of your unread emails.';
+      }
+
       default:
         return `Unknown tool: ${toolName}`;
     }

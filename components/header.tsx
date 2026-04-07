@@ -9,6 +9,7 @@ const pageTitles: Record<string, string> = {
   '/agent': 'Master Agent',
   '/chat': 'Chat',
   '/todos': 'To-Do',
+  '/email': 'Email',
   '/calendar': 'Calendar',
   '/diagrams': 'Diagrams',
   '/images': 'Image Lab',
