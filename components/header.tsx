@@ -10,6 +10,7 @@ const pageTitles: Record<string, string> = {
   '/todos': 'To-Do',
   '/calendar': 'Calendar',
   '/diagrams': 'Diagrams',
+  '/notes': 'Notes',
   '/documents': 'Documents',
   '/workflows': 'Workflows',
   '/whiteboard': 'Whiteboard',
