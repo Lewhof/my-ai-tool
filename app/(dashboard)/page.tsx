@@ -2,19 +2,20 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
-import { MessageSquare, FileText, Zap, Lock, Unlock, RotateCcw, Plus } from 'lucide-react';
+import {
+  Bot, MessageSquare, FileText, Zap, CheckSquare,
+  ChevronRight, TrendingUp, Cpu, Database,
+  ArrowUpRight, Plus, Mic, MicOff,
+  StickyNote, Save, Pin, Calendar,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { formatRelativeDate, truncate } from '@/lib/utils';
+import { toast } from 'sonner';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import WeatherWidget from '@/components/dashboard/weather-widget';
 import CalendarWidget from '@/components/dashboard/calendar-widget';
 import BriefingWidget from '@/components/dashboard/briefing-widget';
 import HealthWidget from '@/components/dashboard/health-widget';
-import type { Layout } from 'react-grid-layout';
-
-const ResponsiveGridLayout = dynamic(
-  () => import('react-grid-layout').then((mod) => mod.WidthProvider(mod.Responsive)),
-  { ssr: false }
-);
 
 interface DashboardData {
   recentChats: Array<{ id: string; title: string; updated_at: string }>;
@@ -48,368 +49,413 @@ function formatTokens(tokens: number): string {
   return String(tokens);
 }
 
-const DEFAULT_LAYOUTS: Record<string, Layout[]> = {
-  lg: [
-    { i: 'quick-actions', x: 0, y: 0, w: 12, h: 2, isResizable: false },
-    { i: 'briefing', x: 0, y: 2, w: 8, h: 8 },
-    { i: 'credits', x: 8, y: 10, w: 4, h: 7 },
-    { i: 'weather', x: 8, y: 2, w: 4, h: 7 },
-    { i: 'health', x: 8, y: 17, w: 4, h: 5 },
-    { i: 'notepad', x: 0, y: 9, w: 4, h: 5 },
-    { i: 'chats', x: 4, y: 9, w: 4, h: 5 },
-    { i: 'docs', x: 8, y: 9, w: 4, h: 5 },
-    { i: 'calendar', x: 0, y: 14, w: 4, h: 7 },
-    { i: 'todos', x: 4, y: 14, w: 4, h: 5 },
-    { i: 'activity', x: 8, y: 14, w: 4, h: 5 },
-  ],
-  md: [
-    { i: 'quick-actions', x: 0, y: 0, w: 10, h: 2, isResizable: false },
-    { i: 'credits', x: 0, y: 2, w: 6, h: 7 },
-    { i: 'weather', x: 6, y: 2, w: 4, h: 7 },
-    { i: 'notepad', x: 0, y: 9, w: 5, h: 5 },
-    { i: 'chats', x: 5, y: 9, w: 5, h: 5 },
-    { i: 'docs', x: 0, y: 14, w: 5, h: 5 },
-    { i: 'calendar', x: 5, y: 14, w: 5, h: 7 },
-    { i: 'todos', x: 0, y: 19, w: 5, h: 5 },
-    { i: 'activity', x: 5, y: 21, w: 5, h: 5 },
-  ],
-  sm: [
-    { i: 'quick-actions', x: 0, y: 0, w: 6, h: 3, isResizable: false },
-    { i: 'briefing', x: 0, y: 3, w: 6, h: 8 },
-    { i: 'weather', x: 0, y: 11, w: 6, h: 7 },
-    { i: 'notepad', x: 0, y: 18, w: 6, h: 5 },
-    { i: 'todos', x: 0, y: 23, w: 6, h: 5 },
-    { i: 'chats', x: 0, y: 28, w: 6, h: 5 },
-    { i: 'docs', x: 0, y: 33, w: 6, h: 5 },
-    { i: 'calendar', x: 0, y: 38, w: 6, h: 7 },
-    { i: 'credits', x: 0, y: 45, w: 6, h: 7 },
-    { i: 'activity', x: 0, y: 52, w: 6, h: 5 },
-    { i: 'health', x: 0, y: 57, w: 6, h: 5 },
-  ],
-};
+const NOTEPAD_KEY = 'lewhof-notepad';
+
+function NotePad() {
+  const [content, setContent] = useState('');
+  const [noteId, setNoteId] = useState<string | null>(null);
+  const [saved, setSaved] = useState(true);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    // Load from API
+    fetch('/api/notes').then(r => r.json()).then(d => {
+      setContent(d?.content ?? localStorage.getItem(NOTEPAD_KEY) ?? '');
+      setNoteId(d?.id ?? null);
+    }).catch(() => {
+      setContent(localStorage.getItem(NOTEPAD_KEY) ?? '');
+    });
+  }, []);
+
+  const handleChange = (val: string) => {
+    setContent(val);
+    setSaved(false);
+    localStorage.setItem(NOTEPAD_KEY, val);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      await fetch('/api/notes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: noteId, content: val }),
+      });
+      setSaved(true);
+    }, 1000);
+  };
+
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
+
+  return (
+    <div className="rounded-2xl border border-border overflow-hidden animate-fade-up animate-fade-up-delay-4"
+      style={{ background: 'var(--color-surface-1)' }}>
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+        <div className="flex items-center gap-2">
+          <StickyNote size={15} style={{ color: 'var(--color-brand)' }} />
+          <h3 className="text-[13px] font-semibold text-foreground">Notepad</h3>
+          <Pin size={11} className="text-muted-foreground" />
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={cn(
+            'text-[10px] font-medium transition-colors',
+            saved ? 'text-emerald-400' : 'text-muted-foreground'
+          )}>
+            {saved ? '\u25CF Saved' : '\u25CF Unsaved'}
+          </span>
+          <button
+            onClick={() => {
+              if (saveTimer.current) clearTimeout(saveTimer.current);
+              localStorage.setItem(NOTEPAD_KEY, content);
+              fetch('/api/notes', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: noteId, content }),
+              });
+              setSaved(true);
+              toast('Notepad saved');
+            }}
+            className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Save size={12} /> Save
+          </button>
+        </div>
+      </div>
+      <div className="p-4">
+        <textarea
+          value={content}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder={'You are my strategic partner...\n\nUse this space for your daily prompts, goals, or anything you want Cerebro to know about you.'}
+          className="w-full resize-none text-[13px] text-foreground placeholder-muted-foreground/40 bg-transparent outline-none leading-relaxed"
+          rows={8}
+          style={{ fontFamily: 'var(--font-body)' }}
+        />
+      </div>
+      <div className="px-5 py-3 border-t border-border flex items-center justify-between">
+        <span className="text-[10px] text-muted-foreground">
+          {content.length} chars
+        </span>
+        <button
+          onClick={() => {
+            setContent('');
+            localStorage.removeItem(NOTEPAD_KEY);
+            fetch('/api/notes', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: noteId, content: '' }),
+            });
+            setSaved(true);
+            toast('Notepad cleared');
+          }}
+          className="text-[10px] text-muted-foreground hover:text-destructive transition-colors"
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const QUICK_ACTIONS = [
+  { label: 'New Chat', icon: MessageSquare, href: '/chat', color: 'var(--color-brand)' },
+  { label: 'Upload Doc', icon: FileText, href: '/documents', color: 'oklch(0.60 0.20 255)' },
+  { label: 'Run Workflow', icon: Zap, href: '/workflows', color: 'oklch(0.55 0.18 160)' },
+  { label: 'Add Task', icon: CheckSquare, href: '/todos', color: 'oklch(0.65 0.16 290)' },
+];
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [credits, setCredits] = useState<CreditsData | null>(null);
-  const [notepad, setNotepad] = useState('');
-  const [noteId, setNoteId] = useState<string | null>(null);
-  const [noteSaved, setNoteSaved] = useState(true);
-  const [locked, setLocked] = useState(true);
-  const [layouts, setLayouts] = useState<Record<string, Layout[]>>(DEFAULT_LAYOUTS);
-  const [newTodo, setNewTodo] = useState('');
-  const [addingTodo, setAddingTodo] = useState(false);
-  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [cerebroInput, setCerebroInput] = useState('');
 
-  const fetchDashboard = useCallback(() => {
-    fetch('/api/dashboard').then((r) => r.json()).then(setData);
-  }, []);
-
-  const addTodo = async () => {
-    if (!newTodo.trim()) return;
-    await fetch('/api/todos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newTodo }),
+  const { isSupported: speechSupported, isListening, transcript, startListening, stopListening, resetTranscript } =
+    useSpeechRecognition({
+      onFinalTranscript: (text) => setCerebroInput(text),
+      onError: (err) => toast.error(`Mic error: ${err}`),
     });
-    setNewTodo('');
-    setAddingTodo(false);
-    fetchDashboard();
+
+  useEffect(() => {
+    if (isListening && transcript) {
+      setCerebroInput(transcript);
+    }
+  }, [isListening, transcript]);
+
+  const handleMicClick = () => {
+    if (!speechSupported) {
+      toast.error('Voice input is not supported in this browser. Try Chrome or Edge.');
+      return;
+    }
+    if (isListening) {
+      stopListening();
+    } else {
+      resetTranscript();
+      setCerebroInput('');
+      startListening();
+      toast('Listening...', { description: 'Speak now \u2014 tap mic again to stop' });
+    }
   };
 
   useEffect(() => {
-    fetchDashboard();
-    fetch('/api/notes').then((r) => r.json()).then((d) => { setNotepad(d?.content ?? ''); setNoteId(d?.id ?? null); });
-    fetch('/api/dashboard/credits').then((r) => r.json()).then(setCredits);
-
-    // Load saved layout
-    const saved = localStorage.getItem('dashboard_layouts');
-    if (saved) {
-      try { setLayouts(JSON.parse(saved)); } catch { /* use default */ }
-    }
+    fetch('/api/dashboard').then(r => r.json()).then(setData);
+    fetch('/api/dashboard/credits').then(r => r.json()).then(setCredits);
   }, []);
-
-  const onLayoutChange = useCallback((_: Layout[], allLayouts: Record<string, Layout[]>) => {
-    setLayouts(allLayouts);
-    localStorage.setItem('dashboard_layouts', JSON.stringify(allLayouts));
-  }, []);
-
-  const resetLayout = () => {
-    setLayouts(DEFAULT_LAYOUTS);
-    localStorage.removeItem('dashboard_layouts');
-  };
 
   return (
-    <div className="p-4 sm:p-6">
-      {/* Layout controls */}
-      <div className="flex items-center justify-end gap-2 mb-3">
-        <button
-          onClick={resetLayout}
-          className="text-gray-500 hover:text-white p-1.5 rounded hover:bg-gray-800 transition-colors"
-          title="Reset layout"
-        >
-          <RotateCcw size={15} />
-        </button>
-        <button
-          onClick={() => setLocked(!locked)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-            locked
-              ? 'text-gray-500 border-gray-700 hover:border-gray-600'
-              : 'text-accent-400 border-accent-600/50 bg-accent-600/10'
-          }`}
-        >
-          {locked ? <Lock size={12} /> : <Unlock size={12} />}
-          {locked ? 'Locked' : 'Editing'}
-        </button>
-      </div>
-
-      <ResponsiveGridLayout
-        layouts={layouts}
-        breakpoints={{ lg: 1200, md: 768, sm: 0 }}
-        cols={{ lg: 12, md: 10, sm: 6 }}
-        rowHeight={40}
-        isDraggable={!locked}
-        isResizable={!locked}
-        onLayoutChange={onLayoutChange}
-        draggableHandle=".widget-handle"
-        containerPadding={[0, 0]}
-        margin={[12, 12]}
-      >
-        {/* Quick Actions */}
-        <div key="quick-actions">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 h-full">
-            <Link href="/chat" className="bg-accent-600/15 hover:bg-accent-600/25 border border-accent-600/30 text-white rounded-lg p-4 flex items-center gap-3 transition-colors">
-              <MessageSquare size={20} className="text-accent-500" />
-              <span className="text-sm font-medium">New Chat</span>
+    <div className="p-4 lg:p-6 space-y-4 animate-fade-up">
+      {/* Cerebro Hero Card */}
+      <div className="relative rounded-2xl overflow-hidden" style={{ minHeight: 160 }}>
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, oklch(0.10 0.012 255 / 0.92) 0%, oklch(0.10 0.012 255 / 0.75) 100%)' }} />
+        <div className="relative p-5 lg:p-6">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center cerebro-pulse" style={{ background: 'var(--color-brand)' }}>
+              <Bot size={16} className="text-white" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-white/50">Cerebro</p>
+              <p className="text-[13px] font-medium text-white/80">Claude Sonnet &middot; All tools active</p>
+            </div>
+            <div className="ml-auto flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full status-dot-green" />
+              <span className="text-[11px] text-white/50">Online</span>
+            </div>
+          </div>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (isListening) stopListening();
+            if (cerebroInput.trim()) {
+              // Navigate to Cerebro with the prompt
+              window.location.href = `/agent?prompt=${encodeURIComponent(cerebroInput)}`;
+            }
+          }} className="flex items-center gap-2">
+            <div className="flex-1 relative">
+              <input
+                value={cerebroInput}
+                onChange={(e) => setCerebroInput(e.target.value)}
+                placeholder="Ask anything \u2014 voice, camera, or type..."
+                className="w-full px-4 py-3 rounded-xl text-[14px] text-white placeholder-white/30 outline-none border border-white/10 focus:border-white/20 transition-colors"
+                style={{ background: 'oklch(1 0 0 / 0.07)', backdropFilter: 'blur(8px)' }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleMicClick}
+              className={cn(
+                'w-11 h-11 rounded-xl flex items-center justify-center border transition-all duration-200',
+                isListening
+                  ? 'border-red-400/60 text-red-400 animate-pulse'
+                  : 'border-white/10 text-white/50 hover:text-white'
+              )}
+              style={{ background: isListening ? 'oklch(0.62 0.22 25 / 0.18)' : 'oklch(1 0 0 / 0.07)' }}
+              title={isListening ? 'Stop listening' : 'Voice input'}
+            >
+              {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+            </button>
+            <Link href="/agent">
+              <button
+                type="button"
+                className="w-11 h-11 rounded-xl flex items-center justify-center text-white transition-all btn-brand"
+                style={{ background: 'var(--color-brand)' }}
+              >
+                <ArrowUpRight size={18} />
+              </button>
             </Link>
-            <Link href="/documents" className="bg-gray-800/50 hover:bg-gray-800 border border-gray-700 text-white rounded-lg p-4 flex items-center gap-3 transition-colors">
-              <FileText size={20} className="text-gray-400" />
-              <span className="text-sm font-medium">Upload Document</span>
-            </Link>
-            <Link href="/workflows" className="bg-gray-800/50 hover:bg-gray-800 border border-gray-700 text-white rounded-lg p-4 flex items-center gap-3 transition-colors">
-              <Zap size={20} className="text-gray-400" />
-              <span className="text-sm font-medium">Run Workflow</span>
-            </Link>
+          </form>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {["What's on my calendar?", 'Show pending tasks', 'Weather today?'].map((s) => (
+              <button
+                key={s}
+                onClick={() => setCerebroInput(s)}
+                className="px-3 py-1 rounded-full text-[11px] text-white/60 hover:text-white border border-white/10 hover:border-white/20 transition-colors"
+                style={{ background: 'oklch(1 0 0 / 0.06)' }}
+              >
+                {s}
+              </button>
+            ))}
           </div>
         </div>
+      </div>
 
-        {/* AI Credits */}
-        {/* AI Briefing */}
-        <div key="briefing">
+      {/* Row 2: Weather + Quick Actions */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-border overflow-hidden animate-fade-up animate-fade-up-delay-1"
+          style={{ background: 'var(--color-surface-1)' }}>
+          <WeatherWidget />
+        </div>
+        <div className="sm:col-span-2 grid grid-cols-2 gap-3 animate-fade-up animate-fade-up-delay-1">
+          {QUICK_ACTIONS.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Link
+                key={action.label}
+                href={action.href}
+                className="flex items-center gap-3 p-4 rounded-2xl border border-border hover:border-white/15 transition-all duration-150 text-left group"
+                style={{ background: 'var(--color-surface-1)' }}
+              >
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
+                  style={{ background: `color-mix(in oklch, ${action.color} 20%, transparent)` }}
+                >
+                  <Icon size={18} style={{ color: action.color }} />
+                </div>
+                <span className="text-[13px] font-medium text-foreground">{action.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Row 3: AI Briefing + Credits */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 rounded-2xl border border-border overflow-hidden animate-fade-up animate-fade-up-delay-2"
+          style={{ background: 'var(--color-surface-1)' }}>
           <BriefingWidget />
         </div>
 
-        <div key="credits" className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden flex flex-col">
-          <div className="widget-handle px-5 py-3 border-b border-gray-700 cursor-move">
-            <h3 className="text-white font-semibold text-sm">AI Credits & Usage</h3>
-            <p className="text-gray-500 text-xs">Last 30 days</p>
+        {/* AI Credits */}
+        <div className="rounded-2xl border border-border overflow-hidden animate-fade-up animate-fade-up-delay-2"
+          style={{ background: 'var(--color-surface-1)' }}>
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+            <div className="flex items-center gap-2">
+              <TrendingUp size={15} style={{ color: 'oklch(0.60 0.20 255)' }} />
+              <h3 className="text-[13px] font-semibold text-foreground">AI Usage</h3>
+            </div>
+            <span className="text-[10px] text-muted-foreground">30 days</span>
           </div>
-          <div className="p-4 flex-1 overflow-auto">
-            {!credits ? (
-              <p className="text-gray-500 text-sm">Loading...</p>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-gray-900 rounded-lg p-3">
-                    <p className="text-gray-400 text-xs mb-0.5">Spend</p>
-                    <p className="text-white text-lg font-bold">{credits.ai?.totalCost !== undefined ? formatCost(credits.ai.totalCost) : '--'}</p>
-                  </div>
-                  <div className="bg-gray-900 rounded-lg p-3">
-                    <p className="text-gray-400 text-xs mb-0.5">Requests</p>
-                    <p className="text-white text-lg font-bold">{credits.ai?.totalRequests ?? '--'}</p>
-                  </div>
-                  <div className="bg-gray-900 rounded-lg p-3">
-                    <p className="text-gray-400 text-xs mb-0.5">Tokens</p>
-                    <p className="text-white text-lg font-bold">{credits.ai?.totalTokens !== undefined ? formatTokens(credits.ai.totalTokens) : '--'}</p>
-                  </div>
-                  <div className="bg-gray-900 rounded-lg p-3">
-                    <p className="text-gray-400 text-xs mb-0.5">Avg/Req</p>
-                    <p className="text-white text-lg font-bold">{credits.ai?.totalRequests ? formatCost(credits.ai.totalCost / credits.ai.totalRequests) : '--'}</p>
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: 'Spend', value: credits?.ai?.totalCost !== undefined ? formatCost(credits.ai.totalCost) : '--', icon: TrendingUp },
+                { label: 'Requests', value: credits?.ai?.totalRequests?.toString() ?? '--', icon: Zap },
+                { label: 'Tokens', value: credits?.ai?.totalTokens !== undefined ? formatTokens(credits.ai.totalTokens) : '--', icon: Cpu },
+                { label: 'Avg/Req', value: credits?.ai?.totalRequests ? formatCost(credits.ai.totalCost / credits.ai.totalRequests) : '--', icon: Database },
+              ].map((stat) => (
+                <div key={stat.label} className="rounded-xl p-3 border border-border" style={{ background: 'var(--color-surface-2)' }}>
+                  <p className="text-[10px] text-muted-foreground mb-1">{stat.label}</p>
+                  <p className="text-[15px] font-bold text-foreground font-mono">{stat.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-1.5">
+              {[
+                { name: 'Anthropic', ok: !credits?.ai?.error },
+                { name: 'Supabase', ok: true },
+                { name: 'Vercel', ok: !credits?.vercel?.error },
+                { name: 'Clerk', ok: true },
+              ].map((s) => (
+                <div key={s.name} className="flex items-center justify-between">
+                  <span className="text-[11px] text-muted-foreground">{s.name}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn('w-1.5 h-1.5 rounded-full', s.ok ? 'status-dot-green' : 'status-dot-red')} />
+                    <span className="text-[10px] text-muted-foreground">{s.ok ? 'Active' : 'Error'}</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[
-                    { name: 'Anthropic', ok: !credits.ai?.error },
-                    { name: 'Vercel', ok: !credits.vercel?.error },
-                    { name: 'Supabase', ok: true },
-                    { name: 'Clerk', ok: true },
-                  ].map((s) => (
-                    <div key={s.name} className="flex items-center gap-1.5 text-xs">
-                      <span className={`w-1.5 h-1.5 rounded-full ${s.ok ? 'bg-green-400' : 'bg-red-400'}`} />
-                      <span className="text-gray-400">{s.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Weather */}
-        <div key="weather">
-          <WeatherWidget />
-        </div>
-
-        {/* Notepad */}
-        <div key="notepad" className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden flex flex-col">
-          <div className="widget-handle px-5 py-3 border-b border-gray-700 flex items-center justify-between cursor-move">
-            <h3 className="text-white font-semibold text-sm">Notepad</h3>
-            <div className="flex items-center gap-3">
-              <Link href="/notes" className="text-gray-500 hover:text-accent-400 transition-colors" title="New note">
-                <Plus size={14} />
-              </Link>
-              <div className="flex items-center gap-1.5">
-                <span className={`w-1.5 h-1.5 rounded-full ${noteSaved ? 'bg-green-400' : 'bg-yellow-400'}`} />
-                <span className="text-gray-500 text-xs">{noteSaved ? 'Saved' : '...'}</span>
-              </div>
+              ))}
             </div>
           </div>
-          <textarea
-            value={notepad}
-            onChange={(e) => {
-              setNotepad(e.target.value);
-              setNoteSaved(false);
-              if (noteTimer.current) clearTimeout(noteTimer.current);
-              noteTimer.current = setTimeout(async () => {
-                await fetch('/api/notes', {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ id: noteId, content: e.target.value }),
-                });
-                setNoteSaved(true);
-              }, 1000);
-            }}
-            placeholder="Quick notes..."
-            className="flex-1 bg-transparent text-gray-300 px-5 py-3 text-sm focus:outline-none resize-none placeholder-gray-600"
-          />
+        </div>
+      </div>
+
+      {/* Row 4: Tasks + Recent Chats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Tasks */}
+        <div className="rounded-2xl border border-border overflow-hidden animate-fade-up animate-fade-up-delay-3"
+          style={{ background: 'var(--color-surface-1)' }}>
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+            <div className="flex items-center gap-2">
+              <CheckSquare size={15} style={{ color: 'oklch(0.55 0.18 160)' }} />
+              <h3 className="text-[13px] font-semibold text-foreground">Pending Tasks</h3>
+            </div>
+            <Link href="/todos" className="text-[11px] font-medium transition-colors" style={{ color: 'var(--color-brand)' }}>
+              View all
+            </Link>
+          </div>
+          <div className="divide-y divide-border">
+            {!data || data.pendingTodos.length === 0 ? (
+              <p className="text-[13px] text-muted-foreground p-5">No pending tasks</p>
+            ) : (
+              data.pendingTodos.slice(0, 5).map((todo) => (
+                <Link key={todo.id} href="/todos" className="flex items-center gap-3 px-5 py-3 hover:bg-surface-2 transition-colors">
+                  <div className="w-4 h-4 rounded border border-border shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] text-foreground truncate">{todo.title}</p>
+                  </div>
+                  <span
+                    className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+                    style={
+                      todo.priority === 'urgent' || todo.priority === 'high'
+                        ? { background: 'oklch(0.62 0.22 25 / 0.15)', color: 'oklch(0.62 0.22 25)' }
+                        : { background: 'var(--color-surface-2)', color: 'var(--color-muted-foreground)' }
+                    }
+                  >
+                    {todo.priority}
+                  </span>
+                </Link>
+              ))
+            )}
+          </div>
+          <div className="px-5 py-3 border-t border-border">
+            <Link href="/todos" className="flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors">
+              <Plus size={13} /> Add task
+            </Link>
+          </div>
         </div>
 
         {/* Recent Chats */}
-        <div key="chats" className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden flex flex-col">
-          <div className="widget-handle px-5 py-3 border-b border-gray-700 flex items-center justify-between cursor-move">
-            <h3 className="text-white font-semibold text-sm">Recent Chats</h3>
-            <Link href="/chat" className="text-accent-400 text-xs hover:underline">View all</Link>
+        <div className="rounded-2xl border border-border overflow-hidden animate-fade-up animate-fade-up-delay-3"
+          style={{ background: 'var(--color-surface-1)' }}>
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+            <div className="flex items-center gap-2">
+              <MessageSquare size={15} style={{ color: 'oklch(0.65 0.16 290)' }} />
+              <h3 className="text-[13px] font-semibold text-foreground">Recent Chats</h3>
+            </div>
+            <Link href="/chat" className="text-[11px] font-medium transition-colors" style={{ color: 'var(--color-brand)' }}>
+              View all
+            </Link>
           </div>
-          <div className="flex-1 overflow-auto divide-y divide-gray-700">
+          <div className="divide-y divide-border">
             {!data || data.recentChats.length === 0 ? (
-              <p className="text-gray-500 text-sm p-5">No chats yet</p>
+              <p className="text-[13px] text-muted-foreground p-5">No chats yet</p>
             ) : (
-              data.recentChats.map((chat) => (
-                <Link key={chat.id} href={`/chat/${chat.id}`} className="flex items-center justify-between px-5 py-2.5 hover:bg-gray-700 transition-colors">
-                  <span className="text-white text-sm truncate mr-3">{chat.title}</span>
-                  <span className="text-gray-500 text-xs whitespace-nowrap">{formatRelativeDate(chat.updated_at)}</span>
+              data.recentChats.slice(0, 4).map((chat) => (
+                <Link
+                  key={chat.id}
+                  href={`/chat/${chat.id}`}
+                  className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-surface-2 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ background: 'var(--color-brand-dim)' }}>
+                      <MessageSquare size={13} style={{ color: 'var(--color-brand)' }} />
+                    </div>
+                    <span className="text-[13px] text-foreground truncate">{chat.title}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    <span className="text-[10px] text-muted-foreground">{formatRelativeDate(chat.updated_at)}</span>
+                    <ChevronRight size={12} className="text-muted-foreground" />
+                  </div>
                 </Link>
               ))
             )}
           </div>
-        </div>
-
-        {/* Recent Documents */}
-        <div key="docs" className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden flex flex-col">
-          <div className="widget-handle px-5 py-3 border-b border-gray-700 flex items-center justify-between cursor-move">
-            <h3 className="text-white font-semibold text-sm">Recent Documents</h3>
-            <Link href="/documents" className="text-accent-400 text-xs hover:underline">View all</Link>
-          </div>
-          <div className="flex-1 overflow-auto divide-y divide-gray-700">
-            {!data || data.recentDocs.length === 0 ? (
-              <p className="text-gray-500 text-sm p-5">No documents yet</p>
-            ) : (
-              data.recentDocs.map((doc) => (
-                <Link key={doc.id} href={`/documents/${doc.id}`} className="flex items-center justify-between px-5 py-2.5 hover:bg-gray-700 transition-colors">
-                  <span className="text-white text-sm truncate mr-3">{doc.name}</span>
-                  <span className="text-gray-500 text-xs whitespace-nowrap">{formatRelativeDate(doc.created_at)}</span>
-                </Link>
-              ))
-            )}
+          <div className="px-5 py-3 border-t border-border">
+            <Link href="/chat" className="flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors">
+              <Plus size={13} /> New chat
+            </Link>
           </div>
         </div>
+      </div>
 
-        {/* Calendar */}
-        <div key="calendar">
+      {/* Row 5: Notepad + Calendar */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <NotePad />
+        <div className="rounded-2xl border border-border overflow-hidden animate-fade-up animate-fade-up-delay-4"
+          style={{ background: 'var(--color-surface-1)' }}>
           <CalendarWidget />
         </div>
+      </div>
 
-        {/* To-Do */}
-        <div key="todos" className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden flex flex-col">
-          <div className="widget-handle px-5 py-3 border-b border-gray-700 flex items-center justify-between cursor-move">
-            <h3 className="text-white font-semibold text-sm">To-Do</h3>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setAddingTodo(!addingTodo)}
-                className="text-gray-500 hover:text-accent-400 transition-colors"
-                title="Add task"
-              >
-                <Plus size={16} />
-              </button>
-              <Link href="/todos" className="text-accent-400 text-xs hover:underline">View all</Link>
-            </div>
-          </div>
-          {addingTodo && (
-            <div className="px-4 py-2.5 border-b border-gray-700 flex gap-2">
-              <input
-                value={newTodo}
-                onChange={(e) => setNewTodo(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addTodo()}
-                placeholder="New task..."
-                autoFocus
-                className="flex-1 bg-gray-700 text-white border border-gray-600 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent-600"
-              />
-              <button
-                onClick={addTodo}
-                disabled={!newTodo.trim()}
-                className="bg-accent-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-accent-700 transition-colors disabled:opacity-50"
-              >
-                Add
-              </button>
-            </div>
-          )}
-          <div className="flex-1 overflow-auto divide-y divide-gray-700">
-            {!data || data.pendingTodos.length === 0 ? (
-              <p className="text-gray-500 text-sm p-5">No pending tasks</p>
-            ) : (
-              data.pendingTodos.map((todo) => (
-                <Link key={todo.id} href="/todos" className="flex items-center justify-between px-5 py-2.5 hover:bg-gray-700 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-1.5 h-1.5 rounded-full ${todo.status === 'in-progress' ? 'bg-yellow-400' : 'bg-blue-400'}`} />
-                    <span className="text-white text-sm truncate">{todo.title}</span>
-                  </div>
-                  <span className={`text-xs px-1.5 py-0.5 rounded border ${
-                    todo.priority === 'urgent' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
-                    todo.priority === 'high' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
-                    'bg-gray-700 text-gray-400 border-gray-600'
-                  }`}>{todo.priority}</span>
-                </Link>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Activity */}
-        <div key="activity" className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden flex flex-col">
-          <div className="widget-handle px-5 py-3 border-b border-gray-700 flex items-center justify-between cursor-move">
-            <h3 className="text-white font-semibold text-sm">Recent Activity</h3>
-            <Link href="/workflows" className="text-accent-400 text-xs hover:underline">View all</Link>
-          </div>
-          <div className="flex-1 overflow-auto divide-y divide-gray-700">
-            {!data || data.recentRuns.length === 0 ? (
-              <p className="text-gray-500 text-sm p-5">No workflow runs yet</p>
-            ) : (
-              data.recentRuns.map((run) => (
-                <div key={run.id} className="flex items-center justify-between px-5 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-1.5 h-1.5 rounded-full ${run.status === 'completed' ? 'bg-green-400' : run.status === 'failed' ? 'bg-red-400' : 'bg-yellow-400'}`} />
-                    <span className="text-white text-sm truncate">{truncate(run.input, 50)}</span>
-                  </div>
-                  <span className="text-gray-500 text-xs whitespace-nowrap">{formatRelativeDate(run.created_at)}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-        {/* Health */}
-        <div key="health">
-          <HealthWidget />
-        </div>
-      </ResponsiveGridLayout>
+      {/* Row 6: Health Monitor */}
+      <div className="rounded-2xl border border-border overflow-hidden animate-fade-up animate-fade-up-delay-5"
+        style={{ background: 'var(--color-surface-1)' }}>
+        <HealthWidget />
+      </div>
     </div>
   );
 }
