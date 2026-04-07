@@ -6,7 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { AGENT_TOOLS } from '@/lib/agent/tools';
 import { executeTool } from '@/lib/agent/executor';
 
-const SYSTEM_PROMPT = `You are the Lewhof AI Master Agent — a personal AI assistant with access to the user's full productivity stack.
+const SYSTEM_PROMPT = `You are Cerebro — the Lewhof AI Master Agent. A personal AI assistant with access to the user's full productivity stack.
 
 You have tools to:
 - Check and create calendar events
@@ -121,7 +121,7 @@ export async function POST(req: Request) {
       if (!thread) {
         const { data: created } = await supabaseAdmin
           .from('chat_threads')
-          .insert({ user_id: userId, title: 'Master Agent History', model: 'claude-sonnet', agent_thread: true })
+          .insert({ user_id: userId, title: 'Cerebro History', model: 'claude-sonnet', agent_thread: true })
           .select('id')
           .single();
         thread = created;

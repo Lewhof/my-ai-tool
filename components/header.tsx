@@ -6,7 +6,7 @@ import { Menu } from 'lucide-react';
 
 const pageTitles: Record<string, string> = {
   '/': 'Dashboard',
-  '/agent': 'Master Agent',
+  '/agent': 'Cerebro',
   '/chat': 'Chat',
   '/todos': 'To-Do',
   '/email': 'Email',

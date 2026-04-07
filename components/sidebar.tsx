@@ -46,7 +46,7 @@ const navGroups: NavGroup[] = [
     label: 'Home',
     items: [
       { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-      { name: 'Master Agent', href: '/agent', icon: Bot },
+      { name: 'Cerebro', href: '/agent', icon: Bot },
     ],
   },
   {
