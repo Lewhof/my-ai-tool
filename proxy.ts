@@ -8,6 +8,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/tasks/pending(.*)',
   '/api/diagrams/:id/share(.*)',
   '/api/migrate(.*)',
+  '/api/cron(.*)',
   '/diagrams/share(.*)',
 ]);
 

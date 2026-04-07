@@ -1,6 +1,8 @@
 import { auth } from '@clerk/nextjs/server';
+import { after } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { anthropic } from '@/lib/anthropic';
+import { supabaseAdmin } from '@/lib/supabase-server';
 import { AGENT_TOOLS } from '@/lib/agent/tools';
 import { executeTool } from '@/lib/agent/executor';
 
@@ -102,6 +104,55 @@ export async function POST(req: Request) {
       break;
     }
   }
+
+  // Save conversation to persistent history
+  after(async () => {
+    try {
+      // Get or create the agent thread
+      let { data: thread } = await supabaseAdmin
+        .from('chat_threads')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('agent_thread', true)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!thread) {
+        const { data: created } = await supabaseAdmin
+          .from('chat_threads')
+          .insert({ user_id: userId, title: 'Master Agent History', model: 'claude-sonnet', agent_thread: true })
+          .select('id')
+          .single();
+        thread = created;
+      }
+
+      if (thread) {
+        // Save user message
+        await supabaseAdmin.from('chat_messages').insert({
+          thread_id: thread.id,
+          role: 'user',
+          content: message,
+        });
+
+        // Save agent response
+        if (finalResponse) {
+          await supabaseAdmin.from('chat_messages').insert({
+            thread_id: thread.id,
+            role: 'assistant',
+            content: finalResponse,
+            model: 'claude-sonnet',
+          });
+        }
+
+        // Update thread timestamp
+        await supabaseAdmin
+          .from('chat_threads')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', thread.id);
+      }
+    } catch { /* silent — don't break the response if history save fails */ }
+  });
 
   return Response.json({
     response: finalResponse,
