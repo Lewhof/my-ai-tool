@@ -60,6 +60,31 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* Data Export */}
+      <section>
+        <h3 className="text-lg font-semibold text-white mb-4">Data Export</h3>
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white text-sm font-medium">Export All Data (JSON)</p>
+              <p className="text-gray-500 text-xs">Download all chats, todos, whiteboard, notes, documents, KB, vault metadata</p>
+            </div>
+            <a href="/api/export?format=json" className="bg-accent-600/20 text-accent-400 border border-accent-600/30 px-4 py-2 rounded-lg text-sm hover:bg-accent-600/30 transition-colors">
+              Download JSON
+            </a>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white text-sm font-medium">Export All Data (CSV)</p>
+              <p className="text-gray-500 text-xs">Spreadsheet-friendly format for todos, whiteboard, notes, documents, KB</p>
+            </div>
+            <a href="/api/export?format=csv" className="bg-accent-600/20 text-accent-400 border border-accent-600/30 px-4 py-2 rounded-lg text-sm hover:bg-accent-600/30 transition-colors">
+              Download CSV
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* Data Management */}
       <section>
         <h3 className="text-lg font-semibold text-white mb-4">Data Management</h3>
