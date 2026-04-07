@@ -2,7 +2,17 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Plus, X, Calendar as CalIcon, ExternalLink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, Calendar as CalIcon, ExternalLink, Users, Trash2 } from 'lucide-react';
+
+interface CalendarAccount {
+  id: string;
+  label: string;
+  email: string;
+  color: string;
+  provider: string;
+  is_default: boolean;
+  connected: boolean;
+}
 
 interface CalendarEvent {
   id: string;
@@ -12,6 +22,9 @@ interface CalendarEvent {
   location: string | null;
   isAllDay: boolean;
   showAs: string;
+  accountId: string;
+  accountLabel: string;
+  accountColor: string;
 }
 
 type View = 'day' | 'week' | 'month';
@@ -74,7 +87,11 @@ function statusColor(showAs: string): string {
 
 export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [accounts, setAccounts] = useState<CalendarAccount[]>([]);
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [showAccounts, setShowAccounts] = useState(false);
+  const [hiddenAccounts, setHiddenAccounts] = useState<Set<string>>(new Set());
+  const [addLabel, setAddLabel] = useState('');
   const [view, setView] = useState<View>('week');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showAddEvent, setShowAddEvent] = useState(false);
@@ -88,6 +105,7 @@ export default function CalendarPage() {
     const res = await fetch('/api/calendar');
     const data = await res.json();
     setConnected(data.connected);
+    setAccounts(data.accounts ?? []);
     setEvents(data.events ?? []);
   }, []);
 
@@ -121,14 +139,35 @@ export default function CalendarPage() {
     fetchEvents();
   };
 
+  const visibleEvents = events.filter((e) => !hiddenAccounts.has(e.accountId));
+
   const getEventsForDay = (date: Date) =>
-    events.filter((e) => isSameDay(new Date(e.start), date));
+    visibleEvents.filter((e) => isSameDay(new Date(e.start), date));
 
   const getEventsForHour = (date: Date, hour: number) =>
-    events.filter((e) => {
+    visibleEvents.filter((e) => {
       const start = new Date(e.start);
       return isSameDay(start, date) && start.getHours() === hour && !e.isAllDay;
     });
+
+  const deleteAccount = async (id: string) => {
+    if (!confirm('Remove this calendar account?')) return;
+    await fetch('/api/calendar/accounts', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    fetchEvents();
+  };
+
+  const toggleAccount = (id: string) => {
+    setHiddenAccounts((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const today = new Date();
 
@@ -150,11 +189,19 @@ export default function CalendarPage() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 gap-4">
         <CalIcon size={48} className="text-gray-600" />
-        <p className="text-gray-400 text-lg">Connect your Microsoft account to view your calendar</p>
-        <a href="/api/auth/microsoft" className="bg-accent-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-accent-700 transition-colors flex items-center gap-2">
-          <ExternalLink size={16} />
-          Connect Microsoft Calendar
-        </a>
+        <p className="text-gray-400 text-lg">Connect a Microsoft account to view your calendar</p>
+        <div className="flex gap-2 items-center">
+          <input
+            value={addLabel}
+            onChange={(e) => setAddLabel(e.target.value)}
+            placeholder="Account label (e.g. Work)"
+            className="bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-600"
+          />
+          <a href={`/api/auth/microsoft?label=${encodeURIComponent(addLabel || 'Microsoft')}`} className="bg-accent-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-accent-700 transition-colors flex items-center gap-2 text-sm">
+            <ExternalLink size={14} />
+            Connect
+          </a>
+        </div>
       </div>
     );
   }
@@ -167,7 +214,7 @@ export default function CalendarPage() {
         <div className="px-4 py-2 border-b border-gray-700 bg-gray-800/50">
           <p className="text-gray-500 text-xs mb-1">All day</p>
           {getEventsForDay(currentDate).filter((e) => e.isAllDay).map((e) => (
-            <div key={e.id} className={`${statusColor(e.showAs)} text-white text-xs px-2 py-1 rounded mb-1`}>{e.subject}</div>
+            <div key={e.id} className=text-white text-xs px-2 py-1 rounded mb-1" style={{ backgroundColor: e.accountColor || statusColor(e.showAs).replace('bg-', '') }}>{e.subject}</div>
           ))}
         </div>
       )}
@@ -270,7 +317,7 @@ export default function CalendarPage() {
                 </p>
                 <div className="space-y-0.5 overflow-hidden">
                   {dayEvents.slice(0, 3).map((e) => (
-                    <div key={e.id} className={`${statusColor(e.showAs)} text-white text-xs px-1 py-0.5 rounded truncate`}>
+                    <div key={e.id} className=text-white text-xs px-1 py-0.5 rounded truncate" style={{ backgroundColor: e.accountColor || '#6366f1' }}>
                       {e.subject}
                     </div>
                   ))}
@@ -314,6 +361,17 @@ export default function CalendarPage() {
               </button>
             ))}
           </div>
+          {/* Accounts toggle */}
+          <button
+            onClick={() => setShowAccounts(!showAccounts)}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center gap-1.5',
+              showAccounts ? 'border-accent-600/50 text-accent-400 bg-accent-600/10' : 'border-gray-700 text-gray-400 hover:text-white'
+            )}
+          >
+            <Users size={14} />
+            Accounts ({accounts.length})
+          </button>
           <button
             onClick={() => { setShowAddEvent(true); setNewDate(currentDate.toISOString().split('T')[0]); }}
             className="bg-accent-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-accent-700 transition-colors flex items-center gap-1.5"
@@ -323,6 +381,58 @@ export default function CalendarPage() {
           </button>
         </div>
       </div>
+
+      {/* Accounts Panel */}
+      {showAccounts && (
+        <div className="px-6 py-3 border-b border-gray-700 shrink-0">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider">Calendar Accounts</p>
+            <div className="flex gap-2 items-center">
+              <input
+                value={addLabel}
+                onChange={(e) => setAddLabel(e.target.value)}
+                placeholder="Label (e.g. Work)"
+                className="bg-gray-800 text-white border border-gray-700 rounded px-2 py-1 text-xs w-32 focus:outline-none focus:ring-1 focus:ring-accent-600"
+              />
+              <a
+                href={`/api/auth/microsoft?label=${encodeURIComponent(addLabel || 'Microsoft')}`}
+                className="bg-accent-600 text-white px-2.5 py-1 rounded text-xs font-medium hover:bg-accent-700 transition-colors flex items-center gap-1"
+              >
+                <Plus size={12} />
+                Add Account
+              </a>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {accounts.map((acc) => (
+              <div
+                key={acc.id}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer',
+                  hiddenAccounts.has(acc.id)
+                    ? 'border-gray-700 text-gray-600 opacity-50'
+                    : 'border-gray-600 text-white'
+                )}
+              >
+                <span
+                  className="w-3 h-3 rounded-full shrink-0"
+                  style={{ backgroundColor: hiddenAccounts.has(acc.id) ? '#4b5563' : acc.color }}
+                  onClick={() => toggleAccount(acc.id)}
+                />
+                <span onClick={() => toggleAccount(acc.id)} className="font-medium">{acc.label}</span>
+                {acc.email && <span className="text-gray-500">{acc.email}</span>}
+                {!acc.connected && <span className="text-red-400">disconnected</span>}
+                <button
+                  onClick={() => deleteAccount(acc.id)}
+                  className="text-gray-600 hover:text-red-400 transition-colors ml-1"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Add Event Modal */}
       {showAddEvent && (
