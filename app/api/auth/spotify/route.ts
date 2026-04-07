@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 
 const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID!;
 const REDIRECT_URI = 'https://lewhofmeyr.co.za/api/auth/spotify/callback';
-const SCOPES = 'user-read-playback-state user-read-currently-playing user-read-recently-played user-top-read';
+const SCOPES = 'user-read-playback-state user-modify-playback-state user-read-currently-playing user-read-recently-played user-top-read user-library-read playlist-read-private playlist-read-collaborative';
 
 export async function GET() {
   const { userId } = await auth();
