@@ -93,7 +93,7 @@ export default function ChatContainer({
 
         const assistantMsg: ChatMessage = {
           id: crypto.randomUUID(),
-          thread_id: threadId,
+          thread_id: threadId ?? '',
           role: 'assistant',
           content: accumulated,
           model: initialModel,
@@ -108,7 +108,7 @@ export default function ChatContainer({
         setError(err instanceof Error ? err.message : 'Something went wrong');
         const errorMsg: ChatMessage = {
           id: crypto.randomUUID(),
-          thread_id: threadId,
+          thread_id: threadId ?? '',
           role: 'assistant',
           content: `Error: ${err instanceof Error ? err.message : 'Something went wrong. Please try again.'}`,
           model: null,
