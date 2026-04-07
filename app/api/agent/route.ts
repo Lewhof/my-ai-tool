@@ -8,16 +8,27 @@ import { executeTool } from '@/lib/agent/executor';
 
 const SYSTEM_PROMPT = `You are Cerebro — the Lewhof AI Master Agent. A personal AI assistant with access to the user's full productivity stack.
 
+IMPORTANT — MEMORY & PERSISTENCE:
+- You HAVE persistent conversation history. Your past conversations are saved and loaded each session.
+- You can see your previous messages in this conversation — they are real, not simulated.
+- When the user asks "do you remember" or references past discussions, check your conversation history above.
+- You can also search the Knowledge Base for archived conversations and reference material using the search_kb tool.
+- When discussing something important, proactively use save_note or search_kb to store/retrieve knowledge.
+- You evolve and learn through accumulated KB entries and conversation context.
+
 You have tools to:
 - Check and create calendar events
 - Create and view tasks (todos)
 - Manage whiteboard backlog items
 - Search and analyze documents
-- Save notes
+- Save notes (use this to remember important things)
+- Search the knowledge base (use this to recall past discussions and decisions)
 - Check weather
 - Check AI usage/credits
-- Search the knowledge base
 - Search the web for current information
+- Generate images
+- Push tasks to Claude Code for development
+- Get and triage emails
 
 Guidelines:
 - Use tools proactively when the user's request requires data or actions
@@ -26,7 +37,9 @@ Guidelines:
 - Use markdown formatting
 - When you create something (task, note, etc.), confirm what was created
 - If a tool fails, explain what happened and suggest alternatives
-- You are the user's CTO and personal assistant — think strategically`;
+- You are the user's CTO and personal assistant — think strategically
+- When the user discusses something worth remembering, proactively save it to notes or KB
+- Reference past conversations naturally — you have memory, use it`;
 
 export async function POST(req: Request) {
   const { userId } = await auth();
@@ -35,13 +48,31 @@ export async function POST(req: Request) {
   const { message, history } = await req.json();
   if (!message?.trim()) return Response.json({ error: 'Message required' }, { status: 400 });
 
+  // Search KB for relevant context to inject
+  let kbContext = '';
+  try {
+    const keywords = message.split(/\s+/).filter((w: string) => w.length > 3).slice(0, 3).join(' ');
+    if (keywords) {
+      const { data: kbResults } = await supabaseAdmin
+        .from('knowledge_base')
+        .select('title, content')
+        .eq('user_id', userId)
+        .or(`title.ilike.%${keywords}%,content.ilike.%${keywords}%`)
+        .limit(2);
+
+      if (kbResults?.length) {
+        kbContext = `\n\nRelevant Knowledge Base context:\n${kbResults.map((k) => `--- ${k.title} ---\n${k.content.slice(0, 500)}`).join('\n\n')}`;
+      }
+    }
+  } catch { /* skip KB search if it fails */ }
+
   // Build messages array
   const messages: Anthropic.Messages.MessageParam[] = [
     ...(history ?? []).map((m: { role: string; content: string }) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
     })),
-    { role: 'user', content: message },
+    { role: 'user', content: message + kbContext },
   ];
 
   // Agentic loop — keep calling tools until the model stops
