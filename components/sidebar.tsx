@@ -64,6 +64,7 @@ const navGroups: NavGroup[] = [
     label: 'Build',
     items: [
       { name: 'Diagrams', href: '/diagrams', icon: GitFork },
+      { name: 'Agents', href: '/agents', icon: Bot },
       { name: 'Image Lab', href: '/images', icon: ImageIcon },
       { name: 'Workflows', href: '/workflows', icon: Zap },
       { name: 'Whiteboard', href: '/whiteboard', icon: ClipboardList },
