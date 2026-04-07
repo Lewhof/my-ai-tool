@@ -22,12 +22,20 @@ export default function ChatPage() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => {
-    fetchThreads();
-  }, [fetchThreads]);
+  useEffect(() => { fetchThreads(); }, [fetchThreads]);
 
-  const handleNewChat = () => {
-    router.push('/chat');
+  const handleNewChat = async (model: string) => {
+    // Create thread with selected model, navigate to it
+    const res = await fetch('/api/chat/threads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'New Chat', model }),
+    });
+    const data = await res.json();
+    if (data.id) {
+      fetchThreads();
+      router.push(`/chat/${data.id}`);
+    }
   };
 
   const handleDelete = async (id: string) => {
