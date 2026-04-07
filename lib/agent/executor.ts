@@ -86,7 +86,54 @@ export async function executeTool(
       }
 
       case 'generate_image': {
-        return `Image generation requested: "${input.prompt}". Open the Image Lab page to generate images with Nano Banana.`;
+        const imgPrompt = input.prompt as string;
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) return 'Gemini API key not configured.';
+
+        try {
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: imgPrompt }] }],
+                generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+              }),
+            }
+          );
+
+          if (!res.ok) return `Image generation failed (${res.status}). Try a different prompt.`;
+
+          const data = await res.json();
+          const parts = data.candidates?.[0]?.content?.parts ?? [];
+          let imageData = '';
+          let mimeType = '';
+          let text = '';
+
+          for (const part of parts) {
+            if (part.text) text += part.text;
+            if (part.inlineData) {
+              imageData = part.inlineData.data;
+              mimeType = part.inlineData.mimeType || 'image/png';
+            }
+          }
+
+          if (imageData) {
+            // Save to Supabase Storage
+            const fileName = `${userId}/cerebro-${Date.now()}.png`;
+            const buffer = Buffer.from(imageData, 'base64');
+            await supabaseAdmin.storage.from('notes').upload(fileName, buffer, { contentType: mimeType });
+            const { data: signed } = await supabaseAdmin.storage.from('notes').createSignedUrl(fileName, 31536000);
+            const url = signed?.signedUrl;
+
+            return `IMAGE_GENERATED:${url}\n\n${text || `Image generated for: "${imgPrompt}"`}`;
+          }
+
+          return text || 'Image generation completed but no image was returned. Try a more descriptive prompt.';
+        } catch (err) {
+          return `Image generation error: ${err instanceof Error ? err.message : 'unknown'}`;
+        }
       }
 
       case 'save_note': {
