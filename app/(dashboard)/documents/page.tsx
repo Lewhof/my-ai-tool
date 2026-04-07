@@ -48,6 +48,15 @@ export default function DocumentsPage() {
     setDocuments((prev) => prev.filter((d) => d.id !== id));
   };
 
+  const handleRename = async (id: string, name: string) => {
+    await fetch(`/api/documents/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    fetchDocs();
+  };
+
   const moveToFolder = async (id: string, folderId: string | null) => {
     await fetch(`/api/documents/${id}`, {
       method: 'PATCH',
@@ -301,6 +310,7 @@ export default function DocumentsPage() {
                   <DocumentCard
                     doc={doc}
                     onDelete={() => handleDelete(doc.id)}
+                    onRename={handleRename}
                     folder={folders.find((f) => f.id === doc.folder_id)?.name || doc.folder}
                     onMoveToFolder={(folderId) => moveToFolder(doc.id, folderId)}
                     folderOptions={folders.map((f) => ({ id: f.id, name: f.name }))}

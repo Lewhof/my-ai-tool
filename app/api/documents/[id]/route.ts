@@ -31,6 +31,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const updates: Record<string, unknown> = {};
   if (body.folder_id !== undefined) updates.folder_id = body.folder_id || null;
   if (body.folder !== undefined) updates.folder = body.folder;
+  if (body.name !== undefined) updates.name = body.name;
+  if (body.display_name !== undefined) updates.display_name = body.display_name || null;
 
   if (Object.keys(updates).length === 0) {
     return Response.json({ error: 'No updates provided' }, { status: 400 });

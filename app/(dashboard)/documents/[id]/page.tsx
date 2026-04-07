@@ -6,6 +6,7 @@ import ChatContainer from '@/components/chat/chat-container';
 interface DocData {
   id: string;
   name: string;
+  display_name: string | null;
   file_type: string;
   signed_url: string | null;
 }
@@ -28,7 +29,10 @@ export default function DocumentViewPage({ params }: { params: Promise<{ id: str
     <div className="flex flex-col lg:flex-row h-full">
       {/* Document viewer */}
       <div className="flex-1 border-b lg:border-b-0 lg:border-r border-gray-700 p-4">
-        <h3 className="text-white font-medium mb-3 truncate">{doc.name}</h3>
+        <h3 className="text-white font-medium mb-1 truncate">{doc.display_name || doc.name}</h3>
+        {doc.display_name && doc.display_name !== doc.name && (
+          <p className="text-gray-600 text-xs mb-3 truncate">{doc.name}</p>
+        )}
         {doc.signed_url ? (
           doc.file_type === 'application/pdf' ? (
             <iframe
