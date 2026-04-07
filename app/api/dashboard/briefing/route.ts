@@ -6,15 +6,50 @@ export async function GET() {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
-  // Gather data from all sources
+  // Check for cached briefing first
   const now = new Date();
   const today = now.toISOString().split('T')[0];
 
-  const [todosRes, whiteboardRes, docsRes, threadsRes] = await Promise.all([
+  try {
+    const { data: cached } = await supabaseAdmin
+      .from('briefings')
+      .select('content')
+      .eq('user_id', userId)
+      .eq('date', today)
+      .limit(1)
+      .single();
+
+    if (cached?.content) {
+      // Still need stats, so continue below but skip AI generation
+      const [todosRes2, whiteboardRes2] = await Promise.all([
+        supabaseAdmin.from('todos').select('title, status, priority, due_date').eq('user_id', userId).neq('status', 'done').limit(10),
+        supabaseAdmin.from('whiteboard').select('title, status, priority, created_at').eq('user_id', userId).neq('status', 'done').limit(10),
+      ]);
+      const todos2 = todosRes2.data ?? [];
+      const overdue2 = todos2.filter(t => t.due_date && t.due_date < today);
+      const dueToday2 = todos2.filter(t => t.due_date === today);
+      return Response.json({
+        briefing: cached.content,
+        cached: true,
+        stats: {
+          activeTasks: todos2.length,
+          overdue: overdue2.length,
+          dueToday: dueToday2.length,
+          whiteboardItems: (whiteboardRes2.data ?? []).length,
+          staleItems: (whiteboardRes2.data ?? []).filter(w => w.status === 'idea' && (now.getTime() - new Date(w.created_at).getTime()) > 14 * 86400000).length,
+        },
+      });
+    }
+  } catch { /* no cache, generate fresh */ }
+
+  // Gather data from all sources
+
+  const [todosRes, whiteboardRes, docsRes, threadsRes, notepadRes] = await Promise.all([
     supabaseAdmin.from('todos').select('title, status, priority, due_date').eq('user_id', userId).neq('status', 'done').order('created_at', { ascending: false }).limit(10),
     supabaseAdmin.from('whiteboard').select('title, status, priority, created_at').eq('user_id', userId).neq('status', 'done').order('priority', { ascending: true }).limit(10),
     supabaseAdmin.from('documents').select('name, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(5),
     supabaseAdmin.from('chat_threads').select('title, updated_at').eq('user_id', userId).order('updated_at', { ascending: false }).limit(5),
+    supabaseAdmin.from('notes').select('content').eq('user_id', userId).limit(1).single(),
   ]);
 
   const todos = todosRes.data ?? [];
@@ -78,6 +113,8 @@ Stale items (14+ days in Idea): ${staleItems.length > 0 ? staleItems.map((s) => 
 
 Recent documents: ${(docsRes.data ?? []).map((d) => d.name).join(', ') || 'None'}
 Recent chats: ${(threadsRes.data ?? []).map((t) => t.title).join(', ') || 'None'}
+
+User's strategic context: ${notepadRes.data?.content?.slice(0, 500) || 'Not set'}
   `.trim();
 
   // Generate briefing

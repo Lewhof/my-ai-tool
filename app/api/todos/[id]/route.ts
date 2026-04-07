@@ -1,6 +1,27 @@
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 
+function getNextRecurrenceDate(recurrence: string, fromDate?: string): string | null {
+  const now = fromDate ? new Date(fromDate) : new Date();
+  switch (recurrence) {
+    case 'daily':
+      now.setDate(now.getDate() + 1);
+      break;
+    case 'weekly':
+      now.setDate(now.getDate() + 7);
+      break;
+    case 'biweekly':
+      now.setDate(now.getDate() + 14);
+      break;
+    case 'monthly':
+      now.setMonth(now.getMonth() + 1);
+      break;
+    default:
+      return null;
+  }
+  return now.toISOString().split('T')[0];
+}
+
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
@@ -11,6 +32,34 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const filtered = Object.fromEntries(
     Object.entries(updates).filter(([k]) => allowed.includes(k))
   );
+
+  // If marking as done, check if it's a recurring task
+  if (filtered.status === 'done') {
+    const { data: todo } = await supabaseAdmin
+      .from('todos')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (todo?.recurrence) {
+      const nextDue = getNextRecurrenceDate(todo.recurrence, todo.due_date);
+      if (nextDue) {
+        // Create next instance
+        await supabaseAdmin.from('todos').insert({
+          user_id: userId,
+          title: todo.title,
+          description: todo.description,
+          status: 'todo',
+          priority: todo.priority,
+          due_date: nextDue,
+          bucket: todo.bucket,
+          tags: todo.tags,
+          recurrence: todo.recurrence,
+        });
+      }
+    }
+  }
 
   const { error } = await supabaseAdmin
     .from('todos')
