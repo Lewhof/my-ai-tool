@@ -241,7 +241,12 @@ export default function EmailPage() {
             </div>
             <div className="flex-1 overflow-auto p-6">
               {emailDetail.bodyType === 'html' ? (
-                <div className="prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: emailDetail.body }} />
+                <iframe
+                  srcDoc={`<!DOCTYPE html><html><head><style>body{color:#e2e8f0;background:#0d1b2a;font-family:system-ui;font-size:14px;padding:0;margin:0}a{color:#ea580c}img{max-width:100%}</style></head><body>${emailDetail.body}</body></html>`}
+                  className="w-full h-full border-0 min-h-[400px]"
+                  sandbox="allow-same-origin"
+                  title="Email content"
+                />
               ) : (
                 <pre className="text-gray-300 text-sm whitespace-pre-wrap font-sans">{emailDetail.body}</pre>
               )}

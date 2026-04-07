@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { cn, formatRelativeDate } from '@/lib/utils';
 
 interface Todo {
@@ -204,7 +204,7 @@ export default function TodosPage() {
           {todos.filter((t) => t.status !== 'done').map((todo) => {
             const due = formatDueDate(todo.due_date);
             return (
-              <>
+              <React.Fragment key={todo.id}>
                 <tr
                   key={todo.id}
                   className="hover:bg-gray-700/50 cursor-pointer transition-colors"
@@ -266,7 +266,7 @@ export default function TodosPage() {
                     </td>
                   </tr>
                 )}
-              </>
+              </React.Fragment>
             );
           })}
           {/* Completed divider */}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { cn, formatRelativeDate } from '@/lib/utils';
 import { Pencil, Check, Play, Trash2, X, Sparkles } from 'lucide-react';
 
@@ -217,9 +217,8 @@ export default function WhiteboardPage() {
         </thead>
         <tbody className="divide-y divide-gray-700">
           {filtered.map((item) => (
-            <>
+            <React.Fragment key={item.id}>
               <tr
-                key={item.id}
                 className="hover:bg-gray-700/50 cursor-pointer transition-colors"
                 onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
               >
@@ -259,7 +258,7 @@ export default function WhiteboardPage() {
                   </td>
                 </tr>
               )}
-            </>
+            </React.Fragment>
           ))}
         </tbody>
       </table>
