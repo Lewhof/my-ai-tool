@@ -27,12 +27,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!userId) return new Response('Unauthorized', { status: 401 });
   const { id } = await params;
 
-  const { folder } = await req.json();
-  if (!folder) return Response.json({ error: 'Folder required' }, { status: 400 });
+  const body = await req.json();
+  const updates: Record<string, unknown> = {};
+  if (body.folder_id !== undefined) updates.folder_id = body.folder_id || null;
+  if (body.folder !== undefined) updates.folder = body.folder;
+
+  if (Object.keys(updates).length === 0) {
+    return Response.json({ error: 'No updates provided' }, { status: 400 });
+  }
 
   const { error } = await supabaseAdmin
     .from('documents')
-    .update({ folder })
+    .update(updates)
     .eq('id', id)
     .eq('user_id', userId);
 
