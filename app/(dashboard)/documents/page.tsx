@@ -177,18 +177,40 @@ export default function DocumentsPage() {
     });
   };
 
+  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
+
+  const handleFolderDragOver = (e: React.DragEvent, folderId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverFolder(folderId);
+  };
+
+  const handleFolderDrop = async (e: React.DragEvent, folderId: string) => {
+    e.preventDefault();
+    setDragOverFolder(null);
+    const docId = e.dataTransfer.getData('application/document-id');
+    if (docId) {
+      await moveToFolder(docId, folderId);
+    }
+  };
+
   const FolderItem = ({ folder, depth = 0 }: { folder: DocFolder; depth?: number }) => {
     const children = getChildren(folder.id);
     const hasChildren = children.length > 0;
     const isExpanded = expandedFolders.has(folder.id);
     const isActive = activeFolder === folder.id;
+    const isDragOver = dragOverFolder === folder.id;
     const docCount = documents.filter((d) => d.folder_id === folder.id).length;
 
     return (
       <>
         <div
+          onDragOver={(e) => handleFolderDragOver(e, folder.id)}
+          onDragLeave={() => setDragOverFolder(null)}
+          onDrop={(e) => handleFolderDrop(e, folder.id)}
           className={cn(
             'flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors group',
+            isDragOver ? 'bg-accent-600/20 border border-accent-600 border-dashed' : '',
             isActive ? 'bg-accent-600/10 text-accent-400' : 'text-gray-300 hover:bg-gray-800'
           )}
           style={{ paddingLeft: `${12 + depth * 16}px` }}
