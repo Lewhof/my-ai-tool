@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface WorkflowRunnerProps {
   workflowId: string;
@@ -105,7 +106,7 @@ export default function WorkflowRunner({ workflowId }: WorkflowRunnerProps) {
                 <span className="text-white text-sm font-medium">{step.name}</span>
               </div>
               <div className="p-4 prose prose-invert prose-sm max-w-none">
-                <ReactMarkdown>{step.content || '...'}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{step.content || '...'}</ReactMarkdown>
               </div>
             </div>
           ))}

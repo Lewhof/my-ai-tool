@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { cn, formatRelativeDate } from '@/lib/utils';
 import { List, LayoutGrid, ChevronLeft, Trash2 } from 'lucide-react';
 
@@ -157,7 +158,7 @@ export default function KnowledgeBasePage() {
                   {expandedGridId === entry.id && (
                     <div className="px-5 py-4 border-t border-gray-700">
                       <div className="prose prose-invert prose-sm max-w-none">
-                        <ReactMarkdown>{entry.content}</ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.content}</ReactMarkdown>
                       </div>
                     </div>
                   )}
@@ -222,7 +223,7 @@ export default function KnowledgeBasePage() {
                 </div>
               ) : (
                 <div className="prose prose-invert prose-sm max-w-none prose-table:border-collapse prose-th:border prose-th:border-gray-700 prose-th:bg-gray-800 prose-th:px-4 prose-th:py-2 prose-th:text-left prose-td:border prose-td:border-gray-700 prose-td:px-4 prose-td:py-2">
-                  <ReactMarkdown>{selected.content}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{selected.content}</ReactMarkdown>
                 </div>
               )}
             </div>
