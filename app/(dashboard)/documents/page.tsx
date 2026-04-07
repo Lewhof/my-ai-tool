@@ -31,7 +31,8 @@ export default function DocumentsPage() {
   const [newFolderParent, setNewFolderParent] = useState<string | null>(null);
   const [uploadComment, setUploadComment] = useState('');
   const [reviewingId, setReviewingId] = useState<string | null>(null);
-  const [reviewResult, setReviewResult] = useState<{ suggested_folder_name: string; confidence: string; reason: string } | null>(null);
+  const [reviewDocId, setReviewDocId] = useState<string | null>(null);
+  const [reviewResult, setReviewResult] = useState<{ suggested_folder_id?: string | null; suggested_folder_name: string; confidence: string; reason: string } | null>(null);
 
   const fetchDocs = useCallback(async () => {
     const res = await fetch('/api/documents');
@@ -92,6 +93,7 @@ export default function DocumentsPage() {
 
   const reviewDocument = async (docId: string) => {
     setReviewingId(docId);
+    setReviewDocId(docId);
     setReviewResult(null);
     try {
       const res = await fetch(`/api/documents/${docId}/review`, { method: 'POST' });
@@ -107,6 +109,37 @@ export default function DocumentsPage() {
     } finally {
       setReviewingId(null);
     }
+  };
+
+  const acceptReview = async () => {
+    if (!reviewResult || !reviewDocId) return;
+
+    let folderId = reviewResult.suggested_folder_id;
+
+    // If no folder ID, create the suggested folder
+    if (!folderId && reviewResult.suggested_folder_name) {
+      const res = await fetch('/api/documents/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: reviewResult.suggested_folder_name }),
+      });
+      const data = await res.json();
+      folderId = data.id;
+    }
+
+    if (folderId) {
+      await moveToFolder(reviewDocId, folderId);
+    }
+
+    setReviewResult(null);
+    setReviewDocId(null);
+  };
+
+  const refileToFolder = async (folderId: string) => {
+    if (!reviewDocId) return;
+    await moveToFolder(reviewDocId, folderId);
+    setReviewResult(null);
+    setReviewDocId(null);
   };
 
   // Handle paste for screenshots
@@ -281,16 +314,38 @@ export default function DocumentsPage() {
 
         {/* AI Review result */}
         {reviewResult && (
-          <div className="bg-accent-600/10 border border-accent-600/30 rounded-lg p-4 flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <Sparkles size={16} className="text-accent-400" />
-                <p className="text-white text-sm font-medium">AI suggests: {reviewResult.suggested_folder_name}</p>
-                <span className={cn('text-xs px-2 py-0.5 rounded', reviewResult.confidence === 'high' ? 'bg-green-500/20 text-green-400' : reviewResult.confidence === 'medium' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-500/20 text-gray-400')}>{reviewResult.confidence}</span>
+          <div className="bg-accent-600/10 border border-accent-600/30 rounded-lg p-4 space-y-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Sparkles size={16} className="text-accent-400" />
+                  <p className="text-white text-sm font-medium">AI suggests: {reviewResult.suggested_folder_name}</p>
+                  <span className={cn('text-xs px-2 py-0.5 rounded', reviewResult.confidence === 'high' ? 'bg-green-500/20 text-green-400' : reviewResult.confidence === 'medium' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-500/20 text-gray-400')}>{reviewResult.confidence}</span>
+                </div>
+                <p className="text-gray-400 text-xs mt-1">{reviewResult.reason}</p>
               </div>
-              <p className="text-gray-400 text-xs mt-1">{reviewResult.reason}</p>
+              <button onClick={() => { setReviewResult(null); setReviewDocId(null); }} className="text-gray-500 hover:text-white text-xs shrink-0">Dismiss</button>
             </div>
-            <button onClick={() => setReviewResult(null)} className="text-gray-500 hover:text-white text-xs">Dismiss</button>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={acceptReview}
+                className="bg-accent-600 text-white px-4 py-1.5 rounded-lg text-xs font-medium hover:bg-accent-700 transition-colors"
+              >
+                Accept — move to {reviewResult.suggested_folder_name}
+              </button>
+              <span className="text-gray-600 text-xs">or move to:</span>
+              {folders.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => refileToFolder(f.id)}
+                  className="text-gray-400 hover:text-white text-xs px-2.5 py-1 border border-gray-600 rounded-lg hover:border-gray-500 transition-colors"
+                >
+                  {f.name}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
