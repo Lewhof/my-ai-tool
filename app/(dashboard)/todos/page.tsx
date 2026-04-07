@@ -46,6 +46,7 @@ export default function TodosPage() {
   const [newPriority, setNewPriority] = useState('medium');
   const [newDueDate, setNewDueDate] = useState('');
   const [newBucket, setNewBucket] = useState('General');
+  const [newRecurrence, setNewRecurrence] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchTodos = useCallback(async () => {
@@ -68,6 +69,7 @@ export default function TodosPage() {
         priority: newPriority,
         due_date: newDueDate || null,
         bucket: newBucket,
+        recurrence: newRecurrence || null,
       }),
     });
     setNewTitle(''); setNewDesc(''); setNewPriority('medium'); setNewDueDate(''); setShowAdd(false);
@@ -396,6 +398,19 @@ export default function TodosPage() {
                 placeholder="General"
                 className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent-600"
               />
+            </div>
+            <div>
+              <label className="text-gray-300 text-sm block mb-1">Repeat</label>
+              <select
+                value={newRecurrence}
+                onChange={(e) => setNewRecurrence(e.target.value)}
+                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2"
+              >
+                <option value="">One-time</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
             </div>
             <div className="flex items-end">
               <button

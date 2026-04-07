@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 
 const CLIENT_ID = process.env.MICROSOFT_CLIENT_ID!;
 const REDIRECT_URI = 'https://lewhofmeyr.co.za/api/auth/microsoft/callback';
-const SCOPES = 'openid profile User.Read Calendars.ReadWrite offline_access';
+const SCOPES = 'openid profile User.Read Calendars.ReadWrite Mail.Read Mail.ReadWrite offline_access';
 
 export async function GET(req: NextRequest) {
   const { userId } = await auth();

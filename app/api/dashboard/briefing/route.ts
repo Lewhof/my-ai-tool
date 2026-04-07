@@ -38,10 +38,33 @@ export async function GET() {
     }
   } catch { /* skip */ }
 
+  // Get unread email count
+  let unreadEmails = 0;
+  try {
+    const { data: accounts } = await supabaseAdmin
+      .from('calendar_accounts')
+      .select('access_token')
+      .eq('user_id', userId)
+      .eq('is_default', true)
+      .limit(1);
+    const token = accounts?.[0]?.access_token;
+    if (token) {
+      const emailRes = await fetch(
+        'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$filter=isRead eq false&$count=true&$top=1',
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (emailRes.ok) {
+        const emailData = await emailRes.json();
+        unreadEmails = emailData['@odata.count'] ?? emailData.value?.length ?? 0;
+      }
+    }
+  } catch { /* skip */ }
+
   // Build context for AI briefing
   const context = `
 Today: ${now.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
 Weather: ${weather || 'Unknown'}
+Unread emails: ${unreadEmails}
 
 Tasks (${todos.length} active):
 ${todos.map((t) => `- [${t.priority}] ${t.title}${t.due_date ? ` (due ${t.due_date})` : ''}`).join('\n') || 'No active tasks'}

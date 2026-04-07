@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
-  const { title, description, status, priority, due_date, bucket, tags } = await req.json();
+  const { title, description, status, priority, due_date, bucket, tags, recurrence } = await req.json();
   if (!title?.trim()) return Response.json({ error: 'Title required' }, { status: 400 });
 
   const { data, error } = await supabaseAdmin
@@ -33,6 +33,7 @@ export async function POST(req: Request) {
       due_date: due_date || null,
       bucket: bucket || 'General',
       tags: tags || [],
+      recurrence: recurrence || null,
     })
     .select()
     .single();
