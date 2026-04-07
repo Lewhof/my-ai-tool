@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn, formatRelativeDate } from '@/lib/utils';
 import {
   Key, Code, CreditCard, Landmark, Fingerprint, FileLock,
   Wifi, Server, Shield, Search, Eye, EyeOff, Copy, Trash2,
   Hash, BadgeCheck, Car, Repeat, TrendingUp, FileText, Home,
-  Building, DoorOpen, Plug,
+  Building, DoorOpen, Plug, Camera, Loader2,
 } from 'lucide-react';
 import type { CategoryDef } from '@/lib/vault-categories';
 
@@ -53,6 +53,8 @@ export default function VaultPage() {
   const [addCategory, setAddCategory] = useState('');
   const [newName, setNewName] = useState('');
   const [newFields, setNewFields] = useState<Record<string, string>>({});
+  const [scanning, setScanning] = useState(false);
+  const scanInputRef = useRef<HTMLInputElement>(null);
   const [revealedId, setRevealedId] = useState<string | null>(null);
   const [revealedFields, setRevealedFields] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState<string | null>(null);
@@ -66,6 +68,48 @@ export default function VaultPage() {
   }, [addCategory]);
 
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
+
+  const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setScanning(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      if (addCategory) formData.append('category', addCategory);
+
+      const res = await fetch('/api/vault/scan', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('Scan failed');
+
+      const data = await res.json();
+
+      // Auto-fill fields from scan result
+      if (data.suggested_category && !addCategory) {
+        setAddCategory(data.suggested_category);
+      }
+      if (data.name) setNewName(data.name);
+
+      // Fill fields — handle both flat and nested formats
+      const fields = data.fields || data;
+      const newFieldsObj: Record<string, string> = {};
+      for (const [key, val] of Object.entries(fields)) {
+        if (typeof val === 'string' && key !== 'suggested_category' && key !== 'name') {
+          newFieldsObj[key] = val;
+        }
+      }
+      if (Object.keys(newFieldsObj).length > 0) {
+        setNewFields((prev) => ({ ...prev, ...newFieldsObj }));
+      }
+
+      setShowAdd(true);
+    } catch {
+      alert('Could not extract data from image. Try a clearer photo.');
+    } finally {
+      setScanning(false);
+      e.target.value = '';
+    }
+  };
 
   const addEntry = async () => {
     if (!newName.trim()) return;
@@ -133,12 +177,24 @@ export default function VaultPage() {
           <h2 className="text-2xl font-bold text-white">Vault</h2>
           <p className="text-gray-500 text-sm mt-1">Securely store passwords, keys, cards, and secrets</p>
         </div>
-        <button
-          onClick={() => setShowAdd(!showAdd)}
-          className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
-        >
-          {showAdd ? 'Cancel' : '+ Add Entry'}
-        </button>
+        <div className="flex gap-2">
+          <input ref={scanInputRef} type="file" accept="image/*" capture="environment" onChange={handleScan} className="hidden" />
+          <button
+            onClick={() => scanInputRef.current?.click()}
+            disabled={scanning}
+            className="text-gray-400 hover:text-accent-400 px-3 py-2 rounded-lg text-sm border border-gray-700 hover:border-accent-600/50 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            title="Scan photo to auto-fill"
+          >
+            {scanning ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+            Scan
+          </button>
+          <button
+            onClick={() => setShowAdd(!showAdd)}
+            className="bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-700 transition-colors"
+          >
+            {showAdd ? 'Cancel' : '+ Add Entry'}
+          </button>
+        </div>
       </div>
 
       {/* Search */}
