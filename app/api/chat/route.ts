@@ -115,6 +115,29 @@ export async function POST(req: Request) {
         model: threadModel,
         tokens_used: inputTokens + outputTokens,
       });
+
+      // Auto-name: if this is the first AI response, rename the thread
+      // based on the response content (more descriptive than user's input)
+      const { count } = await supabaseAdmin
+        .from('chat_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('thread_id', currentThreadId)
+        .eq('role', 'assistant');
+
+      if (count === 1) {
+        // First AI response — use first meaningful words as title
+        const cleanText = fullResponse.replace(/[#*`\n]/g, ' ').trim();
+        const words = cleanText.split(/\s+/).filter(Boolean).slice(0, 8);
+        const autoTitle = words.join(' ').slice(0, 60) + (cleanText.length > 60 ? '...' : '');
+        if (autoTitle.length > 5) {
+          await supabaseAdmin
+            .from('chat_threads')
+            .update({ title: autoTitle, updated_at: new Date().toISOString() })
+            .eq('id', currentThreadId);
+          return;
+        }
+      }
+
       await supabaseAdmin
         .from('chat_threads')
         .update({ updated_at: new Date().toISOString() })

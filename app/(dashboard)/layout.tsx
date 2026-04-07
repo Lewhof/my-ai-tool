@@ -4,6 +4,8 @@ import Sidebar from '@/components/sidebar';
 import Header from '@/components/header';
 import MobileNav from '@/components/mobile-nav';
 import MobileHeader from '@/components/mobile-header';
+import GlobalSearch from '@/components/global-search';
+import MobileFAB from '@/components/mobile-fab';
 
 export default function DashboardLayout({
   children,
@@ -28,6 +30,12 @@ export default function DashboardLayout({
 
       {/* Mobile bottom tab bar — hidden on desktop */}
       <MobileNav />
+
+      {/* Mobile FAB (quick-add) */}
+      <MobileFAB />
+
+      {/* Global search (Cmd+K) */}
+      <GlobalSearch />
     </div>
   );
 }
