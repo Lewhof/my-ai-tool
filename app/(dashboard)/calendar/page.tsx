@@ -214,7 +214,7 @@ export default function CalendarPage() {
         <div className="px-4 py-2 border-b border-gray-700 bg-gray-800/50">
           <p className="text-gray-500 text-xs mb-1">All day</p>
           {getEventsForDay(currentDate).filter((e) => e.isAllDay).map((e) => (
-            <div key={e.id} className=text-white text-xs px-2 py-1 rounded mb-1" style={{ backgroundColor: e.accountColor || statusColor(e.showAs).replace('bg-', '') }}>{e.subject}</div>
+            <div key={e.id} className="text-white text-xs px-2 py-1 rounded mb-1" style={{ backgroundColor: e.accountColor || statusColor(e.showAs).replace('bg-', '') }}>{e.subject}</div>
           ))}
         </div>
       )}
@@ -317,7 +317,7 @@ export default function CalendarPage() {
                 </p>
                 <div className="space-y-0.5 overflow-hidden">
                   {dayEvents.slice(0, 3).map((e) => (
-                    <div key={e.id} className=text-white text-xs px-1 py-0.5 rounded truncate" style={{ backgroundColor: e.accountColor || '#6366f1' }}>
+                    <div key={e.id} className="text-white text-xs px-1 py-0.5 rounded truncate" style={{ backgroundColor: e.accountColor || '#6366f1' }}>
                       {e.subject}
                     </div>
                   ))}
