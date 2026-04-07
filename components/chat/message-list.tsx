@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
+import { CheckSquare, ClipboardList, StickyNote, Check } from 'lucide-react';
 import type { ChatMessage } from '@/lib/types';
 
 interface MessageListProps {
@@ -13,10 +14,51 @@ interface MessageListProps {
 
 export default function MessageList({ messages, streamingContent }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [actionDone, setActionDone] = useState<Record<string, string>>({});
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingContent]);
+
+  const quickAction = async (action: string, content: string, msgId: string) => {
+    const truncated = content.replace(/[#*`>\-]/g, '').trim().slice(0, 100);
+
+    try {
+      if (action === 'task') {
+        await fetch('/api/todos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: truncated }),
+        });
+        setActionDone((prev) => ({ ...prev, [`${msgId}-task`]: 'Task created' }));
+      } else if (action === 'whiteboard') {
+        await fetch('/api/whiteboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: truncated, description: content }),
+        });
+        setActionDone((prev) => ({ ...prev, [`${msgId}-whiteboard`]: 'Added to whiteboard' }));
+      } else if (action === 'note') {
+        await fetch('/api/notes-v2', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: truncated }),
+        });
+        // Update the note content
+        const res = await fetch('/api/notes-v2');
+        const data = await res.json();
+        const latest = data.notes?.[0];
+        if (latest) {
+          await fetch(`/api/notes-v2/${latest.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content }),
+          });
+        }
+        setActionDone((prev) => ({ ...prev, [`${msgId}-note`]: 'Saved as note' }));
+      }
+    } catch { /* silent */ }
+  };
 
   if (messages.length === 0 && !streamingContent) {
     return (
@@ -31,7 +73,7 @@ export default function MessageList({ messages, streamingContent }: MessageListP
       {messages.map((msg) => (
         <div
           key={msg.id}
-          className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}
+          className={cn('flex flex-col', msg.role === 'user' ? 'items-end' : 'items-start')}
         >
           <div
             className={cn(
@@ -46,9 +88,36 @@ export default function MessageList({ messages, streamingContent }: MessageListP
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
               </div>
             ) : (
-              <p className="whitespace-pre-wrap">{msg.content}</p>
+              <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
             )}
           </div>
+
+          {/* Quick actions for assistant messages */}
+          {msg.role === 'assistant' && msg.content.length > 10 && (
+            <div className="flex gap-1 mt-1 ml-1">
+              {actionDone[`${msg.id}-task`] ? (
+                <span className="text-green-400 text-xs flex items-center gap-1"><Check size={10} />{actionDone[`${msg.id}-task`]}</span>
+              ) : (
+                <button onClick={() => quickAction('task', msg.content, msg.id)} className="text-gray-600 hover:text-accent-400 text-xs flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-gray-800 transition-colors">
+                  <CheckSquare size={11} /> Task
+                </button>
+              )}
+              {actionDone[`${msg.id}-whiteboard`] ? (
+                <span className="text-green-400 text-xs flex items-center gap-1"><Check size={10} />{actionDone[`${msg.id}-whiteboard`]}</span>
+              ) : (
+                <button onClick={() => quickAction('whiteboard', msg.content, msg.id)} className="text-gray-600 hover:text-accent-400 text-xs flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-gray-800 transition-colors">
+                  <ClipboardList size={11} /> Whiteboard
+                </button>
+              )}
+              {actionDone[`${msg.id}-note`] ? (
+                <span className="text-green-400 text-xs flex items-center gap-1"><Check size={10} />{actionDone[`${msg.id}-note`]}</span>
+              ) : (
+                <button onClick={() => quickAction('note', msg.content, msg.id)} className="text-gray-600 hover:text-accent-400 text-xs flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-gray-800 transition-colors">
+                  <StickyNote size={11} /> Note
+                </button>
+              )}
+            </div>
+          )}
         </div>
       ))}
       {streamingContent && (
