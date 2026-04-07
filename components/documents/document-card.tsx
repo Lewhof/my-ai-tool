@@ -48,8 +48,17 @@ export default function DocumentCard({ doc, onDelete, onRename, folder, onMoveTo
 
   const displayName = doc.display_name || doc.name;
 
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData('application/document-id', doc.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-gray-600 transition-colors group relative">
+    <div
+      draggable
+      onDragStart={handleDragStart}
+      className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-gray-600 transition-colors group relative cursor-grab active:cursor-grabbing"
+    >
       {/* AI suggested name badge */}
       {doc.display_name && doc.display_name !== doc.name && (
         <div className="flex items-center gap-1 mb-2 text-accent-400">

@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { cn, formatRelativeDate } from '@/lib/utils';
 import {
   Key, Code, CreditCard, Landmark, Fingerprint, FileLock,
-  Wifi, Server, Shield, Search, Eye, EyeOff, Copy, Trash2, Bitcoin,
+  Wifi, Server, Shield, Search, Eye, EyeOff, Copy, Trash2,
+  Hash, BadgeCheck, Car, Repeat, TrendingUp, FileText, Home,
+  Building, DoorOpen, Plug,
 } from 'lucide-react';
 import type { CategoryDef } from '@/lib/vault-categories';
 
@@ -23,14 +25,23 @@ interface VaultEntry {
 const CATEGORY_ICONS: Record<string, typeof Key> = {
   login: Key,
   api_key: Code,
+  pin: Hash,
+  membership: BadgeCheck,
+  vehicle: Car,
+  subscription: Repeat,
   bank_card: CreditCard,
   bank_account: Landmark,
+  investment: TrendingUp,
+  insurance: Shield,
+  tax: FileText,
+  property_bond: Home,
+  property_levy: Building,
+  property_access: DoorOpen,
+  property_utility: Plug,
   identity: Fingerprint,
   secure_note: FileLock,
   wifi: Wifi,
   server: Server,
-  crypto: Bitcoin,
-  insurance: Shield,
 };
 
 export default function VaultPage() {
