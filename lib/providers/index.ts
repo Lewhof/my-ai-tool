@@ -26,4 +26,5 @@ export const PROVIDER_CONFIGS: ProviderConfig[] = [
   { id: 'claude-sonnet', name: 'Claude Sonnet', description: 'Smart & capable', icon: 'brain', color: '#3b82f6', costLabel: '~$0.01/msg' },
   { id: 'groq-llama', name: 'Groq LLaMA 3', description: 'Instant responses', icon: 'rocket', color: '#f97316', costLabel: 'Free tier' },
   { id: 'perplexity', name: 'Perplexity', description: 'Web search built-in', icon: 'search', color: '#06b6d4', costLabel: '~$0.005/msg' },
+  { id: 'gemini', name: 'Gemini 2.0 Flash', description: 'Google AI — fast & free', icon: 'sparkles', color: '#4285f4', costLabel: 'Free tier' },
 ];
