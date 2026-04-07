@@ -45,6 +45,11 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
         localStorage.setItem('theme_colors', JSON.stringify(colors));
       })
       .catch(() => { /* use cached or defaults */ });
+
+    // 3. Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => { /* silent */ });
+    }
   }, []);
 
   return <>{children}</>;
