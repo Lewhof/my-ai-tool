@@ -1,7 +1,7 @@
 // AI Stack diagram — matching the user's architecture screenshot
 // Green border = already built, dashed gray border = not yet built
 
-const LAYER_Y = { frontend: 0, orchestration: 160, aiModels: 320, data: 480, infra: 640 };
+const LAYER_Y = { frontend: 0, orchestration: 160, aiModels: 320, aiModels2: 420, data: 560, infra: 720 };
 const COL_X = { left: 0, center: 280, right: 560, cost: 840 };
 
 const layerLabelStyle = {
@@ -31,10 +31,16 @@ export const aiStackNodes = [
   { id: 'bullmq', position: { x: COL_X.right, y: LAYER_Y.orchestration }, data: { label: 'BullMQ / Inngest\nJob queue (free tier)' }, style: { background: 'transparent', border: '2px dashed #6b7280', color: 'white', width: 220, height: 70, fontSize: 14, fontWeight: 600, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' as const, whiteSpace: 'pre-wrap' as const } },
   { id: 'cost-orch', position: { x: COL_X.cost, y: LAYER_Y.orchestration + 10 }, data: { label: '~$0/mo\nfree tiers' }, style: { background: 'transparent', border: 'none', color: '#9ca3af', width: 100, fontSize: 13, fontWeight: 500, textAlign: 'center' as const, whiteSpace: 'pre-wrap' as const } },
 
-  // ── AI Models ──
-  { id: 'haiku', position: { x: COL_X.left, y: LAYER_Y.aiModels }, data: { label: 'Claude Haiku\nFast + cheap routing' }, style: { background: '#7c4a1a', border: '2px solid #22c55e', color: 'white', width: 220, height: 70, fontSize: 14, fontWeight: 600, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' as const, whiteSpace: 'pre-wrap' as const } },
-  { id: 'gpt4o', position: { x: COL_X.center, y: LAYER_Y.aiModels }, data: { label: 'GPT-4o mini\nCheap fallback model' }, style: { background: '#7c4a1a', border: '2px dashed #6b7280', color: 'white', width: 220, height: 70, fontSize: 14, fontWeight: 600, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' as const, whiteSpace: 'pre-wrap' as const } },
-  { id: 'router', position: { x: COL_X.right, y: LAYER_Y.aiModels }, data: { label: 'Model router\nRoute by complexity' }, style: { background: 'transparent', border: '2px dashed #6b7280', color: 'white', width: 220, height: 70, fontSize: 14, fontWeight: 600, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' as const, whiteSpace: 'pre-wrap' as const } },
+  // ── AI Models (row 1 — text) ──
+  { id: 'haiku', position: { x: COL_X.left, y: LAYER_Y.aiModels }, data: { label: 'Claude Haiku/Sonnet\nFast + smart routing' }, style: { background: '#7c4a1a', border: '2px solid #22c55e', color: 'white', width: 220, height: 70, fontSize: 14, fontWeight: 600, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' as const, whiteSpace: 'pre-wrap' as const } },
+  { id: 'groq', position: { x: COL_X.center, y: LAYER_Y.aiModels }, data: { label: 'Groq LLaMA 3\nInstant responses (free)' }, style: { background: '#7c4a1a', border: '2px solid #22c55e', color: 'white', width: 220, height: 70, fontSize: 14, fontWeight: 600, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' as const, whiteSpace: 'pre-wrap' as const } },
+  { id: 'gemini', position: { x: COL_X.right, y: LAYER_Y.aiModels }, data: { label: 'Gemini 2.0 Flash\nGoogle AI (free)' }, style: { background: '#7c4a1a', border: '2px solid #22c55e', color: 'white', width: 220, height: 70, fontSize: 14, fontWeight: 600, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' as const, whiteSpace: 'pre-wrap' as const } },
+
+  // ── AI Models (row 2 — image + planned) ──
+  { id: 'label-ai2', type: 'default', position: { x: -120, y: LAYER_Y.aiModels2 + 10 }, data: { label: '' }, style: { background: 'transparent', border: 'none', width: 10, height: 10 } },
+  { id: 'nanobanana', position: { x: COL_X.left, y: LAYER_Y.aiModels2 }, data: { label: 'Nano Banana\nGemini Image Gen' }, style: { background: '#7c4a1a', border: '2px solid #22c55e', color: 'white', width: 220, height: 70, fontSize: 14, fontWeight: 600, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' as const, whiteSpace: 'pre-wrap' as const } },
+  { id: 'perplexity-node', position: { x: COL_X.center, y: LAYER_Y.aiModels2 }, data: { label: 'Perplexity\nWeb search AI' }, style: { background: '#7c4a1a', border: '2px dashed #6b7280', color: 'white', width: 220, height: 70, fontSize: 14, fontWeight: 600, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' as const, whiteSpace: 'pre-wrap' as const } },
+  { id: 'router', position: { x: COL_X.right, y: LAYER_Y.aiModels2 }, data: { label: 'Model router\nRoute by complexity' }, style: { background: 'transparent', border: '2px dashed #6b7280', color: 'white', width: 220, height: 70, fontSize: 14, fontWeight: 600, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' as const, whiteSpace: 'pre-wrap' as const } },
   { id: 'cost-ai', position: { x: COL_X.cost, y: LAYER_Y.aiModels + 10 }, data: { label: 'Pay-per-use\nonly AI cost' }, style: { background: 'transparent', border: 'none', color: '#9ca3af', width: 100, fontSize: 13, fontWeight: 500, textAlign: 'center' as const, whiteSpace: 'pre-wrap' as const } },
 
   // ── Data ──
@@ -50,8 +56,8 @@ export const aiStackNodes = [
   { id: 'cost-infra', position: { x: COL_X.cost, y: LAYER_Y.infra + 10 }, data: { label: '~$20/mo\nVercel Pro' }, style: { background: 'transparent', border: 'none', color: '#9ca3af', width: 100, fontSize: 13, fontWeight: 500, textAlign: 'center' as const, whiteSpace: 'pre-wrap' as const } },
 
   // Legend
-  { id: 'legend-built', position: { x: 0, y: 800 }, data: { label: '\u2713 Built' }, style: { background: 'transparent', border: '2px solid #22c55e', color: '#22c55e', width: 100, height: 36, fontSize: 12, fontWeight: 600, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-  { id: 'legend-planned', position: { x: 120, y: 800 }, data: { label: '\u25CB Planned' }, style: { background: 'transparent', border: '2px dashed #6b7280', color: '#9ca3af', width: 100, height: 36, fontSize: 12, fontWeight: 600, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+  { id: 'legend-built', position: { x: 0, y: 880 }, data: { label: '\u2713 Built' }, style: { background: 'transparent', border: '2px solid #22c55e', color: '#22c55e', width: 100, height: 36, fontSize: 12, fontWeight: 600, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+  { id: 'legend-planned', position: { x: 120, y: 880 }, data: { label: '\u25CB Planned' }, style: { background: 'transparent', border: '2px dashed #6b7280', color: '#9ca3af', width: 100, height: 36, fontSize: 12, fontWeight: 600, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
 ];
 
 export const aiStackEdges = [
@@ -60,8 +66,10 @@ export const aiStackEdges = [
   { id: 'e-nextjs-vercelai', source: 'nextjs', target: 'vercel-ai', style: { stroke: '#4b5563' }, animated: true },
   { id: 'e-langchain-haiku', source: 'langchain', target: 'haiku', style: { stroke: '#4b5563' } },
   { id: 'e-vercelai-haiku', source: 'vercel-ai', target: 'haiku', style: { stroke: '#4b5563' } },
-  { id: 'e-router-gpt4o', source: 'router', target: 'gpt4o', style: { stroke: '#4b5563' } },
+  { id: 'e-router-groq', source: 'router', target: 'groq', style: { stroke: '#4b5563' } },
   { id: 'e-router-haiku', source: 'router', target: 'haiku', style: { stroke: '#4b5563' } },
+  { id: 'e-router-gemini', source: 'router', target: 'gemini', style: { stroke: '#4b5563' } },
+  { id: 'e-gemini-nanobanana', source: 'gemini', target: 'nanobanana', style: { stroke: '#4b5563' } },
   { id: 'e-haiku-supabase', source: 'haiku', target: 'supabase', style: { stroke: '#4b5563' } },
   { id: 'e-supabase-pgvector', source: 'supabase', target: 'pgvector', style: { stroke: '#4b5563' } },
   { id: 'e-supabase-vercel', source: 'supabase', target: 'vercel', style: { stroke: '#4b5563' } },
