@@ -98,7 +98,7 @@ export async function GET() {
         name: track.name,
         artist: (track.artists as Array<{ name: string }>)?.map((a) => a.name).join(', '),
         playedAt: item.played_at,
-        albumArt: (track.album as Record<string, unknown>)?.images?.[0]?.url ?? null,
+        albumArt: ((track.album as Record<string, unknown>)?.images as Array<{ url: string }> | undefined)?.[0]?.url ?? null,
         url: (track.external_urls as Record<string, string>)?.spotify,
       };
     });
