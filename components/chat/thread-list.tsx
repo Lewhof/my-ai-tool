@@ -3,29 +3,42 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn, formatRelativeDate } from '@/lib/utils';
+import { Plus, Trash2 } from 'lucide-react';
 import type { ChatThread } from '@/lib/types';
 
 interface ThreadListProps {
   threads: ChatThread[];
   onNewChat: () => void;
   onDelete: (id: string) => void;
+  loading?: boolean;
 }
 
-export default function ThreadList({ threads, onNewChat, onDelete }: ThreadListProps) {
+export default function ThreadList({ threads, onNewChat, onDelete, loading }: ThreadListProps) {
   const pathname = usePathname();
+
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (confirm('Delete this conversation?')) {
+      onDelete(id);
+    }
+  };
 
   return (
     <div className="w-full sm:w-72 border-b sm:border-b-0 sm:border-r border-gray-700 flex flex-col shrink-0 max-h-48 sm:max-h-none sm:h-full">
       <div className="p-3 border-b border-gray-700">
         <button
           onClick={onNewChat}
-          className="w-full bg-accent-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-accent-700 transition-colors text-sm"
+          className="w-full bg-accent-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-accent-700 transition-colors text-sm flex items-center justify-center gap-2"
         >
-          + New Chat
+          <Plus size={16} />
+          New Chat
         </button>
       </div>
       <div className="flex-1 overflow-auto">
-        {threads.length === 0 ? (
+        {loading ? (
+          <p className="text-gray-500 text-center p-4 text-sm">Loading...</p>
+        ) : threads.length === 0 ? (
           <p className="text-gray-500 text-center p-4 text-sm">No conversations yet</p>
         ) : (
           threads.map((thread) => {
@@ -46,14 +59,11 @@ export default function ThreadList({ threads, onNewChat, onDelete }: ThreadListP
                   <p className="text-gray-500 text-xs">{formatRelativeDate(thread.updated_at)}</p>
                 </Link>
                 <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onDelete(thread.id);
-                  }}
+                  onClick={(e) => handleDelete(e, thread.id)}
                   className="opacity-0 group-hover:opacity-100 px-3 text-gray-500 hover:text-red-400 transition-opacity"
-                  title="Delete"
+                  title="Delete conversation"
                 >
-                  x
+                  <Trash2 size={14} />
                 </button>
               </div>
             );

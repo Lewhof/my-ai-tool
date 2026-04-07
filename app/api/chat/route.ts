@@ -3,13 +3,19 @@ import { after } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS } from '@/lib/anthropic';
 
-
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
-  const { threadId, message } = await req.json();
-  if (!message?.trim()) return new Response('Message required', { status: 400 });
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+
+  const { threadId, message } = body;
+  if (!message?.trim()) return Response.json({ error: 'Message required' }, { status: 400 });
 
   // Create or get thread
   let currentThreadId = threadId;
@@ -25,19 +31,20 @@ export async function POST(req: Request) {
   }
 
   // Save user message
-  await supabaseAdmin.from('chat_messages').insert({
+  const { error: msgError } = await supabaseAdmin.from('chat_messages').insert({
     thread_id: currentThreadId,
     role: 'user',
     content: message,
   });
+  if (msgError) return Response.json({ error: msgError.message }, { status: 500 });
 
-  // Load conversation history (last 20 messages)
+  // Load conversation history (last 30 messages for better context)
   const { data: history } = await supabaseAdmin
     .from('chat_messages')
     .select('role, content')
     .eq('thread_id', currentThreadId)
     .order('created_at', { ascending: true })
-    .limit(20);
+    .limit(30);
 
   const messages = (history ?? []).map((m) => ({
     role: m.role as 'user' | 'assistant',
@@ -45,19 +52,21 @@ export async function POST(req: Request) {
   }));
 
   // Stream response
-  const stream = anthropic.messages.stream({
-    model: MODELS.fast,
-    max_tokens: 2048,
-    messages,
-  });
-
   let fullResponse = '';
   let inputTokens = 0;
   let outputTokens = 0;
+  let streamError = false;
 
   const readable = new ReadableStream({
     async start(controller) {
       try {
+        const stream = anthropic.messages.stream({
+          model: MODELS.fast,
+          max_tokens: 4096,
+          system: 'You are a helpful AI assistant. Be concise and clear. Use markdown formatting when appropriate.',
+          messages,
+        });
+
         for await (const event of stream) {
           if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
             fullResponse += event.delta.text;
@@ -72,14 +81,17 @@ export async function POST(req: Request) {
         }
         controller.close();
       } catch (err) {
-        controller.error(err);
+        streamError = true;
+        const errMsg = err instanceof Error ? err.message : 'Stream failed';
+        controller.enqueue(new TextEncoder().encode(`\n\n[Error: ${errMsg}]`));
+        controller.close();
       }
     },
   });
 
   // Save assistant message after stream completes
   after(async () => {
-    if (fullResponse) {
+    if (fullResponse && !streamError) {
       await supabaseAdmin.from('chat_messages').insert({
         thread_id: currentThreadId,
         role: 'assistant',
@@ -87,7 +99,6 @@ export async function POST(req: Request) {
         model: MODELS.fast,
         tokens_used: inputTokens + outputTokens,
       });
-      // Update thread timestamp
       await supabaseAdmin
         .from('chat_threads')
         .update({ updated_at: new Date().toISOString() })
@@ -98,6 +109,8 @@ export async function POST(req: Request) {
   return new Response(readable, {
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
+      'Transfer-Encoding': 'chunked',
+      'Cache-Control': 'no-cache, no-store',
       'X-Thread-Id': currentThreadId,
     },
   });

@@ -21,6 +21,7 @@ export default function ChatContainer({
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [streamingContent, setStreamingContent] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setMessages(initialMessages);
@@ -28,7 +29,9 @@ export default function ChatContainer({
 
   const sendMessage = useCallback(
     async (message: string) => {
-      // Optimistically add user message
+      if (isStreaming) return;
+      setError(null);
+
       const userMsg: ChatMessage = {
         id: crypto.randomUUID(),
         thread_id: threadId ?? '',
@@ -50,16 +53,12 @@ export default function ChatContainer({
         });
 
         if (!res.ok) {
-          throw new Error(`API error: ${res.status}`);
+          const errData = await res.text().catch(() => 'Unknown error');
+          throw new Error(`API error ${res.status}: ${errData}`);
         }
 
-        // Check if we got a new thread ID
         const newThreadId = res.headers.get('X-Thread-Id');
-        if (newThreadId && !threadId) {
-          router.push(`/chat/${newThreadId}`);
-        }
 
-        // Read the stream
         const reader = res.body?.getReader();
         if (!reader) throw new Error('No response body');
 
@@ -72,8 +71,12 @@ export default function ChatContainer({
           accumulated += decoder.decode(value, { stream: true });
           setStreamingContent(accumulated);
         }
+        // Flush decoder
+        accumulated += decoder.decode(undefined, { stream: false });
+        if (accumulated !== streamingContent) {
+          setStreamingContent(accumulated);
+        }
 
-        // Add assistant message to list
         const assistantMsg: ChatMessage = {
           id: crypto.randomUUID(),
           thread_id: newThreadId ?? threadId ?? '',
@@ -85,13 +88,19 @@ export default function ChatContainer({
         };
         setMessages((prev) => [...prev, assistantMsg]);
         setStreamingContent('');
+
+        // Navigate to new thread if created
+        if (newThreadId && !threadId) {
+          router.push(`/chat/${newThreadId}`);
+        }
       } catch (err) {
         setStreamingContent('');
+        setError(err instanceof Error ? err.message : 'Something went wrong');
         const errorMsg: ChatMessage = {
           id: crypto.randomUUID(),
           thread_id: threadId ?? '',
           role: 'assistant',
-          content: `Error: ${err instanceof Error ? err.message : 'Something went wrong'}`,
+          content: `Error: ${err instanceof Error ? err.message : 'Something went wrong. Please try again.'}`,
           model: null,
           tokens_used: null,
           created_at: new Date().toISOString(),
@@ -101,12 +110,17 @@ export default function ChatContainer({
         setIsStreaming(false);
       }
     },
-    [threadId, apiEndpoint, router]
+    [threadId, apiEndpoint, router, isStreaming]
   );
 
   return (
     <div className="flex flex-col h-full">
       <MessageList messages={messages} streamingContent={streamingContent || undefined} />
+      {error && (
+        <div className="px-4 py-2 bg-red-500/10 border-t border-red-500/30">
+          <p className="text-red-400 text-xs">{error}</p>
+        </div>
+      )}
       <ChatInput onSend={sendMessage} disabled={isStreaming} />
     </div>
   );

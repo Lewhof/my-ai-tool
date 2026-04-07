@@ -9,11 +9,17 @@ import type { ChatThread } from '@/lib/types';
 export default function ChatPage() {
   const router = useRouter();
   const [threads, setThreads] = useState<ChatThread[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const fetchThreads = useCallback(async () => {
-    const res = await fetch('/api/chat/threads');
-    const data = await res.json();
-    setThreads(data.threads ?? []);
+    try {
+      const res = await fetch('/api/chat/threads');
+      if (res.ok) {
+        const data = await res.json();
+        setThreads(data.threads ?? []);
+      }
+    } catch { /* silent */ }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -21,7 +27,6 @@ export default function ChatPage() {
   }, [fetchThreads]);
 
   const handleNewChat = () => {
-    // Start a new chat without a threadId — it'll be created on first message
     router.push('/chat');
   };
 
@@ -32,8 +37,8 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col sm:flex-row h-full min-h-0">
-      <ThreadList threads={threads} onNewChat={handleNewChat} onDelete={handleDelete} />
-      <div className="flex-1">
+      <ThreadList threads={threads} onNewChat={handleNewChat} onDelete={handleDelete} loading={loading} />
+      <div className="flex-1 min-w-0 min-h-0">
         <ChatContainer />
       </div>
     </div>
