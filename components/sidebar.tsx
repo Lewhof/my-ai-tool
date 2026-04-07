@@ -117,9 +117,10 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
       <aside
         className={cn(
-          'bg-gray-900 border-r border-gray-700/40 flex flex-col z-50',
-          'hidden lg:flex lg:w-56 lg:relative',
-          mobileOpen && 'fixed inset-y-0 left-0 w-56 flex lg:hidden'
+          'bg-gray-900 border-r border-gray-700/40 flex-col z-50',
+          mobileOpen
+            ? 'flex fixed inset-y-0 left-0 w-56 lg:relative'
+            : 'hidden lg:flex lg:w-56 lg:relative'
         )}
       >
         {/* Logo */}
