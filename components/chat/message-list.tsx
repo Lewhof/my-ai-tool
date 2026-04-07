@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import type { ChatMessage } from '@/lib/types';
 
@@ -42,7 +43,7 @@ export default function MessageList({ messages, streamingContent }: MessageListP
           >
             {msg.role === 'assistant' ? (
               <div className="prose prose-invert prose-sm max-w-none">
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
               </div>
             ) : (
               <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -54,7 +55,7 @@ export default function MessageList({ messages, streamingContent }: MessageListP
         <div className="flex justify-start">
           <div className="max-w-2xl px-4 py-3 rounded-lg bg-gray-700 text-gray-100">
             <div className="prose prose-invert prose-sm max-w-none">
-              <ReactMarkdown>{streamingContent}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
             </div>
           </div>
         </div>
