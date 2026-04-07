@@ -3,20 +3,27 @@ import { after } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS } from '@/lib/anthropic';
 
-const DEFAULT_FOLDERS = ['Legal', 'Finance', 'Personal', 'Business', 'Contracts', 'Reports', 'Other'];
-
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
-  const { data, error } = await supabaseAdmin
-    .from('documents')
-    .select('id, name, file_type, file_size, folder, created_at')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+  const [docsRes, foldersRes] = await Promise.all([
+    supabaseAdmin
+      .from('documents')
+      .select('id, name, file_type, file_size, folder, folder_id, upload_comment, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+    supabaseAdmin
+      .from('document_folders')
+      .select('id, name, parent_id, color, sort_order')
+      .eq('user_id', userId)
+      .order('sort_order', { ascending: true }),
+  ]);
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
-  return Response.json({ documents: data, folders: DEFAULT_FOLDERS });
+  return Response.json({
+    documents: docsRes.data ?? [],
+    folders: foldersRes.data ?? [],
+  });
 }
 
 export async function POST(req: Request) {
@@ -25,19 +32,10 @@ export async function POST(req: Request) {
 
   const formData = await req.formData();
   const file = formData.get('file') as File | null;
-  if (!file) return Response.json({ error: 'No file provided' }, { status: 400 });
+  const comment = formData.get('comment') as string | null;
+  const folderId = formData.get('folder_id') as string | null;
 
-  const allowedTypes = [
-    'application/pdf',
-    'image/png', 'image/jpeg', 'image/webp',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'text/csv',
-  ];
-  if (!allowedTypes.includes(file.type)) {
-    return Response.json({ error: 'File type not allowed.' }, { status: 400 });
-  }
+  if (!file) return Response.json({ error: 'No file provided' }, { status: 400 });
 
   if (file.size > 10 * 1024 * 1024) {
     return Response.json({ error: 'File too large. Max 10MB.' }, { status: 400 });
@@ -55,7 +53,6 @@ export async function POST(req: Request) {
     return Response.json({ error: uploadError.message }, { status: 500 });
   }
 
-  // Insert with default folder first, then classify async
   const { data, error: dbError } = await supabaseAdmin
     .from('documents')
     .insert({
@@ -66,61 +63,69 @@ export async function POST(req: Request) {
       file_type: file.type,
       file_size: file.size,
       folder: 'Other',
+      folder_id: folderId || null,
+      upload_comment: comment || null,
     })
     .select()
     .single();
 
   if (dbError) return Response.json({ error: dbError.message }, { status: 500 });
 
-  // AI classification in background
-  after(async () => {
-    try {
-      let textContent = '';
+  // AI classification in background (only if no folder_id specified)
+  if (!folderId) {
+    after(async () => {
+      try {
+        // Get folders for classification
+        const { data: folders } = await supabaseAdmin
+          .from('document_folders')
+          .select('id, name, parent_id')
+          .eq('user_id', userId);
 
-      // Extract text for classification
-      if (file.type === 'application/pdf') {
-        try {
-          const pdfParse = (await import('pdf-parse')).default;
-          const pdf = await pdfParse(buffer);
-          textContent = pdf.text.slice(0, 2000);
-        } catch { /* skip */ }
-      } else if (file.type.startsWith('image/')) {
-        // Use filename for images since we can't OCR cheaply
-        textContent = `Image file named: ${file.name}`;
-      } else {
-        // Try reading as text
-        try {
-          textContent = buffer.toString('utf-8').slice(0, 2000);
-        } catch { /* skip */ }
-      }
+        const folderNames = (folders ?? []).map((f) => f.name);
+        const defaultFolders = ['Legal', 'Finance', 'Personal', 'Business', 'Contracts', 'Reports', 'Other'];
+        const allFolders = [...new Set([...folderNames, ...defaultFolders])];
 
-      // If we have content or a meaningful filename, classify
-      const classifyText = textContent || `File named: ${file.name}`;
+        let textContent = '';
+        if (file.type === 'application/pdf') {
+          try {
+            const pdfParse = (await import('pdf-parse')).default;
+            const pdf = await pdfParse(buffer);
+            textContent = pdf.text.slice(0, 2000);
+          } catch { /* skip */ }
+        } else if (file.type.startsWith('image/')) {
+          textContent = `Image file named: ${file.name}`;
+        } else {
+          try { textContent = buffer.toString('utf-8').slice(0, 2000); } catch { /* skip */ }
+        }
 
-      const response = await anthropic.messages.create({
-        model: MODELS.fast,
-        max_tokens: 20,
-        messages: [{
-          role: 'user',
-          content: `Classify this document into exactly one folder. Respond with ONLY the folder name, nothing else.\n\nFolders: ${DEFAULT_FOLDERS.join(', ')}\n\nFilename: ${file.name}\nContent preview: ${classifyText}`,
-        }],
-      });
+        const classifyText = textContent || `File named: ${file.name}`;
+        const commentContext = comment ? `\nUser note: ${comment}` : '';
 
-      const folder = response.content[0].type === 'text'
-        ? response.content[0].text.trim()
-        : 'Other';
+        const response = await anthropic.messages.create({
+          model: MODELS.fast,
+          max_tokens: 50,
+          messages: [{
+            role: 'user',
+            content: `Classify this document into exactly one folder. Respond with ONLY the folder name.\n\nFolders: ${allFolders.join(', ')}\n\nFilename: ${file.name}${commentContext}\nContent: ${classifyText}`,
+          }],
+        });
 
-      // Validate the folder is in our list
-      const validFolder = DEFAULT_FOLDERS.includes(folder) ? folder : 'Other';
+        const folderName = response.content[0].type === 'text' ? response.content[0].text.trim() : 'Other';
+        const validFolder = allFolders.includes(folderName) ? folderName : 'Other';
 
-      await supabaseAdmin
-        .from('documents')
-        .update({ folder: validFolder })
-        .eq('id', docId);
-    } catch {
-      // Classification failed, keep as Other
-    }
-  });
+        // Find matching folder_id
+        const matchingFolder = (folders ?? []).find((f) => f.name === validFolder);
+
+        await supabaseAdmin
+          .from('documents')
+          .update({
+            folder: validFolder,
+            folder_id: matchingFolder?.id ?? null,
+          })
+          .eq('id', docId);
+      } catch { /* classification failed */ }
+    });
+  }
 
   return Response.json(data);
 }
