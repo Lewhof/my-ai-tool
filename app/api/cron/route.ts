@@ -4,6 +4,8 @@ import { executeTool } from '@/lib/agent/executor';
 import { sendPushToUser } from '@/lib/push';
 import { gatherBriefingData, generateBriefing, formatBriefingForTelegram } from '@/lib/briefing';
 import { sendTelegramMessage, getTelegramChatId } from '@/lib/telegram';
+import { generateNudges } from '@/lib/nudges';
+import { getMicrosoftToken } from '@/lib/microsoft-token';
 
 // Helper: post a message to a user's Cerebro thread
 async function postToCerebro(userId: string, content: string) {
@@ -425,6 +427,70 @@ ${context}`,
       }
       results.weeklyReview = 'sent';
     } catch { results.weeklyReview = 'error'; }
+  }
+
+  // ── 6. Nudge Generation (every 6 hours: 0, 6, 12, 18 UTC) ──
+  if ([0, 6, 12, 18].includes(now.getUTCHours()) && now.getMinutes() < 5) {
+    try {
+      const { data: users } = await supabaseAdmin.from('todos').select('user_id').limit(50);
+      const uniqueIds = [...new Set((users ?? []).map(u => u.user_id))];
+      let totalNudges = 0;
+
+      for (const userId of uniqueIds) {
+        const count = await generateNudges(userId);
+        totalNudges += count;
+      }
+      results.nudges = totalNudges;
+    } catch { results.nudges = 'error'; }
+  }
+
+  // ── 7. Contact Extraction from Email (daily at 8 AM SAST = 6 AM UTC) ──
+  if (now.getUTCHours() === 6 && now.getMinutes() < 5) {
+    try {
+      const { data: users } = await supabaseAdmin.from('calendar_accounts').select('user_id').limit(50);
+      const uniqueIds = [...new Set((users ?? []).map(u => u.user_id))];
+      let extracted = 0;
+
+      for (const userId of uniqueIds) {
+        const token = await getMicrosoftToken(userId);
+        if (!token) continue;
+
+        // Fetch recent emails (last 24h)
+        const since = new Date(now.getTime() - 86400000).toISOString();
+        const res = await fetch(
+          `https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=20&$orderby=receivedDateTime desc&$filter=receivedDateTime ge ${since}&$select=from,toRecipients`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (!res.ok) continue;
+        const data = await res.json();
+
+        for (const email of data.value ?? []) {
+          // Extract sender
+          const fromAddr = email.from?.emailAddress;
+          if (fromAddr?.address && !fromAddr.address.includes('noreply') && !fromAddr.address.includes('no-reply')) {
+            await supabaseAdmin.from('contacts').upsert({
+              user_id: userId,
+              name: fromAddr.name || fromAddr.address.split('@')[0],
+              email: fromAddr.address.toLowerCase(),
+              source: 'email',
+              last_interaction: email.receivedDateTime || now.toISOString(),
+              interaction_count: 1,
+              updated_at: now.toISOString(),
+            }, { onConflict: 'user_id,email', ignoreDuplicates: false }).then(({ data: upserted }) => {
+              if (upserted) extracted++;
+            }).catch(() => {});
+
+            // Update last_interaction for existing contacts
+            await supabaseAdmin.from('contacts')
+              .update({ last_interaction: email.receivedDateTime || now.toISOString(), updated_at: now.toISOString() })
+              .eq('user_id', userId)
+              .eq('email', fromAddr.address.toLowerCase());
+          }
+        }
+      }
+      results.contacts = extracted;
+    } catch { results.contacts = 'error'; }
   }
 
   return Response.json({ ...results, timestamp: now.toISOString() });
