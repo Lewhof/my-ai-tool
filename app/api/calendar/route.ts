@@ -4,13 +4,17 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 const CLIENT_ID = process.env.MICROSOFT_CLIENT_ID!;
 const CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET!;
 
-async function refreshToken(accountId: string, refreshTokenStr: string): Promise<string | null> {
+async function refreshToken(accountId: string, refreshTokenStr: string, provider = 'microsoft'): Promise<string | null> {
+  const isWork = provider === 'microsoft-work';
+  const cid = isWork ? (process.env.MICROSOFT_WORK_CLIENT_ID || CLIENT_ID) : CLIENT_ID;
+  const csecret = isWork ? (process.env.MICROSOFT_WORK_CLIENT_SECRET || CLIENT_SECRET) : CLIENT_SECRET;
+
   const res = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
+      client_id: cid,
+      client_secret: csecret,
       refresh_token: refreshTokenStr,
       grant_type: 'refresh_token',
       scope: 'openid profile User.Read Calendars.ReadWrite offline_access',
@@ -64,7 +68,7 @@ async function getValidToken(account: { id: string; access_token: string; refres
   if (account.provider === 'google') {
     return refreshGoogleToken(account.id, account.refresh_token);
   }
-  return refreshToken(account.id, account.refresh_token);
+  return refreshToken(account.id, account.refresh_token, account.provider);
 }
 
 export async function GET() {

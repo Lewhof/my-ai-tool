@@ -131,19 +131,26 @@ export default function ConnectionsPage() {
               )}
 
               {/* Add account */}
-              <div className="flex gap-2 items-center">
+              <div className="flex gap-2 items-center flex-wrap">
                 <input
                   value={calLabel}
                   onChange={(e) => setCalLabel(e.target.value)}
                   placeholder="Account label (e.g. Work, Personal)"
-                  className="flex-1 bg-secondary text-foreground border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="flex-1 bg-secondary text-foreground border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring min-w-[180px]"
                 />
                 <a
-                  href={`/api/auth/microsoft?label=${encodeURIComponent(calLabel || 'Microsoft')}`}
+                  href={`/api/auth/microsoft?label=${encodeURIComponent(calLabel || 'Personal')}`}
                   className="bg-primary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary transition-colors flex items-center gap-2 shrink-0"
                 >
                   <Plus size={14} />
-                  Add Account
+                  Personal
+                </a>
+                <a
+                  href={`/api/auth/microsoft-work?label=${encodeURIComponent(calLabel || 'Work')}`}
+                  className="text-foreground px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-surface-2 transition-colors flex items-center gap-2 shrink-0"
+                >
+                  <Plus size={14} />
+                  Work / 365
                 </a>
               </div>
             </div>

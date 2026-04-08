@@ -1,8 +1,6 @@
 import { NextRequest } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 
-const CLIENT_ID = process.env.MICROSOFT_CLIENT_ID!;
-const CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET!;
 const REDIRECT_URI = 'https://lewhofmeyr.co.za/api/auth/microsoft/callback';
 
 export async function GET(req: NextRequest) {
@@ -13,16 +11,24 @@ export async function GET(req: NextRequest) {
     return Response.redirect('https://lewhofmeyr.co.za/calendar?error=auth_failed');
   }
 
-  const [userId, label] = state.split('|');
+  const parts = state.split('|');
+  const userId = parts[0];
+  const label = parts[1] || 'Microsoft';
+  const isWork = parts[2] === 'work';
+
   if (!userId) return Response.redirect('https://lewhofmeyr.co.za/calendar?error=auth_failed');
+
+  // Use correct credentials based on personal vs work
+  const clientId = isWork ? process.env.MICROSOFT_WORK_CLIENT_ID! : process.env.MICROSOFT_CLIENT_ID!;
+  const clientSecret = isWork ? process.env.MICROSOFT_WORK_CLIENT_SECRET! : process.env.MICROSOFT_CLIENT_SECRET!;
 
   // Exchange code for tokens
   const tokenRes = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
+      client_id: clientId,
+      client_secret: clientSecret,
       code,
       redirect_uri: REDIRECT_URI,
       grant_type: 'authorization_code',
@@ -80,7 +86,7 @@ export async function GET(req: NextRequest) {
       .from('calendar_accounts')
       .insert({
         user_id: userId,
-        provider: 'microsoft',
+        provider: isWork ? 'microsoft-work' : 'microsoft',
         label: label || email.split('@')[0] || 'Microsoft',
         email,
         access_token: tokens.access_token,
