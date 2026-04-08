@@ -111,8 +111,12 @@ export async function POST(req: Request) {
         .update({ status: 'approved', updated_at: new Date().toISOString() })
         .eq('id', pending[0].id);
 
+      // Trigger executor immediately (fire-and-forget)
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://lewhofmeyr.co.za';
+      fetch(`${baseUrl}/api/cron/trigger`, { method: 'POST' }).catch(() => {});
+
       return Response.json({
-        response: `\u{2705} **Approved: ${pending[0].title}**\n\nThe task will be executed automatically within 5 minutes. I'll notify you when it's done.`,
+        response: `\u{2705} **Approved: ${pending[0].title}**\n\nExecuting now...`,
       });
     }
 
