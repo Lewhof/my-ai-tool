@@ -7,7 +7,10 @@ import { sendPushToUser } from '@/lib/push';
 // Handles: scheduled agents, overdue task alerts, task executor
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const validCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const validApiKey = req.headers.get('x-api-key') === process.env.ANTHROPIC_API_KEY;
+  // Vercel Cron sends its own auth automatically — also accept ANTHROPIC_API_KEY for manual triggers
+  if (!validCron && !validApiKey && authHeader !== `Bearer ${process.env.ANTHROPIC_API_KEY}`) {
     return new Response('Unauthorized', { status: 401 });
   }
 
