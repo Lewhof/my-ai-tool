@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { getMicrosoftToken } from '@/lib/microsoft-token';
+import { supabaseAdmin } from '@/lib/supabase-server';
 
 export async function GET(req: Request) {
   const { userId } = await auth();
@@ -8,9 +9,21 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const folder = url.searchParams.get('folder') || 'inbox';
   const limit = parseInt(url.searchParams.get('limit') || '20', 10);
+  const accountId = url.searchParams.get('account_id') || undefined;
 
-  const token = await getMicrosoftToken(userId);
+  const token = await getMicrosoftToken(userId, accountId);
   if (!token) return Response.json({ connected: false, emails: [] });
+
+  // Get account info for display
+  let accountInfo: { label: string; alias: string; email: string } | null = null;
+  if (accountId) {
+    const { data } = await supabaseAdmin
+      .from('calendar_accounts')
+      .select('label, alias, email')
+      .eq('id', accountId)
+      .single();
+    accountInfo = data;
+  }
 
   const folderMap: Record<string, string> = {
     inbox: 'inbox',
@@ -46,7 +59,7 @@ export async function GET(req: Request) {
       hasAttachments: e.hasAttachments,
     }));
 
-    return Response.json({ connected: true, emails });
+    return Response.json({ connected: true, emails, account: accountInfo });
   } catch {
     return Response.json({ connected: true, emails: [], error: 'Failed to fetch emails' });
   }

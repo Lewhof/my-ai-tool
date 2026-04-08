@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Plus, X, Calendar as CalIcon, ExternalLink, 
 interface CalendarAccount {
   id: string;
   label: string;
+  alias: string;
   email: string;
   color: string;
   provider: string;
@@ -411,7 +412,7 @@ export default function CalendarPage() {
                   style={{ backgroundColor: hiddenAccounts.has(acc.id) ? '#4b5563' : acc.color }}
                   onClick={() => toggleAccount(acc.id)}
                 />
-                <span onClick={() => toggleAccount(acc.id)} className="font-medium">{acc.label}</span>
+                <span onClick={() => toggleAccount(acc.id)} className="font-medium">{acc.alias || acc.label}</span>
                 {acc.email && <span className="text-muted-foreground">{acc.email}</span>}
                 {!acc.connected && <span className="text-red-400">disconnected</span>}
                 <button
