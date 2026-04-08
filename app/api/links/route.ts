@@ -132,5 +132,5 @@ async function resolveTitle(userId: string, type: string, id: string): Promise<s
     .eq('user_id', userId)
     .single();
 
-  return data?.[config.field] ?? 'Deleted item';
+  return (data as Record<string, string> | null)?.[config.field] ?? 'Deleted item';
 }
