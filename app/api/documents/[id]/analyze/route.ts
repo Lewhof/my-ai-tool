@@ -91,11 +91,12 @@ ${textContent}`;
 
   // Cache result for summarise/extract
   if (action !== 'ask') {
-    await supabaseAdmin
-      .from('documents')
-      .update({ [`ai_${action}`]: analysis })
-      .eq('id', id)
-      .catch(() => { /* column may not exist yet */ });
+    try {
+      await supabaseAdmin
+        .from('documents')
+        .update({ [`ai_${action}`]: analysis })
+        .eq('id', id);
+    } catch { /* column may not exist yet */ }
   }
 
   return Response.json({ analysis });
