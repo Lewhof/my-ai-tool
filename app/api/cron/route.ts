@@ -154,15 +154,14 @@ export async function GET(req: Request) {
     for (const task of queuedTasks ?? []) {
       try {
         // F4: Lock — atomically claim this task to prevent double-processing
-        const { data: locked } = await supabaseAdmin
+        const { data: locked, error: lockErr } = await supabaseAdmin
           .from('task_queue')
           .update({ status: 'planning', updated_at: now.toISOString() })
           .eq('id', task.id)
-          .eq('status', 'queued') // Only update if still queued (atomic check)
-          .select('id')
-          .single();
+          .eq('status', 'queued')
+          .select('id');
 
-        if (!locked) continue; // Another cron already claimed it
+        if (lockErr || !locked?.length) continue; // Another cron already claimed it
 
         const planResponse = await anthropic.messages.create({
           model: MODELS.smart,
@@ -220,11 +219,10 @@ Be specific and actionable.`,
         .from('task_queue')
         .update({ status: 'in-progress', updated_at: now.toISOString() })
         .eq('id', task.id)
-        .eq('status', 'approved') // Only if still approved
-        .select('id')
-        .single();
+        .eq('status', 'approved')
+        .select('id');
 
-      if (!exeLocked) { /* Another cron claimed it */ }
+      if (!exeLocked?.length) { /* Another cron claimed it */ }
       else try {
         const codeResponse = await anthropic.messages.create({
           model: MODELS.smart,
