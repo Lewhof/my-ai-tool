@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { UserButton } from '@clerk/nextjs';
 import { usePathname } from 'next/navigation';
 import { Bell, Search } from 'lucide-react';
@@ -32,12 +33,26 @@ const pageTitles: Record<string, string> = {
   '/focus': 'Focus Mode',
 };
 
+function useClock() {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
+
 export default function Header() {
   const pathname = usePathname();
+  const now = useClock();
   const title =
     pageTitles[pathname] ??
     Object.entries(pageTitles).find(([k]) => k !== '/' && pathname.startsWith(k))?.[1] ??
     'Dashboard';
+
+  const timeStr = now?.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const dateStr = now?.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' });
 
   return (
     <header
@@ -45,7 +60,15 @@ export default function Header() {
       style={{ background: 'var(--color-sidebar)' }}
     >
       <h1 className="text-[15px] font-semibold text-foreground">{title}</h1>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        {/* Clock */}
+        {now && (
+          <div className="flex items-center gap-2 mr-1">
+            <span className="text-[13px] font-mono font-medium text-foreground">{timeStr}</span>
+            <span className="text-[11px] text-muted-foreground">{dateStr}</span>
+          </div>
+        )}
+        <div className="w-px h-5 bg-border" />
         <button
           className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors"
           onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
