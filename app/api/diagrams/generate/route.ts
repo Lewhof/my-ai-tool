@@ -39,30 +39,60 @@ export async function POST(req: Request) {
       const base64 = buffer.toString('base64');
       const mimeType = imageFile.type || 'image/png';
 
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: `Analyze this image in detail. Describe every element, connection, label, box, arrow, and relationship you see. If it's a whiteboard sketch, flowchart, org chart, architecture diagram, or any visual structure, describe it as precisely as possible so it can be recreated as a digital diagram. Additional context from user: ${prompt}` },
-                { inlineData: { mimeType, data: base64 } },
+      // Try Gemini Vision first, fall back to Claude Vision
+      let visionError = '';
+      try {
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: `Analyze this image in detail. Describe every element, connection, label, box, arrow, and relationship you see. If it's a whiteboard sketch, flowchart, org chart, architecture diagram, or any visual structure, describe it as precisely as possible so it can be recreated as a digital diagram. Additional context from user: ${prompt}` },
+                  { inlineData: { mimeType, data: base64 } },
+                ],
+              }],
+              generationConfig: { maxOutputTokens: 1500 },
+            }),
+          }
+        );
+
+        if (geminiRes.ok) {
+          const geminiData = await geminiRes.json();
+          imageAnalysis = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        } else {
+          const errBody = await geminiRes.text();
+          visionError = `Gemini ${geminiRes.status}: ${errBody.slice(0, 200)}`;
+        }
+      } catch (e) {
+        visionError = `Gemini error: ${e instanceof Error ? e.message : 'unknown'}`;
+      }
+
+      // Fallback: use Claude Vision if Gemini fails
+      if (!imageAnalysis) {
+        try {
+          const claudeRes = await anthropic.messages.create({
+            model: MODELS.fast,
+            max_tokens: 1500,
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'image', source: { type: 'base64', media_type: mimeType as 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp', data: base64 } },
+                { type: 'text', text: `Analyze this image in detail. Describe every element, connection, label, box, arrow, and relationship you see so it can be recreated as a digital diagram. User context: ${prompt}` },
               ],
             }],
-            generationConfig: { maxOutputTokens: 1500 },
-          }),
+          });
+          imageAnalysis = claudeRes.content[0].type === 'text' ? claudeRes.content[0].text : '';
+        } catch (e) {
+          const claudeErr = e instanceof Error ? e.message : 'unknown';
+          return Response.json({ error: `Vision failed. Gemini: ${visionError}. Claude: ${claudeErr}` }, { status: 500 });
         }
-      );
-
-      if (geminiRes.ok) {
-        const geminiData = await geminiRes.json();
-        imageAnalysis = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
       }
 
       if (!imageAnalysis) {
-        return Response.json({ error: 'Could not analyze image' }, { status: 500 });
+        return Response.json({ error: `Could not analyze image. ${visionError}` }, { status: 500 });
       }
     }
   } else {
