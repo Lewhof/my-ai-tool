@@ -18,6 +18,7 @@ const SIDEBAR_GROUPS = [
     items: [
       { name: 'Dashboard', href: '/', icon: LayoutDashboard },
       { name: 'Cerebro', href: '/agent', icon: Bot, isBrand: true },
+      { name: 'Social', href: '/social', icon: Globe },
     ],
   },
   {
@@ -47,7 +48,6 @@ const SIDEBAR_GROUPS = [
       { name: 'Vault', href: '/vault', icon: KeyRound },
       { name: 'Knowledge Base', href: '/kb', icon: BookOpen },
       { name: 'AI Credits', href: '/credits', icon: CreditCard },
-      { name: 'Social', href: '/social', icon: Globe },
       { name: 'Settings', href: '/settings', icon: Settings },
     ],
   },
