@@ -389,8 +389,8 @@ export default function AgentPage() {
                           </ReactMarkdown>
                         </div>
                       )}
-                      {/* Plan approval buttons */}
-                      {msg.content.includes('Reply **"approve"**') && (
+                      {/* Plan approval buttons — show on plan messages and pending pipeline */}
+                      {(msg.content.includes('Reply **"approve"**') || msg.content.includes('Awaiting your approval')) && (
                         <div className="flex gap-2 mt-3 pt-3 border-t border-white/10">
                           <button
                             onClick={() => sendMessage('approve')}

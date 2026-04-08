@@ -84,8 +84,9 @@ export async function POST(req: Request) {
       `${statusEmoji[t.status] || '\u{2022}'} **${t.title}**\n   Status: ${statusLabel[t.status] || t.status}`
     ).join('\n\n');
 
+    const hasPending = tasks.some(t => t.status === 'pending_approval');
     return Response.json({
-      response: `**Dev Pipeline:**\n\n${list}\n\n---\nCommands: **approve** | **cancel** | **change: [feedback]**`,
+      response: `**Dev Pipeline:**\n\n${list}${hasPending ? '\n\n\u{1F4CB} Awaiting your approval \u2014 use the buttons below.' : ''}`,
     });
   }
 
