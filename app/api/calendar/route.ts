@@ -31,11 +31,39 @@ async function refreshToken(accountId: string, refreshTokenStr: string): Promise
   return tokens.access_token;
 }
 
-async function getValidToken(account: { id: string; access_token: string; refresh_token: string | null; expires_at: number | null }): Promise<string | null> {
+async function refreshGoogleToken(accountId: string, refreshTokenStr: string): Promise<string | null> {
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID || '',
+      client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+      refresh_token: refreshTokenStr,
+      grant_type: 'refresh_token',
+    }),
+  });
+  if (!res.ok) return null;
+  const tokens = await res.json();
+
+  await supabaseAdmin
+    .from('calendar_accounts')
+    .update({
+      access_token: tokens.access_token,
+      expires_at: Date.now() + tokens.expires_in * 1000,
+    })
+    .eq('id', accountId);
+
+  return tokens.access_token;
+}
+
+async function getValidToken(account: { id: string; access_token: string; refresh_token: string | null; expires_at: number | null; provider: string }): Promise<string | null> {
   if (account.expires_at && Date.now() < account.expires_at - 60000) {
     return account.access_token;
   }
   if (!account.refresh_token) return null;
+  if (account.provider === 'google') {
+    return refreshGoogleToken(account.id, account.refresh_token);
+  }
   return refreshToken(account.id, account.refresh_token);
 }
 
@@ -89,34 +117,64 @@ export async function GET() {
     if (!token) continue;
 
     try {
-      const calRes = await fetch(
-        `https://graph.microsoft.com/v1.0/me/calendarview?startDateTime=${startOfDay}&endDateTime=${endOfWeek}&$orderby=start/dateTime&$top=50&$select=subject,start,end,location,isAllDay,showAs`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Prefer: 'outlook.timezone="Africa/Johannesburg"',
-          },
-        }
-      );
+      if (account.provider === 'google') {
+        // Google Calendar API
+        const timeMin = encodeURIComponent(startOfDay);
+        const timeMax = encodeURIComponent(endOfWeek);
+        const calRes = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin}&timeMax=${timeMax}&maxResults=50&singleEvents=true&orderBy=startTime&timeZone=Africa/Johannesburg`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
 
-      if (calRes.ok) {
-        const calData = await calRes.json();
-        for (const e of calData.value ?? []) {
-          // Append +02:00 so frontend Date() parses as SAST, not UTC
-          const startDt = (e.start?.dateTime || '').replace(/\.0+$/, '');
-          const endDt = (e.end?.dateTime || '').replace(/\.0+$/, '');
-          allEvents.push({
-            id: e.id,
-            subject: e.subject,
-            start: startDt.includes('+') || startDt.includes('Z') ? startDt : startDt + '+02:00',
-            end: endDt.includes('+') || endDt.includes('Z') ? endDt : endDt + '+02:00',
-            location: e.location?.displayName || null,
-            isAllDay: e.isAllDay,
-            showAs: e.showAs,
-            accountId: account.id,
-            accountLabel: account.label,
-            accountColor: account.color,
-          });
+        if (calRes.ok) {
+          const calData = await calRes.json();
+          for (const e of calData.items ?? []) {
+            const startDt = e.start?.dateTime || e.start?.date || '';
+            const endDt = e.end?.dateTime || e.end?.date || '';
+            allEvents.push({
+              id: e.id,
+              subject: e.summary || '(No title)',
+              start: startDt,
+              end: endDt,
+              location: e.location || null,
+              isAllDay: !!e.start?.date && !e.start?.dateTime,
+              showAs: e.transparency === 'transparent' ? 'free' : 'busy',
+              accountId: account.id,
+              accountLabel: account.label,
+              accountColor: account.color,
+            });
+          }
+        }
+      } else {
+        // Microsoft Graph API
+        const calRes = await fetch(
+          `https://graph.microsoft.com/v1.0/me/calendarview?startDateTime=${startOfDay}&endDateTime=${endOfWeek}&$orderby=start/dateTime&$top=50&$select=subject,start,end,location,isAllDay,showAs`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Prefer: 'outlook.timezone="Africa/Johannesburg"',
+            },
+          }
+        );
+
+        if (calRes.ok) {
+          const calData = await calRes.json();
+          for (const e of calData.value ?? []) {
+            const startDt = (e.start?.dateTime || '').replace(/\.0+$/, '');
+            const endDt = (e.end?.dateTime || '').replace(/\.0+$/, '');
+            allEvents.push({
+              id: e.id,
+              subject: e.subject,
+              start: startDt.includes('+') || startDt.includes('Z') ? startDt : startDt + '+02:00',
+              end: endDt.includes('+') || endDt.includes('Z') ? endDt : endDt + '+02:00',
+              location: e.location?.displayName || null,
+              isAllDay: e.isAllDay,
+              showAs: e.showAs,
+              accountId: account.id,
+              accountLabel: account.label,
+              accountColor: account.color,
+            });
+          }
         }
       }
     } catch { /* skip failed account */ }
