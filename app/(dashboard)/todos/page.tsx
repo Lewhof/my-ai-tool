@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { cn, formatRelativeDate } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface Todo {
   id: string;
@@ -48,6 +49,7 @@ export default function TodosPage() {
   const [newBucket, setNewBucket] = useState('General');
   const [newRecurrence, setNewRecurrence] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const fetchTodos = useCallback(async () => {
     const res = await fetch('/api/todos');
@@ -269,15 +271,22 @@ export default function TodosPage() {
               </React.Fragment>
             );
           })}
-          {/* Completed divider */}
+          {/* Completed divider — collapsible */}
           {todos.filter((t) => t.status === 'done').length > 0 && (
             <tr>
               <td colSpan={7} className="px-5 py-2 bg-background/70">
-                <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Completed ({todos.filter((t) => t.status === 'done').length})</p>
+                <button
+                  onClick={() => setShowCompleted(!showCompleted)}
+                  className="text-muted-foreground text-xs font-semibold uppercase tracking-wider hover:text-foreground transition-colors flex items-center gap-1.5"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                    className={`transition-transform ${showCompleted ? 'rotate-90' : ''}`}><path d="M9 18l6-6-6-6"/></svg>
+                  Completed ({todos.filter((t) => t.status === 'done').length})
+                </button>
               </td>
             </tr>
           )}
-          {todos.filter((t) => t.status === 'done').map((todo) => {
+          {showCompleted && todos.filter((t) => t.status === 'done').map((todo) => {
             const due = formatDueDate(todo.due_date);
             return (
               <tr key={todo.id} className="hover:bg-secondary/30 opacity-60">
