@@ -177,6 +177,24 @@ export default function AgentPage() {
       return true;
     }
 
+    // /pending — show dev pipeline (handle client-side to avoid AI fallthrough)
+    if (rawMsg === '/pending' || rawMsg.startsWith('/pending')) {
+      setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
+      setLoading(true);
+      try {
+        const res = await fetch('/api/agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: 'show pending', history: [] }),
+        });
+        const data = await res.json();
+        setMessages(prev => [...prev, { role: 'assistant', content: data.response || 'No pending tasks.' }]);
+      } catch {
+        setMessages(prev => [...prev, { role: 'assistant', content: 'Error loading pipeline.' }]);
+      } finally { setLoading(false); }
+      return true;
+    }
+
     // /board — add to whiteboard backlog
     if (rawMsg.startsWith('/board ')) {
       const title = rawMsg.slice(7).trim();
