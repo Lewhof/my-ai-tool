@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Search, X, MessageSquare, CheckSquare, FileText, StickyNote,
-  BookOpen, ClipboardList, KeyRound,
+  Search, MessageSquare, CheckSquare, FileText, StickyNote,
+  BookOpen, ClipboardList, KeyRound, Zap, Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface SearchResult {
   type: string;
@@ -24,6 +25,7 @@ const TYPE_ICONS: Record<string, typeof Search> = {
   kb: BookOpen,
   whiteboard: ClipboardList,
   vault: KeyRound,
+  todo: CheckSquare,
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -34,6 +36,14 @@ const TYPE_LABELS: Record<string, string> = {
   kb: 'Knowledge Base',
   whiteboard: 'Whiteboard',
   vault: 'Vault',
+  todo: 'Task',
+};
+
+const TYPE_TOASTS: Record<string, string> = {
+  todo: 'Task created',
+  note: 'Note saved',
+  kb: 'KB entry added',
+  whiteboard: 'Added to whiteboard',
 };
 
 export default function GlobalSearch() {
@@ -41,6 +51,7 @@ export default function GlobalSearch() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -92,6 +103,31 @@ export default function GlobalSearch() {
     router.push(result.href);
   };
 
+  // Quick-capture: AI classifies and creates the item
+  const quickCapture = async () => {
+    if (!query.trim() || query.length < 3) return;
+    setCapturing(true);
+    try {
+      const res = await fetch('/api/quick-capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: query }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const label = TYPE_TOASTS[data.created?.type] || 'Item created';
+        const detail = data.classified?.due_date ? ` (due ${data.classified.due_date})` : '';
+        toast.success(`${label}: ${data.created?.title}${detail}`);
+        setOpen(false);
+      } else {
+        toast.error('Could not capture — try rephrasing');
+      }
+    } catch {
+      toast.error('Capture failed');
+    }
+    setCapturing(false);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -99,8 +135,14 @@ export default function GlobalSearch() {
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedIndex(i => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter' && results[selectedIndex]) {
-      navigate(results[selectedIndex]);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (results[selectedIndex]) {
+        navigate(results[selectedIndex]);
+      } else if (query.length >= 3 && !loading) {
+        // No results or no selection — trigger quick-capture
+        quickCapture();
+      }
     }
   };
 
@@ -122,9 +164,10 @@ export default function GlobalSearch() {
               value={query}
               onChange={(e) => handleInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Search across all modules..."
+              placeholder="Search or type to capture..."
               className="flex-1 py-3.5 text-[14px] text-foreground placeholder-muted-foreground bg-transparent outline-none"
             />
+            {capturing && <Loader2 size={14} className="animate-spin text-primary" />}
             <kbd className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground border border-border font-mono">
               ESC
             </kbd>
@@ -135,10 +178,32 @@ export default function GlobalSearch() {
             {loading && (
               <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">Searching...</div>
             )}
-            {!loading && query.length >= 2 && results.length === 0 && (
-              <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">No results found</div>
+            {!loading && query.length >= 2 && results.length === 0 && !capturing && (
+              <div className="px-4 py-4">
+                <p className="text-[13px] text-muted-foreground text-center mb-3">No results found</p>
+                {query.length >= 3 && (
+                  <button
+                    onClick={quickCapture}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors text-left"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                      <Zap size={14} className="text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] text-foreground">Quick Capture: &ldquo;{query}&rdquo;</p>
+                      <p className="text-[10px] text-muted-foreground">AI will classify as task, note, KB entry, or whiteboard item</p>
+                    </div>
+                  </button>
+                )}
+              </div>
             )}
-            {!loading && results.length > 0 && (
+            {capturing && (
+              <div className="px-4 py-6 text-center text-[13px] text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 size={14} className="animate-spin" />
+                Classifying and creating...
+              </div>
+            )}
+            {!loading && !capturing && results.length > 0 && (
               <div className="py-2">
                 {results.map((result, i) => {
                   const Icon = TYPE_ICONS[result.type] || Search;
@@ -161,11 +226,27 @@ export default function GlobalSearch() {
                     </button>
                   );
                 })}
+
+                {/* Quick capture option at bottom of results */}
+                {query.length >= 3 && (
+                  <button
+                    onClick={quickCapture}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-2 border-t border-border mt-1 pt-3"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                      <Zap size={14} className="text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] text-foreground">Quick Capture: &ldquo;{query}&rdquo;</p>
+                      <p className="text-[10px] text-muted-foreground">Create as task, note, KB, or whiteboard</p>
+                    </div>
+                  </button>
+                )}
               </div>
             )}
-            {!loading && query.length < 2 && (
+            {!loading && !capturing && query.length < 2 && (
               <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">
-                Type to search across chats, tasks, documents, notes, KB, whiteboard, vault
+                Search or type anything to quick-capture (task, note, KB, whiteboard)
               </div>
             )}
           </div>
@@ -179,7 +260,7 @@ export default function GlobalSearch() {
             </span>
             <span>
               <kbd className="px-1 py-0.5 rounded border border-border font-mono mx-0.5">&crarr;</kbd>
-              open
+              open / capture
             </span>
           </div>
         </div>

@@ -77,6 +77,9 @@ export default function EmailPage() {
 
   useEffect(() => { fetchEmails(); }, [fetchEmails]);
 
+  // Auto-suggest triage when inbox has unread emails
+  const unreadCount = emails.filter(e => !e.isRead).length;
+
   const loadEmail = async (id: string) => {
     setSelectedId(id);
     setEmailDetail(null);
@@ -126,9 +129,13 @@ export default function EmailPage() {
                   'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors',
                   folder === f.key ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-card'
                 )}
+                title={f.key === 'inbox' && unreadCount > 0 ? `${unreadCount} unread` : undefined}
               >
                 <Icon size={16} />
                 {f.label}
+                {f.key === 'inbox' && unreadCount > 0 && (
+                  <span className="ml-auto text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-medium">{unreadCount}</span>
+                )}
               </button>
             );
           })}
@@ -169,6 +176,21 @@ export default function EmailPage() {
           <div className="border-b border-border shrink-0 px-3 py-2 bg-primary/5">
             <p className="text-primary text-xs font-medium mb-1">{triageSummary}</p>
             <button onClick={() => setShowTriage(false)} className="text-muted-foreground text-xs hover:text-foreground">Show inbox</button>
+          </div>
+        )}
+
+        {/* Triage suggestion banner */}
+        {!showTriage && !loading && folder === 'inbox' && unreadCount > 3 && triaged.length === 0 && (
+          <div className="px-3 py-2 bg-primary/5 border-b border-border flex items-center justify-between shrink-0">
+            <p className="text-xs text-muted-foreground">{unreadCount} unread emails</p>
+            <button
+              onClick={runTriage}
+              disabled={triaging}
+              className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
+            >
+              {triaging ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+              AI Triage
+            </button>
           </div>
         )}
 
