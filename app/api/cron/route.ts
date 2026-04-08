@@ -354,5 +354,78 @@ Return ONLY valid JSON array.`,
     } catch { results.briefing = 'error'; }
   }
 
+  // ── 5. Weekly Review (Monday 7 AM SAST = 5 AM UTC) ──
+  if (now.getUTCHours() === 5 && now.getMinutes() < 5 && now.getDay() === 1) {
+    try {
+      const { data: users } = await supabaseAdmin.from('todos').select('user_id').limit(50);
+      const uniqueIds = [...new Set((users ?? []).map(u => u.user_id))];
+
+      for (const userId of uniqueIds) {
+        // Gather last 7 days of data
+        const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
+
+        const [completedRes, overdueRes, createdRes, habitsRes] = await Promise.all([
+          supabaseAdmin.from('todos').select('title').eq('user_id', userId).eq('status', 'done').gte('updated_at', weekAgo),
+          supabaseAdmin.from('todos').select('title, due_date').eq('user_id', userId).neq('status', 'done').lt('due_date', now.toISOString().split('T')[0]),
+          supabaseAdmin.from('todos').select('title').eq('user_id', userId).gte('created_at', weekAgo),
+          supabaseAdmin.from('habits').select('name, current_streak, best_streak').eq('user_id', userId).eq('active', true),
+        ]);
+
+        const completed = completedRes.data ?? [];
+        const overdue = overdueRes.data ?? [];
+        const created = createdRes.data ?? [];
+        const habits = habitsRes.data ?? [];
+
+        const context = `
+Weekly Review Data:
+- Tasks completed this week: ${completed.length} (${completed.slice(0, 5).map(t => t.title).join(', ')})
+- Tasks created this week: ${created.length}
+- Currently overdue: ${overdue.length} (${overdue.slice(0, 3).map(t => t.title).join(', ')})
+- Habit streaks: ${habits.map(h => `${h.name}: ${h.current_streak} days (best: ${h.best_streak})`).join(', ') || 'No habits tracked'}
+- Completion rate: ${created.length > 0 ? Math.round((completed.length / created.length) * 100) : 0}%
+        `.trim();
+
+        const response = await anthropic.messages.create({
+          model: MODELS.smart,
+          max_tokens: 500,
+          messages: [{
+            role: 'user',
+            content: `You are a personal AI chief of staff. Generate a concise weekly review (max 200 words, markdown). Structure:
+1. Key wins this week
+2. Items that slipped (overdue)
+3. Habit streak report
+4. One recommendation for next week
+5. Focus areas for the coming week
+
+Be direct and actionable.
+
+${context}`,
+          }],
+        });
+
+        const review = response.content[0].type === 'text' ? response.content[0].text : '';
+
+        // Deliver via Telegram
+        const chatId = getTelegramChatId();
+        if (chatId) {
+          const msg = `*Weekly Review \u2014 ${now.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', timeZone: 'Africa/Johannesburg' })}*\n\n${review.replace(/\*\*/g, '*').replace(/^#{1,6}\s+/gm, '')}`;
+          await sendTelegramMessage(chatId, msg);
+        }
+
+        // Push notification
+        await sendPushToUser(userId, {
+          title: '\u{1F4CA} Weekly Review',
+          body: review.replace(/[#*`\n]/g, ' ').trim().split('.')[0].slice(0, 120),
+          tag: 'weekly-review',
+          url: '/',
+        });
+
+        // Post to Cerebro
+        await postToCerebro(userId, `\u{1F4CA} **Weekly Review \u2014 ${now.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', timeZone: 'Africa/Johannesburg' })}**\n\n${review}`);
+      }
+      results.weeklyReview = 'sent';
+    } catch { results.weeklyReview = 'error'; }
+  }
+
   return Response.json({ ...results, timestamp: now.toISOString() });
 }
