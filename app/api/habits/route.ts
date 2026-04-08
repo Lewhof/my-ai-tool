@@ -87,10 +87,9 @@ export async function PATCH(req: Request) {
       // Undo completion
       await supabaseAdmin.from('habit_logs').delete().eq('id', existing[0].id);
       // Decrement streak
-      await supabaseAdmin.rpc('decrement_habit_streak', { habit_id_input: id }).catch(() => {
-        // Fallback: manual update
-        supabaseAdmin.from('habits').update({ current_streak: 0 }).eq('id', id);
-      });
+      const { data: h } = await supabaseAdmin.from('habits').select('current_streak').eq('id', id).single();
+      const newStreak = Math.max(0, (h?.current_streak || 1) - 1);
+      await supabaseAdmin.from('habits').update({ current_streak: newStreak }).eq('id', id);
       return Response.json({ completed: false });
     } else {
       // Mark completed
