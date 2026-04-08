@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn, formatRelativeDate } from '@/lib/utils';
 import { Plus, Trash2, Image, ChevronLeft, StickyNote } from 'lucide-react';
+import EntityLinks from '@/components/entity-links';
 
 interface Note {
   id: string;
@@ -239,6 +240,13 @@ export default function NotesPage() {
                     </a>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Linked items */}
+            {selectedId && (
+              <div className="px-5 py-2 shrink-0">
+                <EntityLinks entityType="note" entityId={selectedId} />
               </div>
             )}
           </>

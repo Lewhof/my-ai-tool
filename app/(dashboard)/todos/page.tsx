@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { cn, formatRelativeDate } from '@/lib/utils';
 import { toast } from 'sonner';
+import EntityLinks from '@/components/entity-links';
 
 interface Todo {
   id: string;
@@ -134,6 +135,7 @@ export default function TodosPage() {
             <span className="text-xs px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{todo.bucket}</span>
           )}
           {due && <span className={cn('text-xs', due.className)}>{due.text}</span>}
+          <EntityLinks entityType="todo" entityId={todo.id} compact />
         </div>
         {/* Quick status move */}
         <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -261,10 +263,13 @@ export default function TodosPage() {
                     </button>
                   </td>
                 </tr>
-                {expandedId === todo.id && todo.description && (
+                {expandedId === todo.id && (
                   <tr key={`${todo.id}-desc`}>
                     <td colSpan={7} className="px-5 py-3 bg-background/50">
-                      <p className="text-foreground text-sm whitespace-pre-wrap">{todo.description}</p>
+                      {todo.description && (
+                        <p className="text-foreground text-sm whitespace-pre-wrap">{todo.description}</p>
+                      )}
+                      <EntityLinks entityType="todo" entityId={todo.id} />
                     </td>
                   </tr>
                 )}
