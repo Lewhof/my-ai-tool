@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { UserButton } from '@clerk/nextjs';
 import {
   LayoutDashboard, Bot, CheckSquare, FileText,
-  Calendar, Mail, KeyRound, Settings, MessageSquare,
+  Calendar, CalendarDays, Mail, KeyRound, Settings, MessageSquare,
   Zap, BookOpen, Image as ImageIcon, Focus, StickyNote, GitFork,
   ClipboardList, CreditCard, ChevronLeft, ChevronRight, Globe,
 } from 'lucide-react';
@@ -24,6 +24,7 @@ const SIDEBAR_GROUPS = [
   {
     label: 'Productivity',
     items: [
+      { name: 'Planner', href: '/planner', icon: CalendarDays },
       { name: 'Tasks', href: '/todos', icon: CheckSquare },
       { name: 'Calendar', href: '/calendar', icon: Calendar },
       { name: 'Email', href: '/email', icon: Mail },

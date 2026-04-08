@@ -16,6 +16,7 @@ import WeatherWidget from '@/components/dashboard/weather-widget';
 import CalendarWidget from '@/components/dashboard/calendar-widget';
 import BriefingWidget from '@/components/dashboard/briefing-widget';
 import HealthWidget from '@/components/dashboard/health-widget';
+import HabitTracker from '@/components/habit-tracker';
 
 interface DashboardData {
   recentChats: Array<{ id: string; title: string; updated_at: string }>;
@@ -471,10 +472,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Row 6: Health Monitor */}
-      <div className="rounded-2xl border border-border overflow-hidden animate-fade-up animate-fade-up-delay-5"
-        style={{ background: 'var(--color-surface-1)' }}>
-        <HealthWidget />
+      {/* Row 6: Habits + Health */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-up animate-fade-up-delay-5">
+        <HabitTracker compact />
+        <div className="rounded-2xl border border-border overflow-hidden"
+          style={{ background: 'var(--color-surface-1)' }}>
+          <HealthWidget />
+        </div>
       </div>
     </div>
   );

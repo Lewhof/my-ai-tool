@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Bot, CheckSquare, FileText, MoreHorizontal, X,
-  MessageSquare, Calendar, Mail, StickyNote, GitFork, Zap,
+  MessageSquare, Calendar, CalendarDays, Mail, StickyNote, GitFork, Zap,
   ClipboardList, BookOpen, KeyRound, Settings, CreditCard,
   Globe, Focus, Image as ImageIcon,
 } from 'lucide-react';
@@ -20,6 +20,7 @@ const TABS = [
 ];
 
 const MORE_GRID = [
+  { name: 'Planner', href: '/planner', icon: CalendarDays },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Email', href: '/email', icon: Mail },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
