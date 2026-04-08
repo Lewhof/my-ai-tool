@@ -3,6 +3,37 @@ import { anthropic, MODELS } from '@/lib/anthropic';
 import { executeTool } from '@/lib/agent/executor';
 import { sendPushToUser } from '@/lib/push';
 
+// Helper: post a message to a user's Cerebro thread
+async function postToCerebro(userId: string, content: string) {
+  let { data: thread } = await supabaseAdmin
+    .from('chat_threads')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('agent_thread', true)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!thread) {
+    const { data: created } = await supabaseAdmin
+      .from('chat_threads')
+      .insert({ user_id: userId, title: 'Cerebro History', model: 'claude-sonnet', agent_thread: true })
+      .select('id')
+      .single();
+    thread = created;
+  }
+
+  if (thread) {
+    await supabaseAdmin.from('chat_messages').insert({
+      thread_id: thread.id,
+      role: 'assistant',
+      content,
+      model: 'system',
+    });
+    await supabaseAdmin.from('chat_threads').update({ updated_at: new Date().toISOString() }).eq('id', thread.id);
+  }
+}
+
 // Unified cron endpoint — runs every 5 minutes
 // Handles: scheduled agents, overdue task alerts, task executor
 export async function GET(req: Request) {
@@ -149,11 +180,7 @@ Be specific and actionable.`,
           updated_at: now.toISOString(),
         }).eq('id', task.id);
 
-        await supabaseAdmin.from('agent_thread').insert({
-          user_id: task.user_id,
-          role: 'assistant',
-          content: `\u{1F4CB} **Task Plan: ${task.title}**\n\n${plan}\n\n---\n\u{2705} Reply **"approve"** to execute\n\u{270F}\u{FE0F} Reply **"change: [feedback]"** to adjust\n\u{274C} Reply **"cancel"** to discard`,
-        });
+        await postToCerebro(task.user_id, `\u{1F4CB} **Task Plan: ${task.title}**\n\n${plan}\n\n---\n\u{2705} Reply **"approve"** to execute\n\u{270F}\u{FE0F} Reply **"change: [feedback]"** to adjust\n\u{274C} Reply **"cancel"** to discard`);
 
         await sendPushToUser(task.user_id, {
           title: 'Task plan ready',
@@ -252,11 +279,7 @@ Return ONLY valid JSON array.`,
           updated_at: now.toISOString(),
         }).eq('id', task.id);
 
-        await supabaseAdmin.from('agent_thread').insert({
-          user_id: task.user_id,
-          role: 'assistant',
-          content: `\u{2705} **Completed: ${task.title}**\n\n${files.length} file(s) committed. Vercel deploying now.\n\nCommit: \`${commit.sha?.slice(0, 7)}\``,
-        });
+        await postToCerebro(task.user_id, `\u{2705} **Completed: ${task.title}**\n\n${files.length} file(s) committed. Vercel deploying now.\n\nCommit: \`${commit.sha?.slice(0, 7)}\``);
 
         await sendPushToUser(task.user_id, {
           title: 'Task completed',
@@ -269,11 +292,7 @@ Return ONLY valid JSON array.`,
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Failed';
         await supabaseAdmin.from('task_queue').update({ status: 'failed', result: errMsg }).eq('id', task.id);
-        await supabaseAdmin.from('agent_thread').insert({
-          user_id: task.user_id,
-          role: 'assistant',
-          content: `\u{274C} **Failed: ${task.title}**\n\n${errMsg}`,
-        });
+        await postToCerebro(task.user_id, `\u{274C} **Failed: ${task.title}**\n\n${errMsg}`);
         await sendPushToUser(task.user_id, { title: 'Task failed', body: errMsg.slice(0, 80), tag: 'task-failed', url: '/agent' });
         results.executed = 'failed';
       }
