@@ -63,9 +63,9 @@ export async function POST(req: Request) {
   if (lowerMsg === 'show pending' || lowerMsg === 'pending' || lowerMsg === 'show tasks' || lowerMsg === 'dev status') {
     const { data: tasks } = await supabaseAdmin
       .from('task_queue')
-      .select('id, title, status, updated_at')
+      .select('id, title, status, result, updated_at')
       .eq('user_id', userId)
-      .in('status', ['queued', 'pending_approval', 'approved', 'in-progress'])
+      .in('status', ['queued', 'in-progress'])
       .order('updated_at', { ascending: false })
       .limit(10);
 
@@ -73,65 +73,83 @@ export async function POST(req: Request) {
       return Response.json({ response: 'No pending dev tasks. Use `/dev`, `/ship`, or `/bug` to queue one.' });
     }
 
-    const statusEmoji: Record<string, string> = {
-      'queued': '\u{23F3}',
-      'pending_approval': '\u{1F4CB}',
-      'approved': '\u{2705}',
-      'in-progress': '\u{1F527}',
-    };
-    const statusLabel: Record<string, string> = {
-      'queued': 'Queued (plan generating...)',
-      'pending_approval': 'Awaiting your approval',
-      'approved': 'Approved (executing...)',
-      'in-progress': 'Building...',
+    // Determine display status based on status + result
+    const getDisplayStatus = (t: { status: string; result: string | null }) => {
+      if (t.status === 'in-progress') {
+        try {
+          const r = JSON.parse(t.result || '{}');
+          if (r.approved) return { emoji: '\u{1F527}', label: 'Building...' };
+        } catch {}
+        return { emoji: '\u{1F527}', label: 'Executing...' };
+      }
+      if (t.status === 'queued' && t.result) {
+        try {
+          const r = JSON.parse(t.result);
+          if (r.awaiting_approval) return { emoji: '\u{1F4CB}', label: 'Awaiting your approval' };
+        } catch {}
+      }
+      return { emoji: '\u{23F3}', label: 'Queued (plan generating...)' };
     };
 
-    const list = tasks.map(t =>
-      `${statusEmoji[t.status] || '\u{2022}'} **${t.title}**\n   Status: ${statusLabel[t.status] || t.status}`
-    ).join('\n\n');
+    const list = tasks.map(t => {
+      const ds = getDisplayStatus(t);
+      return `${ds.emoji} **${t.title}**\n   Status: ${ds.label}`;
+    }).join('\n\n');
 
     return Response.json({
       response: `**Dev Pipeline:**\n\n${list}\n\n<!-- SHOW_APPROVAL_BUTTONS -->`,
     });
   }
 
-  // Approve — ONLY matches pending_approval (has a plan ready)
+  // Approve — find queued task with a plan (result contains awaiting_approval)
   if (lowerMsg === 'approve' || lowerMsg === 'go' || lowerMsg === 'yes, approve' || lowerMsg === 'approved' || lowerMsg === 'yes') {
-    const { data: pending } = await supabaseAdmin
+    // Find task with plan awaiting approval
+    const { data: allQueued } = await supabaseAdmin
       .from('task_queue')
-      .select('id, title')
+      .select('id, title, result')
       .eq('user_id', userId)
-      .eq('status', 'pending_approval')
+      .eq('status', 'queued')
+      .not('result', 'is', null)
       .order('updated_at', { ascending: false })
-      .limit(1);
+      .limit(5);
 
-    if (pending?.length) {
+    const pending = allQueued?.find(t => {
+      try { return JSON.parse(t.result).awaiting_approval; } catch { return false; }
+    });
+
+    if (pending) {
+      // Mark plan as approved and set status to in-progress
+      const planData = JSON.parse(pending.result);
+      planData.approved = true;
+      planData.awaiting_approval = false;
+
       await supabaseAdmin
         .from('task_queue')
-        .update({ status: 'approved', updated_at: new Date().toISOString() })
-        .eq('id', pending[0].id);
+        .update({ status: 'in-progress', result: JSON.stringify(planData), updated_at: new Date().toISOString() })
+        .eq('id', pending.id);
 
-      // Trigger executor immediately (fire-and-forget)
+      // Trigger executor immediately
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://lewhofmeyr.co.za';
       fetch(`${baseUrl}/api/cron/trigger`, { method: 'POST' }).catch(() => {});
 
       return Response.json({
-        response: `\u{2705} **Approved: ${pending[0].title}**\n\nExecuting now...`,
+        response: `\u{2705} **Approved: ${pending.title}**\n\nExecuting now...`,
       });
     }
 
-    // Check if there's a queued task (plan not ready yet)
-    const { data: queued } = await supabaseAdmin
+    // Check if there's a queued task with no plan yet
+    const { data: noPlan } = await supabaseAdmin
       .from('task_queue')
       .select('id, title')
       .eq('user_id', userId)
       .eq('status', 'queued')
+      .is('result', null)
       .order('updated_at', { ascending: false })
       .limit(1);
 
-    if (queued?.length) {
+    if (noPlan?.length) {
       return Response.json({
-        response: `\u{23F3} **${queued[0].title}** is still being planned. The plan will appear here shortly \u2014 you can approve once it's ready.`,
+        response: `\u{23F3} **${noPlan[0].title}** is still being planned. The plan will appear here shortly.`,
       });
     }
 
@@ -141,24 +159,24 @@ export async function POST(req: Request) {
     });
   }
 
-  // Cancel
+  // Cancel — use 'failed' status (allowed by constraint) with cancel marker
   if (lowerMsg === 'cancel' || lowerMsg === 'reject') {
     const { data: pending } = await supabaseAdmin
       .from('task_queue')
       .select('id, title')
       .eq('user_id', userId)
-      .in('status', ['pending_approval', 'queued'])
+      .eq('status', 'queued')
       .order('updated_at', { ascending: false })
       .limit(1);
 
     if (pending?.length) {
       await supabaseAdmin
         .from('task_queue')
-        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .update({ status: 'failed', result: 'Cancelled by user', updated_at: new Date().toISOString() })
         .eq('id', pending[0].id);
 
       return Response.json({
-        response: `\u{274C} **Cancelled: ${pending[0].title}**\n\nTask discarded. Let me know if you want to try a different approach.`,
+        response: `\u{274C} **Cancelled: ${pending[0].title}**\n\nTask discarded.`,
       });
     }
 
@@ -172,7 +190,7 @@ export async function POST(req: Request) {
       .from('task_queue')
       .select('id, title, description')
       .eq('user_id', userId)
-      .in('status', ['pending_approval', 'queued'])
+      .eq('status', 'queued')
       .order('updated_at', { ascending: false })
       .limit(1);
 
@@ -181,6 +199,7 @@ export async function POST(req: Request) {
         .from('task_queue')
         .update({
           status: 'queued',
+          result: null, // Clear plan so it gets regenerated
           description: `${pending[0].description || ''}\n\n--- User feedback ---\n${feedback}`,
           updated_at: new Date().toISOString(),
         })
