@@ -18,6 +18,12 @@ interface Message {
 }
 
 const SLASH_COMMANDS = [
+  { cmd: '/dev', desc: 'Build now \u2014 queue for dev', example: '/dev Add contact form page', highlight: true },
+  { cmd: '/ship', desc: 'Auto-build \u2014 no approval', example: '/ship Fix button color', highlight: true },
+  { cmd: '/bug', desc: 'Report bug \u2014 urgent fix', example: '/bug Calendar wrong time', highlight: true },
+  { cmd: '/board', desc: 'Add to whiteboard backlog', example: '/board AI email templates', highlight: true },
+  { cmd: '/scope', desc: 'Deep research + SSA spec', example: '/scope Financial module', highlight: true },
+  { cmd: '/plan', desc: 'Implementation plan only', example: '/plan Capacitor native app', highlight: true },
   { cmd: '/task', desc: 'Create a task', example: '/task Review contracts' },
   { cmd: '/note', desc: 'Save a note', example: '/note Meeting recap' },
   { cmd: '/image', desc: 'Generate image', example: '/image A futuristic city' },
@@ -129,12 +135,114 @@ export default function AgentPage() {
     return msg;
   };
 
+  // Direct action commands — bypass Cerebro AI, go straight to APIs
+  const handleDirectCommand = async (rawMsg: string): Promise<boolean> => {
+    const post = (url: string, body: Record<string, unknown>) =>
+      fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+    // /dev — immediate dev task, queue for plan + approval
+    if (rawMsg.startsWith('/dev ')) {
+      const title = rawMsg.slice(5).trim();
+      setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
+      await post('/api/tasks', { title, description: `Dev command: build immediately.\n\n${title}`, whiteboard_id: null });
+      setMessages(prev => [...prev, { role: 'assistant', content: `\u{1F6E0}\u{FE0F} **Queued for dev: ${title}**\n\nA plan will be generated within 5 minutes. You'll see it here with Approve/Change/Cancel buttons.` }]);
+      toast('Dev task queued');
+      return true;
+    }
+
+    // /ship — auto-approved, no approval needed
+    if (rawMsg.startsWith('/ship ')) {
+      const title = rawMsg.slice(6).trim();
+      setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
+      const res = await post('/api/tasks', { title, description: `Ship command: auto-approved, build and deploy.\n\n${title}`, status: 'queued' });
+      const task = await res.json();
+      // Immediately approve it
+      if (task.id) {
+        await fetch(`/api/tasks/pending`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-api-key': '' }, body: JSON.stringify({ id: task.id, status: 'approved' }) });
+      }
+      setMessages(prev => [...prev, { role: 'assistant', content: `\u{1F680} **Shipping: ${title}**\n\nAuto-approved. Will be built and deployed within 5-10 minutes. No approval needed.` }]);
+      toast('Shipping \u2014 auto-approved');
+      return true;
+    }
+
+    // /bug — urgent task, fast-track
+    if (rawMsg.startsWith('/bug ')) {
+      const title = rawMsg.slice(5).trim();
+      setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
+      await post('/api/tasks', { title: `[BUG] ${title}`, description: `Bug report: fix urgently.\n\n${title}`, priority: 'urgent' });
+      setMessages(prev => [...prev, { role: 'assistant', content: `\u{1F41B} **Bug reported: ${title}**\n\nQueued as urgent. Plan coming within 5 minutes.` }]);
+      toast('Bug reported');
+      return true;
+    }
+
+    // /board — add to whiteboard backlog
+    if (rawMsg.startsWith('/board ')) {
+      const title = rawMsg.slice(7).trim();
+      setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
+      await post('/api/whiteboard', { title, status: 'idea', priority: 99, tags: ['cerebro'] });
+      setMessages(prev => [...prev, { role: 'assistant', content: `\u{1F4CB} **Added to whiteboard: ${title}**\n\nStatus: Idea. You can scope and prioritize it later.` }]);
+      toast('Added to whiteboard');
+      return true;
+    }
+
+    // /scope — deep research + spec document
+    if (rawMsg.startsWith('/scope ')) {
+      const topic = rawMsg.slice(7).trim();
+      setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
+      setLoading(true);
+      try {
+        const res = await fetch('/api/agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: `SSA (Scope, Spec, Advise) for: "${topic}"\n\nDo deep research. Search the web for best practices and existing solutions. Then create a comprehensive document with:\n\n## Scope\nWhat this feature/project entails. Define boundaries.\n\n## Specification\n- Technical architecture\n- Data models / DB changes\n- API endpoints needed\n- UI/UX components\n- Dependencies and integrations\n\n## Advisory\n- Recommended approach\n- Risks and mitigations\n- Estimated complexity (S/M/L)\n- Priority recommendation\n- Suggested sprint\n\nBe thorough. This document will guide implementation. Save the result to the Knowledge Base when done.`,
+            history: messages.slice(-10),
+          }),
+        });
+        const data = await res.json();
+        setMessages(prev => [...prev, { role: 'assistant', content: data.response || 'Could not generate scope.' }]);
+      } catch {
+        setMessages(prev => [...prev, { role: 'assistant', content: 'Error generating scope.' }]);
+      } finally { setLoading(false); }
+      return true;
+    }
+
+    // /plan — generate plan only, save to KB
+    if (rawMsg.startsWith('/plan ')) {
+      const topic = rawMsg.slice(6).trim();
+      setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
+      setLoading(true);
+      try {
+        const res = await fetch('/api/agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: `Create a detailed implementation plan for: "${topic}"\n\nInclude:\n1. Files to create/modify (with paths)\n2. Step-by-step implementation order\n3. Key technical decisions\n4. Dependencies needed\n5. Testing approach\n\nDo NOT execute anything. Just plan. Save to Knowledge Base when done.`,
+            history: messages.slice(-10),
+          }),
+        });
+        const data = await res.json();
+        setMessages(prev => [...prev, { role: 'assistant', content: data.response || 'Could not generate plan.' }]);
+      } catch {
+        setMessages(prev => [...prev, { role: 'assistant', content: 'Error generating plan.' }]);
+      } finally { setLoading(false); }
+      return true;
+    }
+
+    return false;
+  };
+
   const sendMessage = async (text?: string) => {
     const rawMsg = text || input.trim();
     if (!rawMsg || loading) return;
+
+    // Check for direct action commands first
+    setInput('');
+    const handled = await handleDirectCommand(rawMsg);
+    if (handled) { inputRef.current?.focus(); return; }
+
     const msg = processSlashCommand(rawMsg);
     const fullMsg = replyTo ? `> Replying to: "${replyTo.content.slice(0, 150)}"\n\n${msg}` : msg;
-    setInput('');
     setReplyTo(null);
     setMessages((prev) => [...prev, { role: 'user', content: fullMsg }]);
     setLoading(true);
@@ -381,9 +489,12 @@ export default function AgentPage() {
         <div className="px-4 py-2 border-t border-border shrink-0 max-h-48 overflow-auto" style={{ background: 'var(--color-surface-1)' }}>
           {SLASH_COMMANDS.filter((c) => c.cmd.startsWith(input.split(' ')[0])).map((cmd) => (
             <button key={cmd.cmd} onClick={() => setInput(cmd.cmd + ' ')}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-surface-2 transition-colors text-left">
+              className={cn('w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-surface-2 transition-colors text-left',
+                (cmd as { highlight?: boolean }).highlight && 'border-l-2'
+              )}
+              style={(cmd as { highlight?: boolean }).highlight ? { borderColor: 'var(--color-brand)' } : {}}>
               <div>
-                <span className="text-[13px] font-mono" style={{ color: 'var(--color-brand)' }}>{cmd.cmd}</span>
+                <span className="text-[13px] font-mono" style={{ color: (cmd as { highlight?: boolean }).highlight ? 'var(--color-brand)' : 'var(--color-muted-foreground)' }}>{cmd.cmd}</span>
                 <span className="text-muted-foreground text-[11px] ml-2">{cmd.desc}</span>
               </div>
               <span className="text-muted-foreground/40 text-[10px]">{cmd.example}</span>
