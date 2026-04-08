@@ -11,6 +11,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/migrate(.*)',
   '/api/cron(.*)',
   '/api/health(.*)',
+  '/api/widget(.*)',
   '/diagrams/share(.*)',
 ]);
 

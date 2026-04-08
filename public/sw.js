@@ -1,4 +1,5 @@
-const CACHE_NAME = 'lewhof-ai-v1';
+const CACHE_NAME = 'lewhof-ai-v2';
+const API_CACHE = 'lewhof-api-v1';
 const OFFLINE_URL = '/offline';
 
 const PRECACHE_URLS = [
@@ -6,7 +7,22 @@ const PRECACHE_URLS = [
   '/agent',
   '/todos',
   '/documents',
+  '/calendar',
+  '/notes',
   '/offline',
+];
+
+// API routes to cache for offline reading
+const CACHEABLE_API = [
+  '/api/todos',
+  '/api/dashboard',
+  '/api/dashboard/credits',
+  '/api/dashboard/briefing',
+  '/api/calendar',
+  '/api/notes-v2',
+  '/api/kb',
+  '/api/whiteboard',
+  '/api/vault',
 ];
 
 // Install — cache app shell
@@ -21,7 +37,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => k !== CACHE_NAME && k !== API_CACHE).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
@@ -60,16 +76,43 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// Fetch — network first, fallback to cache, then offline page
+// Fetch — network first with API caching for offline
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET and API requests
   if (event.request.method !== 'GET') return;
-  if (event.request.url.includes('/api/')) return;
 
+  const url = new URL(event.request.url);
+
+  // Cacheable API routes — network first, cache fallback
+  if (CACHEABLE_API.some(path => url.pathname === path || url.pathname.startsWith(path + '/'))) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(API_CACHE).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match(event.request).then((cached) => {
+            if (cached) return cached;
+            return new Response(JSON.stringify({ offline: true, error: 'You are offline' }), {
+              headers: { 'Content-Type': 'application/json' },
+              status: 503,
+            });
+          });
+        })
+    );
+    return;
+  }
+
+  // Skip other API routes
+  if (url.pathname.startsWith('/api/')) return;
+
+  // App shell — network first, cache fallback, offline page
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Cache successful responses
         if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
@@ -77,10 +120,8 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => {
-        // Try cache
         return caches.match(event.request).then((cached) => {
           if (cached) return cached;
-          // Fallback to offline page for navigation
           if (event.request.mode === 'navigate') {
             return caches.match(OFFLINE_URL);
           }
@@ -88,4 +129,18 @@ self.addEventListener('fetch', (event) => {
         });
       })
   );
+});
+
+// Background sync — process offline mutations when back online
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'sync-queue') {
+    event.waitUntil(
+      // Notify the client to process the sync queue
+      self.clients.matchAll().then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({ type: 'SYNC_QUEUE' });
+        });
+      })
+    );
+  }
 });
