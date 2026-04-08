@@ -220,26 +220,42 @@ export async function executeTool(
 
       case 'web_search': {
         const query = input.query as string;
-        // Use Gemini for web-aware responses since Perplexity may not have a key
         const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) return 'No search API configured.';
+        if (!apiKey) return 'No search API configured. Add GEMINI_API_KEY to environment.';
 
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: `Search the web for: ${query}\n\nProvide a concise, factual answer with key information.` }] }],
-              generationConfig: { maxOutputTokens: 500 },
-            }),
+        // Try with retry on 429
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: `Search the web and provide current, factual information about: ${query}\n\nBe concise. Include dates, numbers, and sources where possible.` }] }],
+                  generationConfig: { maxOutputTokens: 600 },
+                }),
+              }
+            );
+
+            if (res.status === 429) {
+              if (attempt === 0) {
+                await new Promise(r => setTimeout(r, 2000)); // Wait 2s and retry
+                continue;
+              }
+              return 'Web search is temporarily rate-limited. Please try again in a minute.';
+            }
+
+            if (!res.ok) return `Web search failed (HTTP ${res.status}). Try again later.`;
+            const data = await res.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            return text || 'No results found.';
+          } catch (err) {
+            if (attempt === 0) continue;
+            return 'Web search failed due to a network error.';
           }
-        );
-
-        if (!res.ok) return `Web search failed (${res.status}).`;
-        const data = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        return text || 'No results found.';
+        }
+        return 'Web search failed after retries.';
       }
 
       case 'get_emails': {
