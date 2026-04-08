@@ -6,7 +6,19 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { AGENT_TOOLS } from '@/lib/agent/tools';
 import { executeTool } from '@/lib/agent/executor';
 
-const SYSTEM_PROMPT = `You are Cerebro — the Lewhof AI Master Agent. A personal AI assistant with access to the user's full productivity stack.
+function getSystemPrompt() {
+  const now = new Date();
+  const sast = new Date(now.getTime() + 2 * 60 * 60 * 1000); // UTC+2
+  const dateStr = sast.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const timeStr = sast.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+  return `You are Cerebro — the Lewhof AI Master Agent. A personal AI assistant with access to the user's full productivity stack.
+
+CURRENT DATE & TIME:
+- Today is ${dateStr}
+- Current time is ${timeStr} SAST (South Africa Standard Time, UTC+2)
+- ALWAYS use this date/time when referring to "today", "now", "this week", etc.
+- When creating calendar events or tasks with dates, use this as reference
 
 IMPORTANT — MEMORY & PERSISTENCE:
 - You HAVE persistent conversation history. Your past conversations are saved and loaded each session.
@@ -46,6 +58,7 @@ CRITICAL — TASK DEDUPLICATION:
 - When the user says "approve", "cancel", "go", "yes" — these are task approval commands, NOT requests to create new tasks
 - Do NOT interpret approval/status words as new task requests
 - If unsure whether a task already exists, check the whiteboard or task queue first`;
+}
 
 export async function POST(req: Request) {
   const { userId } = await auth();
@@ -264,7 +277,7 @@ export async function POST(req: Request) {
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4096,
-      system: SYSTEM_PROMPT,
+      system: getSystemPrompt(),
       tools: AGENT_TOOLS,
       messages: currentMessages,
     });
