@@ -149,6 +149,41 @@ export default function ConnectionsPage() {
             </div>
           </section>
 
+          {/* ── Google Calendar ── */}
+          <section className="bg-card border border-border rounded-lg overflow-hidden">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Calendar size={20} className="text-red-400" />
+                <div>
+                  <h3 className="text-foreground font-semibold text-sm">Google Calendar</h3>
+                  <p className="text-muted-foreground text-xs">Gmail / Google Workspace calendars</p>
+                </div>
+              </div>
+              <StatusBadge connected={(status?.calendar ?? []).some(a => a.provider === 'google')} />
+            </div>
+            <div className="p-5">
+              {(status?.calendar ?? []).filter(a => a.provider === 'google').map((acc) => (
+                <div key={acc.id} className="flex items-center justify-between bg-background rounded-lg px-4 py-3 mb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: acc.color }} />
+                    <div>
+                      <p className="text-foreground text-sm font-medium">{acc.label}</p>
+                      <p className="text-muted-foreground text-xs">{acc.email}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => removeCalAccount(acc.id)} className="text-muted-foreground hover:text-red-400 p-1 transition-colors"><Trash2 size={14} /></button>
+                </div>
+              ))}
+              <a
+                href="/api/auth/google"
+                className="bg-primary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary transition-colors flex items-center gap-2 w-fit"
+              >
+                <Plus size={14} />
+                Connect Google Calendar
+              </a>
+            </div>
+          </section>
+
           {/* ── Spotify ── */}
           <section className="bg-card border border-border rounded-lg overflow-hidden">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
