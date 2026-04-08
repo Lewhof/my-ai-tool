@@ -98,7 +98,10 @@ export default function DiagramsPage() {
         });
       }
 
-      if (!genRes.ok) throw new Error('Generation failed');
+      if (!genRes.ok) {
+        const errData = await genRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Generation failed (${genRes.status})`);
+      }
       const { nodes, edges } = await genRes.json();
 
       const name = (generatePrompt || 'Image diagram').slice(0, 50);
@@ -112,8 +115,8 @@ export default function DiagramsPage() {
         toast('Diagram generated');
         router.push(`/diagrams/${saved.id}`);
       }
-    } catch {
-      toast.error('Could not generate diagram. Try again.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not generate diagram. Try again.');
     } finally {
       setGenerating(false);
     }
