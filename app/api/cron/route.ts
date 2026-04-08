@@ -140,30 +140,26 @@ export async function GET(req: Request) {
     } catch { results.overdue = 'error'; }
   }
 
-  // ── 3. Task Executor — plan queued tasks, execute approved ones ──
+  // ── 3. Task Executor ──
+  // Lifecycle (only DB-allowed statuses):
+  //   queued (result=null)     → needs plan generation
+  //   queued (result has plan) → awaiting user approval
+  //   in-progress              → approved, executing code
+  //   completed                → done
+  //   failed                   → error
   try {
-    // 3a. Generate plans for queued tasks
+    // 3a. Generate plans for queued tasks WITHOUT a plan yet
     const { data: queuedTasks } = await supabaseAdmin
       .from('task_queue')
       .select('*')
       .eq('status', 'queued')
+      .is('result', null)
       .order('created_at', { ascending: true })
       .limit(2);
 
     let planned = 0;
     for (const task of queuedTasks ?? []) {
       try {
-        // F4: Lock — atomically claim this task to prevent double-processing
-        // Lock by setting to in-progress temporarily (allowed by check constraint)
-        const { data: locked, error: lockErr } = await supabaseAdmin
-          .from('task_queue')
-          .update({ status: 'in-progress', updated_at: now.toISOString() })
-          .eq('id', task.id)
-          .eq('status', 'queued')
-          .select('id');
-
-        if (lockErr || !locked?.length) continue; // Another cron already claimed it
-
         const planResponse = await anthropic.messages.create({
           model: MODELS.smart,
           max_tokens: 1000,
@@ -185,9 +181,9 @@ Be specific and actionable.`,
 
         const plan = planResponse.content[0].type === 'text' ? planResponse.content[0].text : 'Could not generate plan.';
 
+        // Store plan in result — task stays queued, awaiting approval
         await supabaseAdmin.from('task_queue').update({
-          status: 'pending_approval',
-          result: JSON.stringify({ plan }),
+          result: JSON.stringify({ plan, awaiting_approval: true }),
           updated_at: now.toISOString(),
         }).eq('id', task.id);
 
@@ -205,26 +201,26 @@ Be specific and actionable.`,
     }
     results.planned = planned;
 
-    // 3b. Execute approved tasks
-    const { data: approvedTasks } = await supabaseAdmin
+    // 3b. Execute tasks that are in-progress (user approved → set to in-progress)
+    const { data: execTasks } = await supabaseAdmin
       .from('task_queue')
       .select('*')
-      .eq('status', 'approved')
-      .order('created_at', { ascending: true })
+      .eq('status', 'in-progress')
+      .not('result', 'is', null)
+      .order('updated_at', { ascending: true })
       .limit(1);
 
-    if (approvedTasks?.length) {
-      const task = approvedTasks[0];
-      // F4: Lock — atomically claim
-      const { data: exeLocked } = await supabaseAdmin
-        .from('task_queue')
-        .update({ status: 'in-progress', updated_at: now.toISOString() })
-        .eq('id', task.id)
-        .eq('status', 'approved')
-        .select('id');
+    // Filter to only tasks whose result contains a plan (not already executing)
+    const taskToExecute = execTasks?.find(t => {
+      try {
+        const r = JSON.parse(t.result);
+        return r.plan && r.approved;
+      } catch { return false; }
+    });
 
-      if (!exeLocked?.length) { /* Another cron claimed it */ }
-      else try {
+    if (taskToExecute) {
+      const task = taskToExecute;
+      try {
         const codeResponse = await anthropic.messages.create({
           model: MODELS.smart,
           max_tokens: 4096,
