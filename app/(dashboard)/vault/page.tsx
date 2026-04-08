@@ -6,8 +6,9 @@ import {
   Key, Code, CreditCard, Landmark, Fingerprint, FileLock,
   Wifi, Server, Shield, Search, Eye, EyeOff, Copy, Trash2,
   Hash, BadgeCheck, Car, Repeat, TrendingUp, FileText, Home,
-  Building, DoorOpen, Plug, Camera, Loader2,
+  Building, DoorOpen, Plug, Camera, Loader2, Lock, LockOpen,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { CategoryDef } from '@/lib/vault-categories';
 
 interface VaultEntry {
@@ -45,6 +46,12 @@ const CATEGORY_ICONS: Record<string, typeof Key> = {
 };
 
 export default function VaultPage() {
+  const [locked, setLocked] = useState(true);
+  const [hasPin, setHasPin] = useState<boolean | null>(null);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [settingUp, setSettingUp] = useState(false);
+
   const [entries, setEntries] = useState<VaultEntry[]>([]);
   const [categories, setCategories] = useState<CategoryDef[]>([]);
   const [activeCategory, setActiveCategory] = useState('All');
@@ -59,6 +66,48 @@ export default function VaultPage() {
   const [revealedFields, setRevealedFields] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState<string | null>(null);
 
+  // Check vault lock status
+  useEffect(() => {
+    fetch('/api/vault/auth')
+      .then(r => r.json())
+      .then(d => {
+        setHasPin(d.hasPin);
+        if (!d.hasPin) setLocked(false); // No PIN = no lock
+      })
+      .catch(() => setLocked(false));
+  }, []);
+
+  const verifyPin = async () => {
+    setPinError('');
+    const res = await fetch('/api/vault/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'verify', pin: pinInput }),
+    });
+    if (res.ok) {
+      setLocked(false);
+      setPinInput('');
+    } else {
+      setPinError('Incorrect PIN');
+      setPinInput('');
+    }
+  };
+
+  const setupPin = async () => {
+    if (pinInput.length < 4) { setPinError('PIN must be at least 4 digits'); return; }
+    const res = await fetch('/api/vault/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'setup', pin: pinInput }),
+    });
+    if (res.ok) {
+      setHasPin(true);
+      setSettingUp(false);
+      setPinInput('');
+      toast('Vault PIN set');
+    }
+  };
+
   const fetchEntries = useCallback(async () => {
     const res = await fetch('/api/vault');
     const data = await res.json();
@@ -67,7 +116,86 @@ export default function VaultPage() {
     if (!addCategory && data.categories?.length) setAddCategory(data.categories[0].key);
   }, [addCategory]);
 
-  useEffect(() => { fetchEntries(); }, [fetchEntries]);
+  useEffect(() => { if (!locked) fetchEntries(); }, [fetchEntries, locked]);
+
+  // Lock screen
+  if (hasPin === null) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 size={18} className="animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (locked && hasPin) {
+    return (
+      <div className="flex items-center justify-center h-full p-6">
+        <div className="w-full max-w-xs text-center space-y-4 animate-fade-up">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{ background: 'var(--color-brand-dim)' }}>
+            <Lock size={28} style={{ color: 'var(--color-brand)' }} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-foreground">Vault Locked</h2>
+            <p className="text-[13px] text-muted-foreground mt-1">Enter your PIN to access credentials</p>
+          </div>
+          <input
+            type="password"
+            inputMode="numeric"
+            maxLength={8}
+            value={pinInput}
+            onChange={(e) => { setPinInput(e.target.value.replace(/\D/g, '')); setPinError(''); }}
+            onKeyDown={(e) => e.key === 'Enter' && verifyPin()}
+            placeholder="Enter PIN"
+            autoFocus
+            className="w-full text-center text-2xl font-mono tracking-[0.5em] py-3 rounded-xl border border-border text-foreground placeholder-muted-foreground outline-none focus:border-white/20"
+            style={{ background: 'var(--color-surface-2)' }}
+          />
+          {pinError && <p className="text-destructive text-[12px]">{pinError}</p>}
+          <button
+            onClick={verifyPin}
+            disabled={pinInput.length < 4}
+            className="w-full py-2.5 rounded-xl text-[13px] font-medium text-white btn-brand disabled:opacity-50"
+            style={{ background: 'var(--color-brand)' }}
+          >
+            Unlock
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (settingUp) {
+    return (
+      <div className="flex items-center justify-center h-full p-6">
+        <div className="w-full max-w-xs text-center space-y-4 animate-fade-up">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{ background: 'var(--color-brand-dim)' }}>
+            <Shield size={28} style={{ color: 'var(--color-brand)' }} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-foreground">Set Vault PIN</h2>
+            <p className="text-[13px] text-muted-foreground mt-1">Choose a 4-8 digit PIN to protect your vault</p>
+          </div>
+          <input
+            type="password"
+            inputMode="numeric"
+            maxLength={8}
+            value={pinInput}
+            onChange={(e) => { setPinInput(e.target.value.replace(/\D/g, '')); setPinError(''); }}
+            onKeyDown={(e) => e.key === 'Enter' && setupPin()}
+            placeholder="New PIN"
+            autoFocus
+            className="w-full text-center text-2xl font-mono tracking-[0.5em] py-3 rounded-xl border border-border text-foreground placeholder-muted-foreground outline-none focus:border-white/20"
+            style={{ background: 'var(--color-surface-2)' }}
+          />
+          {pinError && <p className="text-destructive text-[12px]">{pinError}</p>}
+          <div className="flex gap-2">
+            <button onClick={() => setSettingUp(false)} className="flex-1 py-2.5 rounded-xl text-[13px] font-medium text-muted-foreground border border-border hover:text-foreground transition-colors">Cancel</button>
+            <button onClick={setupPin} disabled={pinInput.length < 4} className="flex-1 py-2.5 rounded-xl text-[13px] font-medium text-white btn-brand disabled:opacity-50" style={{ background: 'var(--color-brand)' }}>Set PIN</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -181,6 +309,24 @@ export default function VaultPage() {
           <p className="text-muted-foreground text-sm mt-1">Securely store passwords, keys, cards, and secrets</p>
         </div>
         <div className="flex gap-2">
+          {/* Lock / Setup button */}
+          {hasPin ? (
+            <button
+              onClick={() => setLocked(true)}
+              className="text-muted-foreground hover:text-foreground px-3 py-2 rounded-lg text-sm border border-border hover:border-white/15 transition-colors flex items-center gap-1.5"
+              title="Lock vault"
+            >
+              <Lock size={14} /> Lock
+            </button>
+          ) : (
+            <button
+              onClick={() => setSettingUp(true)}
+              className="text-muted-foreground hover:text-foreground px-3 py-2 rounded-lg text-sm border border-border hover:border-white/15 transition-colors flex items-center gap-1.5"
+              title="Set up vault PIN"
+            >
+              <Shield size={14} /> Set PIN
+            </button>
+          )}
           <input ref={scanInputRef} type="file" accept="image/*" capture="environment" onChange={handleScan} className="hidden" />
           <button
             onClick={() => scanInputRef.current?.click()}
