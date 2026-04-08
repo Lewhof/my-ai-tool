@@ -51,18 +51,27 @@ export default function AgentPage() {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  const loadHistory = () => {
     fetch('/api/agent/history')
       .then((r) => r.json())
       .then((data) => {
         if (data.messages?.length) {
-          setMessages(data.messages.map((m: { role: string; content: string }) => ({
+          const newMsgs = data.messages.map((m: { role: string; content: string }) => ({
             role: m.role as 'user' | 'assistant',
             content: m.content,
-          })));
+          }));
+          // Only update if message count changed (avoids scroll jump)
+          setMessages(prev => newMsgs.length !== prev.length ? newMsgs : prev);
         }
       })
       .catch(() => {});
+  };
+
+  useEffect(() => {
+    loadHistory();
+    // Poll for new messages every 10 seconds (catches executor plans)
+    const poll = setInterval(loadHistory, 10000);
+    return () => clearInterval(poll);
   }, []);
 
   useEffect(() => {
@@ -263,7 +272,38 @@ export default function AgentPage() {
                       })()}
                       {!msg.content.includes('IMAGE_GENERATED:') && (
                         <div className="prose prose-invert prose-sm max-w-none text-[13px] leading-relaxed">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {msg.content.includes('Reply **"approve"**')
+                              ? msg.content.split('---')[0].trim()
+                              : msg.content}
+                          </ReactMarkdown>
+                        </div>
+                      )}
+                      {/* Plan approval buttons */}
+                      {msg.content.includes('Reply **"approve"**') && (
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-white/10">
+                          <button
+                            onClick={() => sendMessage('approve')}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-medium text-white btn-brand"
+                            style={{ background: 'oklch(0.55 0.18 160)' }}
+                          >
+                            &#x2705; Approve
+                          </button>
+                          <button
+                            onClick={() => {
+                              const feedback = prompt('What should change?');
+                              if (feedback) sendMessage(`change: ${feedback}`);
+                            }}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-medium text-muted-foreground border border-border hover:text-foreground hover:bg-surface-2 transition-colors"
+                          >
+                            &#x270F;&#xFE0F; Change
+                          </button>
+                          <button
+                            onClick={() => sendMessage('cancel')}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-medium text-muted-foreground border border-border hover:text-destructive transition-colors"
+                          >
+                            &#x274C; Cancel
+                          </button>
                         </div>
                       )}
                       {/* Forward actions */}
