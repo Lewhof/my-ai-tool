@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS } from '@/lib/anthropic';
 import { executeTool } from '@/lib/agent/executor';
+import { sendPushToUser } from '@/lib/push';
 
 // Cron endpoint — called by Vercel Cron every 5 minutes
 // Secured by CRON_SECRET header
@@ -83,6 +84,36 @@ export async function GET(req: Request) {
 
       executed++;
     } catch { /* skip failed agent */ }
+  }
+
+  // Check for overdue tasks (once per hour — only at minute 0-4)
+  if (now.getMinutes() < 5) {
+    try {
+      const today = now.toISOString().split('T')[0];
+      const { data: overdueTasks } = await supabaseAdmin
+        .from('todos')
+        .select('user_id, title')
+        .neq('status', 'done')
+        .lt('due_date', today)
+        .limit(20);
+
+      if (overdueTasks?.length) {
+        const byUser = overdueTasks.reduce((acc, t) => {
+          if (!acc[t.user_id]) acc[t.user_id] = [];
+          acc[t.user_id].push(t.title);
+          return acc;
+        }, {} as Record<string, string[]>);
+
+        for (const [uid, titles] of Object.entries(byUser)) {
+          await sendPushToUser(uid, {
+            title: `${titles.length} overdue task${titles.length > 1 ? 's' : ''}`,
+            body: titles.slice(0, 3).join(', '),
+            tag: 'task-overdue',
+            url: '/todos',
+          });
+        }
+      }
+    } catch { /* skip */ }
   }
 
   return Response.json({ executed, timestamp: now.toISOString() });
