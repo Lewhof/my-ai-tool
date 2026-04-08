@@ -150,6 +150,11 @@ export default function AgentPage() {
     } catch { /* non-critical */ }
   };
 
+  // Trigger the cron executor immediately (fire-and-forget)
+  const triggerExecutor = () => {
+    fetch('/api/cron/trigger', { method: 'POST' }).catch(() => {});
+  };
+
   const handleDirectCommand = async (rawMsg: string): Promise<boolean> => {
     const post = (url: string, body: Record<string, unknown>) =>
       fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -159,9 +164,10 @@ export default function AgentPage() {
       const title = rawMsg.slice(5).trim();
       setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
       await post('/api/tasks', { title, description: `Dev command: build immediately.\n\n${title}`, whiteboard_id: null });
-      const response = `\u{1F6E0}\u{FE0F} **Queued for dev: ${title}**\n\nA plan will be generated within 5 minutes. You'll see it here with Approve/Change/Cancel buttons.`;
+      const response = `\u{1F6E0}\u{FE0F} **Queued for dev: ${title}**\n\nGenerating plan now...`;
       setMessages(prev => [...prev, { role: 'assistant', content: response }]);
       saveToHistory(rawMsg, response);
+      triggerExecutor();
       toast('Dev task queued');
       return true;
     }
@@ -171,9 +177,10 @@ export default function AgentPage() {
       const title = rawMsg.slice(6).trim();
       setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
       await post('/api/tasks', { title, description: `Ship command: auto-approved, build and deploy.\n\n${title}`, status: 'approved' });
-      const response = `\u{1F680} **Shipping: ${title}**\n\nAuto-approved. Will be built and deployed within 5-10 minutes. No approval needed.`;
+      const response = `\u{1F680} **Shipping: ${title}**\n\nAuto-approved. Building now...`;
       setMessages(prev => [...prev, { role: 'assistant', content: response }]);
       saveToHistory(rawMsg, response);
+      triggerExecutor();
       toast('Shipping \u2014 auto-approved');
       return true;
     }
@@ -183,9 +190,10 @@ export default function AgentPage() {
       const title = rawMsg.slice(5).trim();
       setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
       await post('/api/tasks', { title: `[BUG] ${title}`, description: `Bug report: fix urgently.\n\n${title}`, priority: 'urgent' });
-      const response = `\u{1F41B} **Bug reported: ${title}**\n\nQueued as urgent. Plan coming within 5 minutes.`;
+      const response = `\u{1F41B} **Bug reported: ${title}**\n\nGenerating fix plan now...`;
       setMessages(prev => [...prev, { role: 'assistant', content: response }]);
       saveToHistory(rawMsg, response);
+      triggerExecutor();
       toast('Bug reported');
       return true;
     }
