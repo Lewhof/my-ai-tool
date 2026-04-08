@@ -51,7 +51,7 @@ export default function EntityLinks({ entityType, entityId, compact = false }: E
   const [searching, setSearching] = useState(false);
   const [linking, setLinking] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   const fetchLinks = useCallback(async () => {
     try {
