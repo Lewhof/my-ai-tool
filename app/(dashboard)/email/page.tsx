@@ -5,7 +5,9 @@ import { cn, formatRelativeDate } from '@/lib/utils';
 import {
   Mail, Inbox, Send, FileText, Archive, Sparkles, Loader2,
   Paperclip, AlertTriangle, Clock, Info, ExternalLink, ChevronDown,
+  PenLine, Copy, X as XIcon,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Email {
   id: string;
@@ -70,6 +72,8 @@ export default function EmailPage() {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [folder, setFolder] = useState('inbox');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draftReply, setDraftReply] = useState<{ subject: string; body: string; to: string; toName: string } | null>(null);
+  const [drafting, setDrafting] = useState(false);
   const [emailDetail, setEmailDetail] = useState<EmailDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [triaging, setTriaging] = useState(false);
@@ -419,7 +423,65 @@ export default function EmailPage() {
               {activeAccount && (
                 <p className="text-muted-foreground/40 text-[10px] mt-0.5">to: {activeAccount.alias || activeAccount.label} ({activeAccount.email})</p>
               )}
+              {/* Draft Reply button */}
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  onClick={async () => {
+                    setDrafting(true);
+                    setDraftReply(null);
+                    try {
+                      const res = await fetch('/api/email/draft', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ emailId: selectedId, accountId: isAllInbox ? undefined : activeAccountId }),
+                      });
+                      if (res.ok) {
+                        const data = await res.json();
+                        setDraftReply(data.draft);
+                      } else {
+                        toast.error('Could not generate draft');
+                      }
+                    } catch { toast.error('Draft failed'); }
+                    setDrafting(false);
+                  }}
+                  disabled={drafting}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors disabled:opacity-50"
+                >
+                  {drafting ? <Loader2 size={12} className="animate-spin" /> : <PenLine size={12} />}
+                  Draft Reply
+                </button>
+              </div>
             </div>
+
+            {/* Draft reply panel */}
+            {draftReply && (
+              <div className="px-6 py-4 border-b border-border bg-primary/5 shrink-0">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-primary text-xs font-medium">AI Draft Reply</p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(draftReply.body); toast.success('Copied to clipboard'); }}
+                      className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                      title="Copy draft"
+                    >
+                      <Copy size={12} />
+                    </button>
+                    <button
+                      onClick={() => setDraftReply(null)}
+                      className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <XIcon size={12} />
+                    </button>
+                  </div>
+                </div>
+                <p className="text-muted-foreground text-[10px] mb-1">To: {draftReply.toName} &lt;{draftReply.to}&gt;</p>
+                <p className="text-muted-foreground text-[10px] mb-2">Subject: {draftReply.subject}</p>
+                <div className="bg-card border border-border rounded-lg p-3">
+                  <pre className="text-foreground text-xs whitespace-pre-wrap font-sans">{draftReply.body}</pre>
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 overflow-auto p-6">
               {emailDetail.bodyType === 'html' ? (
                 <iframe
