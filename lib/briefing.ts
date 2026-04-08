@@ -177,7 +177,23 @@ ${context}`,
 }
 
 /**
- * Format briefing for Telegram (Markdown).
+ * Sanitize markdown for Telegram V1 Markdown.
+ * Telegram only supports: *bold*, _italic_, `code`, [link](url)
+ * Strips: # headings, ** double bold, ---, > blockquotes
+ */
+function sanitizeForTelegram(text: string): string {
+  return text
+    .replace(/^#{1,6}\s+/gm, '')       // Remove # headings
+    .replace(/\*\*/g, '*')              // ** → * (Telegram uses single *)
+    .replace(/^---+$/gm, '')            // Remove horizontal rules
+    .replace(/^>\s?/gm, '')             // Remove blockquotes
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // Remove links, keep text
+    .replace(/\n{3,}/g, '\n\n')         // Collapse multiple blank lines
+    .trim();
+}
+
+/**
+ * Format briefing for Telegram (Markdown V1).
  */
 export function formatBriefingForTelegram(result: BriefingResult): string {
   const { stats, data } = result;
@@ -200,10 +216,10 @@ export function formatBriefingForTelegram(result: BriefingResult): string {
   if (data.calendarEvents.length > 0) {
     for (const e of data.calendarEvents.slice(0, 6)) {
       const start = new Date(e.start).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg' });
-      msg += `  \u2022 ${start} \u2014 ${e.subject}\n`;
+      msg += `  \u2022 ${start} - ${e.subject}\n`;
     }
   } else {
-    msg += `  Clear day \u2014 no meetings\n`;
+    msg += `  Clear day - no meetings\n`;
   }
   msg += '\n';
 
@@ -216,15 +232,16 @@ export function formatBriefingForTelegram(result: BriefingResult): string {
     msg += `  \u{1F4CC} Today: ${data.dueTodayTasks.map(t => t.title).join(', ')}\n`;
   }
   if (stats.overdue === 0 && stats.dueToday === 0) {
-    msg += `  All clear \u2014 no urgent items\n`;
+    msg += `  All clear - no urgent items\n`;
   }
   msg += '\n';
 
   // Email
   msg += `\u{1F4E7} *Unread Emails:* ${stats.unreadEmails}\n\n`;
 
-  // AI Insight (the generated briefing)
-  msg += `\u{1F9E0} *AI Insight:*\n${result.briefing.replace(/^#+\s/gm, '*').replace(/\*\*/g, '*').slice(0, 800)}`;
+  // AI Insight (the generated briefing, sanitized for Telegram)
+  const sanitized = sanitizeForTelegram(result.briefing);
+  msg += `\u{1F9E0} *AI Insight:*\n${sanitized.slice(0, 800)}`;
 
   return msg;
 }
