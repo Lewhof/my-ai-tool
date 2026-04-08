@@ -138,6 +138,18 @@ export default function AgentPage() {
   };
 
   // Direct action commands — bypass Cerebro AI, go straight to APIs
+  // Save messages to Cerebro thread so they persist across refresh
+  const saveToHistory = async (userMsg: string, assistantMsg: string) => {
+    try {
+      // Use a lightweight endpoint to save both messages
+      await fetch('/api/agent/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userMessage: userMsg, assistantMessage: assistantMsg }),
+      });
+    } catch { /* non-critical */ }
+  };
+
   const handleDirectCommand = async (rawMsg: string): Promise<boolean> => {
     const post = (url: string, body: Record<string, unknown>) =>
       fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -147,7 +159,9 @@ export default function AgentPage() {
       const title = rawMsg.slice(5).trim();
       setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
       await post('/api/tasks', { title, description: `Dev command: build immediately.\n\n${title}`, whiteboard_id: null });
-      setMessages(prev => [...prev, { role: 'assistant', content: `\u{1F6E0}\u{FE0F} **Queued for dev: ${title}**\n\nA plan will be generated within 5 minutes. You'll see it here with Approve/Change/Cancel buttons.` }]);
+      const response = `\u{1F6E0}\u{FE0F} **Queued for dev: ${title}**\n\nA plan will be generated within 5 minutes. You'll see it here with Approve/Change/Cancel buttons.`;
+      setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+      saveToHistory(rawMsg, response);
       toast('Dev task queued');
       return true;
     }
@@ -157,7 +171,9 @@ export default function AgentPage() {
       const title = rawMsg.slice(6).trim();
       setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
       await post('/api/tasks', { title, description: `Ship command: auto-approved, build and deploy.\n\n${title}`, status: 'approved' });
-      setMessages(prev => [...prev, { role: 'assistant', content: `\u{1F680} **Shipping: ${title}**\n\nAuto-approved. Will be built and deployed within 5-10 minutes. No approval needed.` }]);
+      const response = `\u{1F680} **Shipping: ${title}**\n\nAuto-approved. Will be built and deployed within 5-10 minutes. No approval needed.`;
+      setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+      saveToHistory(rawMsg, response);
       toast('Shipping \u2014 auto-approved');
       return true;
     }
@@ -167,7 +183,9 @@ export default function AgentPage() {
       const title = rawMsg.slice(5).trim();
       setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
       await post('/api/tasks', { title: `[BUG] ${title}`, description: `Bug report: fix urgently.\n\n${title}`, priority: 'urgent' });
-      setMessages(prev => [...prev, { role: 'assistant', content: `\u{1F41B} **Bug reported: ${title}**\n\nQueued as urgent. Plan coming within 5 minutes.` }]);
+      const response = `\u{1F41B} **Bug reported: ${title}**\n\nQueued as urgent. Plan coming within 5 minutes.`;
+      setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+      saveToHistory(rawMsg, response);
       toast('Bug reported');
       return true;
     }
@@ -195,7 +213,9 @@ export default function AgentPage() {
       const title = rawMsg.slice(7).trim();
       setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
       await post('/api/whiteboard', { title, status: 'idea', priority: 99, tags: ['cerebro'] });
-      setMessages(prev => [...prev, { role: 'assistant', content: `\u{1F4CB} **Added to whiteboard: ${title}**\n\nStatus: Idea. You can scope and prioritize it later.` }]);
+      const response = `\u{1F4CB} **Added to whiteboard: ${title}**\n\nStatus: Idea. You can scope and prioritize it later.`;
+      setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+      saveToHistory(rawMsg, response);
       toast('Added to whiteboard');
       return true;
     }
