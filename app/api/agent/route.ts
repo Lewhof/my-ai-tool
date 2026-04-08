@@ -50,12 +50,12 @@ export async function POST(req: Request) {
 
   // Check for task approval commands
   const lowerMsg = message.trim().toLowerCase();
-  if (lowerMsg === 'approve' || lowerMsg === 'go' || lowerMsg === 'yes, approve' || lowerMsg === 'approved') {
+  if (lowerMsg === 'approve' || lowerMsg === 'go' || lowerMsg === 'yes, approve' || lowerMsg === 'approved' || lowerMsg === 'yes') {
     const { data: pending } = await supabaseAdmin
       .from('task_queue')
       .select('id, title')
       .eq('user_id', userId)
-      .eq('status', 'pending_approval')
+      .in('status', ['pending_approval', 'queued'])
       .order('updated_at', { ascending: false })
       .limit(1);
 
@@ -76,7 +76,7 @@ export async function POST(req: Request) {
       .from('task_queue')
       .select('id, title')
       .eq('user_id', userId)
-      .eq('status', 'pending_approval')
+      .in('status', ['pending_approval', 'queued'])
       .order('updated_at', { ascending: false })
       .limit(1);
 
@@ -98,7 +98,7 @@ export async function POST(req: Request) {
       .from('task_queue')
       .select('id, title, description')
       .eq('user_id', userId)
-      .eq('status', 'pending_approval')
+      .in('status', ['pending_approval', 'queued'])
       .order('updated_at', { ascending: false })
       .limit(1);
 
