@@ -91,17 +91,25 @@ export async function GET() {
     try {
       const calRes = await fetch(
         `https://graph.microsoft.com/v1.0/me/calendarview?startDateTime=${startOfDay}&endDateTime=${endOfWeek}&$orderby=start/dateTime&$top=50&$select=subject,start,end,location,isAllDay,showAs`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Prefer: 'outlook.timezone="Africa/Johannesburg"',
+          },
+        }
       );
 
       if (calRes.ok) {
         const calData = await calRes.json();
         for (const e of calData.value ?? []) {
+          // Append +02:00 so frontend Date() parses as SAST, not UTC
+          const startDt = (e.start?.dateTime || '').replace(/\.0+$/, '');
+          const endDt = (e.end?.dateTime || '').replace(/\.0+$/, '');
           allEvents.push({
             id: e.id,
             subject: e.subject,
-            start: e.start?.dateTime,
-            end: e.end?.dateTime,
+            start: startDt.includes('+') || startDt.includes('Z') ? startDt : startDt + '+02:00',
+            end: endDt.includes('+') || endDt.includes('Z') ? endDt : endDt + '+02:00',
             location: e.location?.displayName || null,
             isAllDay: e.isAllDay,
             showAs: e.showAs,

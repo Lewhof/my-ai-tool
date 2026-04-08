@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { UserButton } from '@clerk/nextjs';
 import { usePathname } from 'next/navigation';
 import { Bell, Search } from 'lucide-react';
@@ -29,10 +30,20 @@ const pageTitles: Record<string, string> = {
 
 export default function MobileHeader() {
   const pathname = usePathname();
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
   const title =
     pageTitles[pathname] ??
     Object.entries(pageTitles).find(([k]) => k !== '/' && pathname.startsWith(k))?.[1] ??
     'Lewhof AI';
+
+  const timeStr = now?.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
 
   return (
     <header
@@ -48,6 +59,9 @@ export default function MobileHeader() {
             <span className="text-white text-xs font-bold font-mono">L</span>
           </div>
           <p className="text-[15px] font-semibold text-foreground">{title}</p>
+          {now && (
+            <span className="text-[11px] font-mono text-muted-foreground ml-1">{timeStr}</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
