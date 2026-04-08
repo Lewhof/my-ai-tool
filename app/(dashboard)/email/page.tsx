@@ -16,6 +16,9 @@ interface Email {
   preview: string;
   importance: string;
   hasAttachments: boolean;
+  accountId?: string;
+  accountLabel?: string;
+  accountColor?: string;
 }
 
 interface TriagedEmail {
@@ -74,9 +77,9 @@ export default function EmailPage() {
   const [triageSummary, setTriageSummary] = useState<string | null>(null);
   const [showTriage, setShowTriage] = useState(false);
 
-  // Multi-account support
+  // Multi-account support — 'all' means combined inbox
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
-  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
+  const [activeAccountId, setActiveAccountId] = useState<string>('all');
   const [showAccountPicker, setShowAccountPicker] = useState(false);
 
   // Fetch email accounts (Microsoft only — they have Mail.Read scope)
@@ -86,32 +89,55 @@ export default function EmailPage() {
       .then(data => {
         const msAccounts = (data.accounts ?? []).filter((a: EmailAccount) => a.provider !== 'google');
         setAccounts(msAccounts);
-        // Default to the is_default account
-        const def = msAccounts.find((a: EmailAccount) => a.is_default);
-        if (def && !activeAccountId) setActiveAccountId(def.id);
+        // Default to 'all' if multiple accounts, otherwise the single account
+        if (msAccounts.length === 1) setActiveAccountId(msAccounts[0].id);
       })
       .catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
+  const isAllInbox = activeAccountId === 'all';
   const activeAccount = accounts.find(a => a.id === activeAccountId);
-  const displayName = activeAccount?.alias || activeAccount?.label || 'Email';
+  const displayName = isAllInbox ? 'All Inboxes' : (activeAccount?.alias || activeAccount?.label || 'Email');
 
   const fetchEmails = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ folder });
-      if (activeAccountId) params.set('account_id', activeAccountId);
-      const res = await fetch(`/api/email?${params}`);
-      const data = await res.json();
-      setConnected(data.connected ?? false);
-      setEmails(data.emails ?? []);
+      if (isAllInbox && accounts.length > 1) {
+        // Fetch from all accounts in parallel
+        const results = await Promise.all(
+          accounts.map(async (acc) => {
+            const params = new URLSearchParams({ folder, account_id: acc.id });
+            const res = await fetch(`/api/email?${params}`);
+            if (!res.ok) return [];
+            const data = await res.json();
+            return (data.emails ?? []).map((e: Email) => ({
+              ...e,
+              accountId: acc.id,
+              accountLabel: acc.alias || acc.label,
+              accountColor: acc.color,
+            }));
+          })
+        );
+        const merged = results.flat().sort((a: Email, b: Email) =>
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+        setConnected(true);
+        setEmails(merged);
+      } else {
+        const params = new URLSearchParams({ folder });
+        if (!isAllInbox) params.set('account_id', activeAccountId);
+        const res = await fetch(`/api/email?${params}`);
+        const data = await res.json();
+        setConnected(data.connected ?? false);
+        setEmails(data.emails ?? []);
+      }
     } catch { setConnected(false); }
     finally { setLoading(false); }
-  }, [folder, activeAccountId]);
+  }, [folder, activeAccountId, isAllInbox, accounts]);
 
   useEffect(() => {
-    if (activeAccountId) fetchEmails();
-  }, [fetchEmails, activeAccountId]);
+    if (activeAccountId && accounts.length > 0) fetchEmails();
+  }, [fetchEmails, activeAccountId, accounts]);
 
   const unreadCount = emails.filter(e => !e.isRead).length;
 
@@ -171,20 +197,40 @@ export default function EmailPage() {
               onClick={() => setShowAccountPicker(!showAccountPicker)}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-secondary hover:bg-secondary/80 transition-colors"
             >
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: activeAccount?.color || '#6366f1' }} />
+              {isAllInbox ? (
+                <Mail size={12} className="text-primary shrink-0" />
+              ) : (
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: activeAccount?.color || '#6366f1' }} />
+              )}
               <span className="text-foreground font-medium truncate flex-1 text-left">{displayName}</span>
               <ChevronDown size={12} className={cn('text-muted-foreground transition-transform', showAccountPicker && 'rotate-180')} />
             </button>
 
             {showAccountPicker && (
               <div className="absolute top-full left-3 right-3 mt-1 bg-card border border-border rounded-lg shadow-lg z-10 py-1">
+                {/* All Inboxes option */}
+                {accounts.length > 1 && (
+                  <button
+                    onClick={() => switchAccount('all')}
+                    className={cn(
+                      'w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-secondary transition-colors',
+                      isAllInbox && 'bg-secondary'
+                    )}
+                  >
+                    <Mail size={12} className="text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-foreground text-xs font-medium">All Inboxes</p>
+                      <p className="text-muted-foreground text-[10px]">{accounts.length} accounts combined</p>
+                    </div>
+                  </button>
+                )}
                 {accounts.map((acc) => (
                   <button
                     key={acc.id}
                     onClick={() => switchAccount(acc.id)}
                     className={cn(
                       'w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-secondary transition-colors',
-                      acc.id === activeAccountId && 'bg-secondary'
+                      acc.id === activeAccountId && !isAllInbox && 'bg-secondary'
                     )}
                   >
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: acc.color }} />
@@ -251,10 +297,11 @@ export default function EmailPage() {
           {accounts.length > 1 && (
             <div className="px-2 py-1.5 border-b border-border">
               <select
-                value={activeAccountId || ''}
+                value={activeAccountId}
                 onChange={(e) => switchAccount(e.target.value)}
                 className="w-full bg-secondary text-foreground text-xs rounded-lg px-2 py-1.5 border border-border"
               >
+                {accounts.length > 1 && <option value="all">All Inboxes</option>}
                 {accounts.map(acc => (
                   <option key={acc.id} value={acc.id}>{acc.alias || acc.label} ({acc.email})</option>
                 ))}
@@ -340,7 +387,14 @@ export default function EmailPage() {
                   <p className={cn('text-sm truncate flex-1', email.isRead ? 'text-foreground' : 'text-foreground font-medium')}>{email.subject}</p>
                   {email.hasAttachments && <Paperclip size={12} className="text-muted-foreground shrink-0 ml-2" />}
                 </div>
-                <p className="text-muted-foreground text-xs truncate">{email.from.name || email.from.email}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-muted-foreground text-xs truncate">{email.from.name || email.from.email}</p>
+                  {isAllInbox && email.accountLabel && (
+                    <span className="text-[9px] px-1 py-0.5 rounded shrink-0" style={{ backgroundColor: `${email.accountColor}20`, color: email.accountColor }}>
+                      {email.accountLabel}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center justify-between mt-0.5">
                   <p className="text-muted-foreground/60 text-xs truncate flex-1">{email.preview?.slice(0, 60)}</p>
                   <span className="text-muted-foreground/60 text-xs shrink-0 ml-2">{formatRelativeDate(email.date)}</span>
