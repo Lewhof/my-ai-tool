@@ -152,16 +152,11 @@ export default function AgentPage() {
       return true;
     }
 
-    // /ship — auto-approved, no approval needed
+    // /ship — auto-approved, no approval needed. Uses status 'approved' directly.
     if (rawMsg.startsWith('/ship ')) {
       const title = rawMsg.slice(6).trim();
       setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
-      const res = await post('/api/tasks', { title, description: `Ship command: auto-approved, build and deploy.\n\n${title}`, status: 'queued' });
-      const task = await res.json();
-      // Immediately approve it
-      if (task.id) {
-        await fetch(`/api/tasks/pending`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-api-key': '' }, body: JSON.stringify({ id: task.id, status: 'approved' }) });
-      }
+      await post('/api/tasks', { title, description: `Ship command: auto-approved, build and deploy.\n\n${title}`, status: 'approved' });
       setMessages(prev => [...prev, { role: 'assistant', content: `\u{1F680} **Shipping: ${title}**\n\nAuto-approved. Will be built and deployed within 5-10 minutes. No approval needed.` }]);
       toast('Shipping \u2014 auto-approved');
       return true;
@@ -408,32 +403,44 @@ export default function AgentPage() {
                         </div>
                       )}
                       {/* Plan approval buttons — show on plan messages and pending pipeline */}
-                      {(msg.content.includes('Reply **"approve"**') || msg.content.includes('SHOW_APPROVAL_BUTTONS')) && (
-                        <div className="flex gap-2 mt-3 pt-3 border-t border-white/10">
-                          <button
-                            onClick={() => sendMessage('approve')}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-medium text-white btn-brand"
-                            style={{ background: 'oklch(0.55 0.18 160)' }}
-                          >
-                            &#x2705; Approve
-                          </button>
-                          <button
-                            onClick={() => {
-                              const feedback = prompt('What should change?');
-                              if (feedback) sendMessage(`change: ${feedback}`);
-                            }}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-medium text-muted-foreground border border-border hover:text-foreground hover:bg-surface-2 transition-colors"
-                          >
-                            &#x270F;&#xFE0F; Change
-                          </button>
-                          <button
-                            onClick={() => sendMessage('cancel')}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-medium text-muted-foreground border border-border hover:text-destructive transition-colors"
-                          >
-                            &#x274C; Cancel
-                          </button>
-                        </div>
-                      )}
+                      {/* Approval buttons — only on the LAST plan message, and only if no approval response follows */}
+                      {(msg.content.includes('Reply **"approve"**') || msg.content.includes('SHOW_APPROVAL_BUTTONS')) && (() => {
+                        // Check if this plan was already acted on (approved/cancelled message follows)
+                        const laterMessages = messages.slice(i + 1);
+                        const alreadyActed = laterMessages.some(m =>
+                          m.content.includes('**Approved:') ||
+                          m.content.includes('**Cancelled:') ||
+                          m.content.includes('**Completed:') ||
+                          m.content.includes('**Updated:')
+                        );
+                        if (alreadyActed) return null;
+                        return (
+                          <div className="flex gap-2 mt-3 pt-3 border-t border-white/10">
+                            <button
+                              onClick={() => sendMessage('approve')}
+                              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-medium text-white btn-brand"
+                              style={{ background: 'oklch(0.55 0.18 160)' }}
+                            >
+                              &#x2705; Approve
+                            </button>
+                            <button
+                              onClick={() => {
+                                const feedback = prompt('What should change?');
+                                if (feedback) sendMessage(`change: ${feedback}`);
+                              }}
+                              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-medium text-muted-foreground border border-border hover:text-foreground hover:bg-surface-2 transition-colors"
+                            >
+                              &#x270F;&#xFE0F; Change
+                            </button>
+                            <button
+                              onClick={() => sendMessage('cancel')}
+                              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-medium text-muted-foreground border border-border hover:text-destructive transition-colors"
+                            >
+                              &#x274C; Cancel
+                            </button>
+                          </div>
+                        );
+                      })()}
                       {/* Forward actions */}
                       {msg.content.length > 10 && (
                         <div className="flex gap-1 mt-2 pt-2 border-t border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">

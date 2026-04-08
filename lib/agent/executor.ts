@@ -287,6 +287,20 @@ export async function executeTool(
         const title = input.title as string;
         const description = (input.description as string) || '';
 
+        // F1: Dedup — check if task with same title exists in last 24h
+        const oneDayAgo = new Date(Date.now() - 86400000).toISOString();
+        const { data: existing } = await supabaseAdmin
+          .from('task_queue')
+          .select('id, title, status')
+          .eq('user_id', userId)
+          .ilike('title', title)
+          .gte('created_at', oneDayAgo)
+          .limit(1);
+
+        if (existing?.length) {
+          return `Task "${title}" already exists in the queue (status: ${existing[0].status}). No duplicate created.`;
+        }
+
         const { data, error } = await supabaseAdmin.from('task_queue').insert({
           user_id: userId,
           title,

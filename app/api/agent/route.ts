@@ -39,7 +39,13 @@ Guidelines:
 - If a tool fails, explain what happened and suggest alternatives
 - You are the user's CTO and personal assistant — think strategically
 - When the user discusses something worth remembering, proactively save it to notes or KB
-- Reference past conversations naturally — you have memory, use it`;
+- Reference past conversations naturally — you have memory, use it
+
+CRITICAL — TASK DEDUPLICATION:
+- NEVER call push_to_claude_code if a task with the same or similar title already exists
+- When the user says "approve", "cancel", "go", "yes" — these are task approval commands, NOT requests to create new tasks
+- Do NOT interpret approval/status words as new task requests
+- If unsure whether a task already exists, check the whiteboard or task queue first`;
 
 export async function POST(req: Request) {
   const { userId } = await auth();
