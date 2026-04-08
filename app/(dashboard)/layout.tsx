@@ -7,6 +7,7 @@ import MobileHeader from '@/components/mobile-header';
 import GlobalSearch from '@/components/global-search';
 import MobileFAB from '@/components/mobile-fab';
 import PushPrompt from '@/components/push-prompt';
+import OfflineBanner from '@/components/offline-banner';
 
 export default function DashboardLayout({
   children,
@@ -34,6 +35,9 @@ export default function DashboardLayout({
 
       {/* Mobile FAB (quick-add) */}
       <MobileFAB />
+
+      {/* Offline banner */}
+      <OfflineBanner />
 
       {/* Push notification prompt */}
       <PushPrompt />
