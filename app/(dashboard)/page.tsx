@@ -6,7 +6,7 @@ import {
   Bot, MessageSquare, FileText, Zap, CheckSquare,
   ChevronRight, TrendingUp, Cpu, Database,
   ArrowUpRight, Plus, Mic, MicOff,
-  StickyNote, Save, Pin, Calendar,
+  StickyNote, Save, Pin, Calendar, BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRelativeDate, truncate } from '@/lib/utils';
@@ -100,6 +100,22 @@ function NotePad() {
           )}>
             {saved ? '\u25CF Saved' : '\u25CF Unsaved'}
           </span>
+          <button
+            onClick={async () => {
+              if (!content.trim()) { toast('Nothing to save'); return; }
+              const title = content.split('\n')[0].slice(0, 50) || 'Dashboard Note';
+              await fetch('/api/notes-v2', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, content }),
+              });
+              toast('Saved as note');
+            }}
+            className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+            title="Save as a permanent note"
+          >
+            <BookOpen size={12} /> Note
+          </button>
           <button
             onClick={() => {
               if (saveTimer.current) clearTimeout(saveTimer.current);
