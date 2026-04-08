@@ -48,6 +48,77 @@ export async function POST(req: Request) {
   const { message, history } = await req.json();
   if (!message?.trim()) return Response.json({ error: 'Message required' }, { status: 400 });
 
+  // Check for task approval commands
+  const lowerMsg = message.trim().toLowerCase();
+  if (lowerMsg === 'approve' || lowerMsg === 'go' || lowerMsg === 'yes, approve' || lowerMsg === 'approved') {
+    const { data: pending } = await supabaseAdmin
+      .from('task_queue')
+      .select('id, title')
+      .eq('user_id', userId)
+      .eq('status', 'pending_approval')
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    if (pending?.length) {
+      await supabaseAdmin
+        .from('task_queue')
+        .update({ status: 'approved', updated_at: new Date().toISOString() })
+        .eq('id', pending[0].id);
+
+      return Response.json({
+        response: `\u{2705} **Approved: ${pending[0].title}**\n\nThe task will be executed automatically within 5 minutes. I'll notify you when it's done.`,
+      });
+    }
+  }
+
+  if (lowerMsg === 'cancel' || lowerMsg === 'reject' || lowerMsg === 'no') {
+    const { data: pending } = await supabaseAdmin
+      .from('task_queue')
+      .select('id, title')
+      .eq('user_id', userId)
+      .eq('status', 'pending_approval')
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    if (pending?.length) {
+      await supabaseAdmin
+        .from('task_queue')
+        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .eq('id', pending[0].id);
+
+      return Response.json({
+        response: `\u{274C} **Cancelled: ${pending[0].title}**\n\nTask discarded. Let me know if you want to try a different approach.`,
+      });
+    }
+  }
+
+  if (lowerMsg.startsWith('change:') || lowerMsg.startsWith('modify:') || lowerMsg.startsWith('adjust:')) {
+    const feedback = message.slice(message.indexOf(':') + 1).trim();
+    const { data: pending } = await supabaseAdmin
+      .from('task_queue')
+      .select('id, title, description')
+      .eq('user_id', userId)
+      .eq('status', 'pending_approval')
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    if (pending?.length) {
+      // Re-queue with updated description including feedback
+      await supabaseAdmin
+        .from('task_queue')
+        .update({
+          status: 'queued',
+          description: `${pending[0].description || ''}\n\n--- User feedback ---\n${feedback}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', pending[0].id);
+
+      return Response.json({
+        response: `\u{270F}\u{FE0F} **Updated: ${pending[0].title}**\n\nI'll regenerate the plan with your feedback:\n> ${feedback}\n\nNew plan coming in a few minutes.`,
+      });
+    }
+  }
+
   // Inject notepad context if available
   let notepadContext = '';
   try {
