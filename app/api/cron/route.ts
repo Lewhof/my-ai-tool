@@ -2,6 +2,8 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS } from '@/lib/anthropic';
 import { executeTool } from '@/lib/agent/executor';
 import { sendPushToUser } from '@/lib/push';
+import { gatherBriefingData, generateBriefing, formatBriefingForTelegram } from '@/lib/briefing';
+import { sendTelegramMessage, getTelegramChatId } from '@/lib/telegram';
 
 // Helper: post a message to a user's Cerebro thread
 async function postToCerebro(userId: string, content: string) {
@@ -313,43 +315,40 @@ Return ONLY valid JSON array.`,
     }
   } catch { results.executor = 'error'; }
 
-  // ── 4. Daily Briefing (6 AM SAST = 4 AM UTC, run at minute 0-4) ──
-  if (now.getUTCHours() === 4 && now.getMinutes() < 5) {
+  // ── 4. Daily Briefing (6:30 AM SAST = 4:30 AM UTC, run at minute 25-34) ──
+  if (now.getUTCHours() === 4 && now.getMinutes() >= 25 && now.getMinutes() < 35) {
     try {
       const { data: users } = await supabaseAdmin.from('todos').select('user_id').limit(50);
       const uniqueIds = [...new Set((users ?? []).map(u => u.user_id))];
       const today = now.toISOString().split('T')[0];
 
       for (const userId of uniqueIds) {
+        // Skip if already generated today
         const { data: existing } = await supabaseAdmin.from('briefings').select('id').eq('user_id', userId).eq('date', today).limit(1);
         if (existing?.length) continue;
 
-        const [todosRes, notepadRes] = await Promise.all([
-          supabaseAdmin.from('todos').select('title, priority, due_date').eq('user_id', userId).neq('status', 'done').limit(10),
-          supabaseAdmin.from('notes').select('content').eq('user_id', userId).limit(1).single(),
-        ]);
+        // Generate briefing via shared function (weather, calendar, tasks, email, whiteboard)
+        const data = await gatherBriefingData(userId);
+        const result = await generateBriefing(userId, data);
 
-        let weather = '';
-        try {
-          const wRes = await fetch('https://api.open-meteo.com/v1/forecast?latitude=-26.2041&longitude=28.0473&current=temperature_2m,weather_code');
-          if (wRes.ok) weather = `${(await wRes.json()).current.temperature_2m}\u00B0C`;
-        } catch {}
-
-        const briefingRes = await anthropic.messages.create({
-          model: MODELS.fast,
-          max_tokens: 400,
-          messages: [{ role: 'user', content: `Morning briefing (max 150 words, markdown). Tasks: ${(todosRes.data ?? []).slice(0, 5).map(t => t.title).join(', ')}. Weather: ${weather}. Context: ${notepadRes.data?.content?.slice(0, 300) || 'None'}` }],
-        });
-
-        const briefing = briefingRes.content[0].type === 'text' ? briefingRes.content[0].text : '';
-        await supabaseAdmin.from('briefings').upsert({ user_id: userId, date: today, content: briefing, created_at: now.toISOString() });
-
+        // 1. Push notification
+        const firstLine = result.briefing.replace(/[#*`\n]/g, ' ').trim().split('.')[0];
         await sendPushToUser(userId, {
-          title: 'Morning Briefing',
-          body: briefing.replace(/[#*`\n]/g, ' ').trim().split('.')[0].slice(0, 120),
+          title: '\u2615 Morning Briefing',
+          body: firstLine.slice(0, 120),
           tag: 'briefing',
           url: '/',
         });
+
+        // 2. Telegram delivery
+        const chatId = getTelegramChatId();
+        if (chatId) {
+          const telegramMsg = formatBriefingForTelegram(result);
+          await sendTelegramMessage(chatId, telegramMsg);
+        }
+
+        // 3. Post to Cerebro thread for history
+        await postToCerebro(userId, `\u{1F4CB} **Morning Briefing \u2014 ${today}**\n\n${result.briefing}`);
       }
       results.briefing = 'sent';
     } catch { results.briefing = 'error'; }

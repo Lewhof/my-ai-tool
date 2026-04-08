@@ -1,23 +1,17 @@
 import { after } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { sendTelegramMessage } from '@/lib/telegram';
 
 const anthropic = new Anthropic();
 
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN!;
 const GITHUB_OWNER = process.env.GITHUB_OWNER!;
 const GITHUB_REPO = process.env.GITHUB_REPO!;
 
+const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
+
 const SYSTEM_PROMPT =
   'You are an expert Next.js developer. When asked to make changes, respond with the COMPLETE updated file content wrapped in XML tags: <file path="app/page.tsx">complete file content here</file>. Only include files that need to be changed. Do not include bash commands or EOF markers.';
-
-async function sendTelegramMessage(chatId: number, text: string) {
-  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' }),
-  });
-}
 
 async function getGitHubFile(path: string): Promise<{ content: string; sha: string } | null> {
   const res = await fetch(
