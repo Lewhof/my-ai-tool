@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { cn, formatRelativeDate } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { List, LayoutGrid, ChevronLeft, Trash2, GitFork, Loader2 } from 'lucide-react';
+import EntityLinks from '@/components/entity-links';
 
 interface KBEntry {
   id: string;
@@ -183,6 +184,7 @@ export default function KnowledgeBasePage() {
                       <div className="prose prose-invert prose-sm max-w-none">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.content}</ReactMarkdown>
                       </div>
+                      <EntityLinks entityType="kb" entityId={entry.id} />
                     </div>
                   )}
                 </div>
@@ -257,6 +259,7 @@ export default function KnowledgeBasePage() {
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{selected.content}</ReactMarkdown>
                 </div>
               )}
+              <EntityLinks entityType="kb" entityId={selected.id} />
             </div>
           </>
         ) : (
