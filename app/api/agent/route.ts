@@ -48,14 +48,54 @@ export async function POST(req: Request) {
   const { message, history } = await req.json();
   if (!message?.trim()) return Response.json({ error: 'Message required' }, { status: 400 });
 
-  // Check for task approval commands
+  // ── Task lifecycle commands ──
+  // Status flow: queued → pending_approval → approved → in-progress → completed/failed
+  // Only pending_approval tasks can be approved/cancelled/changed
   const lowerMsg = message.trim().toLowerCase();
+
+  // Show pending items
+  if (lowerMsg === 'show pending' || lowerMsg === 'pending' || lowerMsg === 'show tasks' || lowerMsg === 'dev status') {
+    const { data: tasks } = await supabaseAdmin
+      .from('task_queue')
+      .select('id, title, status, updated_at')
+      .eq('user_id', userId)
+      .in('status', ['queued', 'pending_approval', 'approved', 'in-progress'])
+      .order('updated_at', { ascending: false })
+      .limit(10);
+
+    if (!tasks?.length) {
+      return Response.json({ response: 'No pending dev tasks. Use `/dev`, `/ship`, or `/bug` to queue one.' });
+    }
+
+    const statusEmoji: Record<string, string> = {
+      'queued': '\u{23F3}',
+      'pending_approval': '\u{1F4CB}',
+      'approved': '\u{2705}',
+      'in-progress': '\u{1F527}',
+    };
+    const statusLabel: Record<string, string> = {
+      'queued': 'Queued (plan generating...)',
+      'pending_approval': 'Awaiting your approval',
+      'approved': 'Approved (executing...)',
+      'in-progress': 'Building...',
+    };
+
+    const list = tasks.map(t =>
+      `${statusEmoji[t.status] || '\u{2022}'} **${t.title}**\n   Status: ${statusLabel[t.status] || t.status}`
+    ).join('\n\n');
+
+    return Response.json({
+      response: `**Dev Pipeline:**\n\n${list}\n\n---\nCommands: **approve** | **cancel** | **change: [feedback]**`,
+    });
+  }
+
+  // Approve — ONLY matches pending_approval (has a plan ready)
   if (lowerMsg === 'approve' || lowerMsg === 'go' || lowerMsg === 'yes, approve' || lowerMsg === 'approved' || lowerMsg === 'yes') {
     const { data: pending } = await supabaseAdmin
       .from('task_queue')
       .select('id, title')
       .eq('user_id', userId)
-      .in('status', ['pending_approval', 'queued'])
+      .eq('status', 'pending_approval')
       .order('updated_at', { ascending: false })
       .limit(1);
 
@@ -69,9 +109,30 @@ export async function POST(req: Request) {
         response: `\u{2705} **Approved: ${pending[0].title}**\n\nThe task will be executed automatically within 5 minutes. I'll notify you when it's done.`,
       });
     }
+
+    // Check if there's a queued task (plan not ready yet)
+    const { data: queued } = await supabaseAdmin
+      .from('task_queue')
+      .select('id, title')
+      .eq('user_id', userId)
+      .eq('status', 'queued')
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    if (queued?.length) {
+      return Response.json({
+        response: `\u{23F3} **${queued[0].title}** is still being planned. The plan will appear here shortly \u2014 you can approve once it's ready.`,
+      });
+    }
+
+    // Nothing to approve — don't let it fall through to AI
+    return Response.json({
+      response: 'No tasks pending approval. Use `/dev` to queue a new task, or `show pending` to see the pipeline.',
+    });
   }
 
-  if (lowerMsg === 'cancel' || lowerMsg === 'reject' || lowerMsg === 'no') {
+  // Cancel
+  if (lowerMsg === 'cancel' || lowerMsg === 'reject') {
     const { data: pending } = await supabaseAdmin
       .from('task_queue')
       .select('id, title')
@@ -90,8 +151,11 @@ export async function POST(req: Request) {
         response: `\u{274C} **Cancelled: ${pending[0].title}**\n\nTask discarded. Let me know if you want to try a different approach.`,
       });
     }
+
+    return Response.json({ response: 'No tasks to cancel.' });
   }
 
+  // Change
   if (lowerMsg.startsWith('change:') || lowerMsg.startsWith('modify:') || lowerMsg.startsWith('adjust:')) {
     const feedback = message.slice(message.indexOf(':') + 1).trim();
     const { data: pending } = await supabaseAdmin
@@ -103,7 +167,6 @@ export async function POST(req: Request) {
       .limit(1);
 
     if (pending?.length) {
-      // Re-queue with updated description including feedback
       await supabaseAdmin
         .from('task_queue')
         .update({

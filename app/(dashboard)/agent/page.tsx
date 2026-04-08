@@ -24,6 +24,7 @@ const SLASH_COMMANDS = [
   { cmd: '/board', desc: 'Add to whiteboard backlog', example: '/board AI email templates', highlight: true },
   { cmd: '/scope', desc: 'Deep research + SSA spec', example: '/scope Financial module', highlight: true },
   { cmd: '/plan', desc: 'Implementation plan only', example: '/plan Capacitor native app', highlight: true },
+  { cmd: '/pending', desc: 'Show dev pipeline status', example: '/pending', highlight: true },
   { cmd: '/task', desc: 'Create a task', example: '/task Review contracts' },
   { cmd: '/note', desc: 'Save a note', example: '/note Meeting recap' },
   { cmd: '/image', desc: 'Generate image', example: '/image A futuristic city' },
@@ -127,6 +128,7 @@ export default function AgentPage() {
     if (msg.startsWith('/search ')) return `Search the web for: ${msg.slice(8)}`;
     if (msg.startsWith('/whiteboard ')) return `Add to whiteboard: "${msg.slice(12)}"`;
     if (msg.startsWith('/kb ')) return `Search the knowledge base for: ${msg.slice(4)}`;
+    if (msg.startsWith('/pending')) return 'show pending';
     if (msg.startsWith('/calendar')) return 'Show me my calendar events for today and tomorrow';
     if (msg.startsWith('/weather')) return "What's the current weather?";
     if (msg.startsWith('/credits')) return 'Show me my AI usage and credits';
