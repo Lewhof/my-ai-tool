@@ -154,9 +154,10 @@ export async function GET(req: Request) {
     for (const task of queuedTasks ?? []) {
       try {
         // F4: Lock — atomically claim this task to prevent double-processing
+        // Lock by setting to in-progress temporarily (allowed by check constraint)
         const { data: locked, error: lockErr } = await supabaseAdmin
           .from('task_queue')
-          .update({ status: 'planning', updated_at: now.toISOString() })
+          .update({ status: 'in-progress', updated_at: now.toISOString() })
           .eq('id', task.id)
           .eq('status', 'queued')
           .select('id');
