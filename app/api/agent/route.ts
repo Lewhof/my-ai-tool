@@ -85,7 +85,7 @@ export async function POST(req: Request) {
     ).join('\n\n');
 
     return Response.json({
-      response: `**Dev Pipeline:**\n\n${list}\n\n\u{1F4CB} Awaiting your approval \u2014 use the buttons below.`,
+      response: `**Dev Pipeline:**\n\n${list}\n\n<!-- SHOW_APPROVAL_BUTTONS -->`,
     });
   }
 
