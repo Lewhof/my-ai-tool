@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { cn, formatRelativeDate } from '@/lib/utils';
 import {
   Mail, Inbox, Send, FileText, Archive, Sparkles, Loader2,
-  Paperclip, AlertTriangle, Clock, Info, ExternalLink,
+  Paperclip, AlertTriangle, Clock, Info, ExternalLink, ChevronDown,
 } from 'lucide-react';
 
 interface Email {
@@ -39,6 +39,16 @@ interface EmailDetail {
   hasAttachments: boolean;
 }
 
+interface EmailAccount {
+  id: string;
+  label: string;
+  alias: string;
+  email: string;
+  color: string;
+  provider: string;
+  is_default: boolean;
+}
+
 const FOLDERS = [
   { key: 'inbox', label: 'Inbox', icon: Inbox },
   { key: 'sent', label: 'Sent', icon: Send },
@@ -64,25 +74,52 @@ export default function EmailPage() {
   const [triageSummary, setTriageSummary] = useState<string | null>(null);
   const [showTriage, setShowTriage] = useState(false);
 
+  // Multi-account support
+  const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
+  const [showAccountPicker, setShowAccountPicker] = useState(false);
+
+  // Fetch email accounts (Microsoft only — they have Mail.Read scope)
+  useEffect(() => {
+    fetch('/api/calendar/accounts')
+      .then(r => r.json())
+      .then(data => {
+        const msAccounts = (data.accounts ?? []).filter((a: EmailAccount) => a.provider !== 'google');
+        setAccounts(msAccounts);
+        // Default to the is_default account
+        const def = msAccounts.find((a: EmailAccount) => a.is_default);
+        if (def && !activeAccountId) setActiveAccountId(def.id);
+      })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const activeAccount = accounts.find(a => a.id === activeAccountId);
+  const displayName = activeAccount?.alias || activeAccount?.label || 'Email';
+
   const fetchEmails = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/email?folder=${folder}`);
+      const params = new URLSearchParams({ folder });
+      if (activeAccountId) params.set('account_id', activeAccountId);
+      const res = await fetch(`/api/email?${params}`);
       const data = await res.json();
       setConnected(data.connected ?? false);
       setEmails(data.emails ?? []);
     } catch { setConnected(false); }
     finally { setLoading(false); }
-  }, [folder]);
+  }, [folder, activeAccountId]);
 
-  useEffect(() => { fetchEmails(); }, [fetchEmails]);
+  useEffect(() => {
+    if (activeAccountId) fetchEmails();
+  }, [fetchEmails, activeAccountId]);
 
-  // Auto-suggest triage when inbox has unread emails
   const unreadCount = emails.filter(e => !e.isRead).length;
 
   const loadEmail = async (id: string) => {
     setSelectedId(id);
     setEmailDetail(null);
+    const params = new URLSearchParams({ id });
+    if (activeAccountId) params.set('account_id', activeAccountId);
     const res = await fetch(`/api/email/${id}`);
     if (res.ok) setEmailDetail(await res.json());
   };
@@ -101,7 +138,16 @@ export default function EmailPage() {
     finally { setTriaging(false); }
   };
 
-  if (connected === false) {
+  const switchAccount = (accountId: string) => {
+    setActiveAccountId(accountId);
+    setSelectedId(null);
+    setEmailDetail(null);
+    setShowTriage(false);
+    setTriaged([]);
+    setShowAccountPicker(false);
+  };
+
+  if (connected === false && accounts.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 gap-4">
         <Mail size={48} className="text-muted-foreground/60" />
@@ -118,6 +164,49 @@ export default function EmailPage() {
     <div className="flex h-full min-h-0">
       {/* Folder sidebar */}
       <div className="w-48 border-r border-border flex flex-col shrink-0 hidden md:flex">
+        {/* Account switcher */}
+        {accounts.length > 0 && (
+          <div className="p-3 border-b border-border relative">
+            <button
+              onClick={() => setShowAccountPicker(!showAccountPicker)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-secondary hover:bg-secondary/80 transition-colors"
+            >
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: activeAccount?.color || '#6366f1' }} />
+              <span className="text-foreground font-medium truncate flex-1 text-left">{displayName}</span>
+              <ChevronDown size={12} className={cn('text-muted-foreground transition-transform', showAccountPicker && 'rotate-180')} />
+            </button>
+
+            {showAccountPicker && (
+              <div className="absolute top-full left-3 right-3 mt-1 bg-card border border-border rounded-lg shadow-lg z-10 py-1">
+                {accounts.map((acc) => (
+                  <button
+                    key={acc.id}
+                    onClick={() => switchAccount(acc.id)}
+                    className={cn(
+                      'w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-secondary transition-colors',
+                      acc.id === activeAccountId && 'bg-secondary'
+                    )}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: acc.color }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-foreground text-xs font-medium truncate">{acc.alias || acc.label}</p>
+                      <p className="text-muted-foreground text-[10px] truncate">{acc.email}</p>
+                    </div>
+                    {acc.is_default && <span className="text-[9px] text-primary">Default</span>}
+                  </button>
+                ))}
+                <a
+                  href="/settings/connections"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground border-t border-border mt-1 pt-2 transition-colors"
+                >
+                  <ExternalLink size={10} />
+                  Manage accounts
+                </a>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="p-3 space-y-1">
           {FOLDERS.map((f) => {
             const Icon = f.icon;
@@ -129,7 +218,6 @@ export default function EmailPage() {
                   'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors',
                   folder === f.key ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-card'
                 )}
-                title={f.key === 'inbox' && unreadCount > 0 ? `${unreadCount} unread` : undefined}
               >
                 <Icon size={16} />
                 {f.label}
@@ -141,7 +229,7 @@ export default function EmailPage() {
           })}
         </div>
 
-        <div className="p-3 border-t border-border">
+        <div className="p-3 border-t border-border mt-auto">
           <button
             onClick={runTriage}
             disabled={triaging}
@@ -158,17 +246,32 @@ export default function EmailPage() {
         'flex flex-col border-r border-border shrink-0',
         selectedId ? 'hidden md:flex md:w-80' : 'w-full md:w-80'
       )}>
-        {/* Mobile folder tabs */}
-        <div className="md:hidden flex border-b border-border px-2 py-1.5 gap-1 overflow-x-auto shrink-0">
-          {FOLDERS.map((f) => (
-            <button key={f.key} onClick={() => { setFolder(f.key); setShowTriage(false); }}
-              className={cn('text-xs px-3 py-1.5 rounded-lg shrink-0', folder === f.key ? 'bg-secondary text-foreground' : 'text-muted-foreground')}>
-              {f.label}
+        {/* Mobile: account + folder tabs */}
+        <div className="md:hidden border-b border-border shrink-0">
+          {accounts.length > 1 && (
+            <div className="px-2 py-1.5 border-b border-border">
+              <select
+                value={activeAccountId || ''}
+                onChange={(e) => switchAccount(e.target.value)}
+                className="w-full bg-secondary text-foreground text-xs rounded-lg px-2 py-1.5 border border-border"
+              >
+                {accounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>{acc.alias || acc.label} ({acc.email})</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="flex px-2 py-1.5 gap-1 overflow-x-auto">
+            {FOLDERS.map((f) => (
+              <button key={f.key} onClick={() => { setFolder(f.key); setShowTriage(false); }}
+                className={cn('text-xs px-3 py-1.5 rounded-lg shrink-0', folder === f.key ? 'bg-secondary text-foreground' : 'text-muted-foreground')}>
+                {f.label}
+              </button>
+            ))}
+            <button onClick={runTriage} disabled={triaging} className="text-xs px-3 py-1.5 rounded-lg text-primary shrink-0 flex items-center gap-1">
+              <Sparkles size={12} /> Triage
             </button>
-          ))}
-          <button onClick={runTriage} disabled={triaging} className="text-xs px-3 py-1.5 rounded-lg text-primary shrink-0 flex items-center gap-1">
-            <Sparkles size={12} /> Triage
-          </button>
+          </div>
         </div>
 
         {/* Triage results */}
@@ -199,7 +302,6 @@ export default function EmailPage() {
           {loading ? (
             <div className="flex items-center justify-center p-6"><Loader2 size={18} className="animate-spin text-muted-foreground" /></div>
           ) : showTriage && triaged.length > 0 ? (
-            // Triage view
             (['IMPORTANT', 'CAN_WAIT', 'FYI'] as const).map((cat) => {
               const catEmails = triaged.filter((e) => e.category === cat);
               if (catEmails.length === 0) return null;
@@ -254,12 +356,15 @@ export default function EmailPage() {
         {emailDetail ? (
           <>
             <div className="px-6 py-4 border-b border-border shrink-0">
-              <button onClick={() => { setSelectedId(null); setEmailDetail(null); }} className="md:hidden text-muted-foreground hover:text-foreground text-sm mb-2">← Back</button>
+              <button onClick={() => { setSelectedId(null); setEmailDetail(null); }} className="md:hidden text-muted-foreground hover:text-foreground text-sm mb-2">&larr; Back</button>
               <h2 className="text-foreground text-lg font-semibold">{emailDetail.subject}</h2>
               <div className="flex items-center gap-3 mt-1">
                 <p className="text-muted-foreground text-sm">{emailDetail.from.name} &lt;{emailDetail.from.email}&gt;</p>
                 <span className="text-muted-foreground/60 text-xs">{formatRelativeDate(emailDetail.date)}</span>
               </div>
+              {activeAccount && (
+                <p className="text-muted-foreground/40 text-[10px] mt-0.5">to: {activeAccount.alias || activeAccount.label} ({activeAccount.email})</p>
+              )}
             </div>
             <div className="flex-1 overflow-auto p-6">
               {emailDetail.bodyType === 'html' ? (

@@ -110,6 +110,7 @@ export async function GET() {
     const summary = {
       id: account.id,
       label: account.label,
+      alias: account.alias || '',
       email: account.email,
       color: account.color,
       provider: account.provider,
@@ -144,7 +145,7 @@ export async function GET() {
               isAllDay: !!e.start?.date && !e.start?.dateTime,
               showAs: e.transparency === 'transparent' ? 'free' : 'busy',
               accountId: account.id,
-              accountLabel: account.label,
+              accountLabel: account.alias || account.label,
               accountColor: account.color,
             });
           }
@@ -175,7 +176,7 @@ export async function GET() {
               isAllDay: e.isAllDay,
               showAs: e.showAs,
               accountId: account.id,
-              accountLabel: account.label,
+              accountLabel: account.alias || account.label,
               accountColor: account.color,
             });
           }

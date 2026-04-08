@@ -7,7 +7,7 @@ export async function GET() {
 
   const { data } = await supabaseAdmin
     .from('calendar_accounts')
-    .select('id, label, email, provider, color, is_default, created_at')
+    .select('id, label, alias, email, provider, color, is_default, created_at')
     .eq('user_id', userId)
     .order('is_default', { ascending: false });
 
@@ -34,11 +34,12 @@ export async function PATCH(req: Request) {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
-  const { id, label, color, is_default } = await req.json();
+  const { id, label, alias, color, is_default } = await req.json();
   if (!id) return Response.json({ error: 'Account ID required' }, { status: 400 });
 
   const updates: Record<string, unknown> = {};
-  if (label) updates.label = label;
+  if (label !== undefined) updates.label = label;
+  if (alias !== undefined) updates.alias = alias;
   if (color) updates.color = color;
   if (is_default !== undefined) {
     updates.is_default = is_default;
