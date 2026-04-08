@@ -469,7 +469,7 @@ ${context}`,
           // Extract sender
           const fromAddr = email.from?.emailAddress;
           if (fromAddr?.address && !fromAddr.address.includes('noreply') && !fromAddr.address.includes('no-reply')) {
-            await supabaseAdmin.from('contacts').upsert({
+            const { error: upsertErr } = await supabaseAdmin.from('contacts').upsert({
               user_id: userId,
               name: fromAddr.name || fromAddr.address.split('@')[0],
               email: fromAddr.address.toLowerCase(),
@@ -477,15 +477,8 @@ ${context}`,
               last_interaction: email.receivedDateTime || now.toISOString(),
               interaction_count: 1,
               updated_at: now.toISOString(),
-            }, { onConflict: 'user_id,email', ignoreDuplicates: false }).then(({ data: upserted }) => {
-              if (upserted) extracted++;
-            }).catch(() => {});
-
-            // Update last_interaction for existing contacts
-            await supabaseAdmin.from('contacts')
-              .update({ last_interaction: email.receivedDateTime || now.toISOString(), updated_at: now.toISOString() })
-              .eq('user_id', userId)
-              .eq('email', fromAddr.address.toLowerCase());
+            }, { onConflict: 'user_id,email' });
+            if (!upsertErr) extracted++;
           }
         }
       }
