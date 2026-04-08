@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { formatRelativeDate } from '@/lib/utils';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Sparkles, Loader2, Upload, Image as ImageIcon, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Diagram {
@@ -21,6 +22,9 @@ export default function DiagramsPage() {
   const [showGenerate, setShowGenerate] = useState(false);
   const [generatePrompt, setGeneratePrompt] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDiagrams = useCallback(async () => {
     const res = await fetch('/api/diagrams');
@@ -42,21 +46,62 @@ export default function DiagramsPage() {
     if (data.id) router.push(`/diagrams/${data.id}`);
   };
 
+  const handleImageSelect = (file: File) => {
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setImagePreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) handleImageSelect(file);
+        return;
+      }
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer?.files?.[0];
+    if (file && file.type.startsWith('image/')) handleImageSelect(file);
+  };
+
+  const clearImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const generateDiagram = async () => {
-    if (!generatePrompt.trim()) return;
+    if (!generatePrompt.trim() && !imageFile) return;
     setGenerating(true);
     try {
-      // Generate nodes/edges from AI
-      const genRes = await fetch('/api/diagrams/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: generatePrompt }),
-      });
+      let genRes: Response;
+
+      if (imageFile) {
+        // Send image + prompt via FormData
+        const formData = new FormData();
+        formData.append('image', imageFile);
+        formData.append('prompt', generatePrompt || 'Convert this image into a diagram');
+        genRes = await fetch('/api/diagrams/generate', { method: 'POST', body: formData });
+      } else {
+        genRes = await fetch('/api/diagrams/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: generatePrompt }),
+        });
+      }
+
       if (!genRes.ok) throw new Error('Generation failed');
       const { nodes, edges } = await genRes.json();
 
-      // Save as new diagram
-      const name = generatePrompt.slice(0, 50) + (generatePrompt.length > 50 ? '...' : '');
+      const name = (generatePrompt || 'Image diagram').slice(0, 50);
       const saveRes = await fetch('/api/diagrams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -111,25 +156,58 @@ export default function DiagramsPage() {
             <Sparkles size={14} style={{ color: 'var(--color-brand)' }} />
             <span className="text-[13px] font-semibold text-foreground">AI Diagram Generator</span>
           </div>
-          <textarea
-            value={generatePrompt}
-            onChange={(e) => setGeneratePrompt(e.target.value)}
-            placeholder="Describe your diagram — e.g. 'User auth flow with OAuth, signup, login, password reset'"
-            rows={3}
-            className="w-full rounded-xl px-4 py-3 text-[13px] text-foreground placeholder-muted-foreground outline-none border border-border focus:border-white/20 resize-none"
-            style={{ background: 'var(--color-surface-2)' }}
-          />
-          <div className="flex flex-wrap gap-2">
-            {['Org chart for a tech startup', 'CI/CD pipeline', 'E-commerce checkout flow', 'Database schema for SaaS'].map(ex => (
+          <div onPaste={handlePaste} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}>
+            <textarea
+              value={generatePrompt}
+              onChange={(e) => setGeneratePrompt(e.target.value)}
+              placeholder="Describe your diagram — or paste/upload an image of a whiteboard, sketch, or existing diagram"
+              rows={3}
+              className="w-full rounded-xl px-4 py-3 text-[13px] text-foreground placeholder-muted-foreground outline-none border border-border focus:border-white/20 resize-none"
+              style={{ background: 'var(--color-surface-2)' }}
+            />
+          </div>
+
+          {/* Image preview */}
+          {imagePreview && (
+            <div className="relative inline-block animate-fade-up">
+              <img src={imagePreview} alt="Upload" className="max-h-40 rounded-xl border border-border" />
+              <button
+                onClick={clearImage}
+                className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-destructive text-white flex items-center justify-center"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
+
+          {/* Image upload + examples row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageSelect(f); }}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-muted-foreground border border-border rounded-full hover:border-white/15 hover:text-foreground transition-colors"
+            >
+              <Upload size={11} /> Upload image
+            </button>
+            <span className="text-[10px] text-muted-foreground/40">or paste (Ctrl+V)</span>
+            <span className="text-[10px] text-muted-foreground/40 mx-1">|</span>
+            {['Org chart for a tech startup', 'CI/CD pipeline', 'E-commerce checkout flow'].map(ex => (
               <button key={ex} onClick={() => setGeneratePrompt(ex)}
                 className="px-2.5 py-1 text-[11px] text-muted-foreground border border-border rounded-full hover:border-white/15 hover:text-foreground transition-colors">
                 {ex}
               </button>
             ))}
           </div>
+
           <button
             onClick={generateDiagram}
-            disabled={!generatePrompt.trim() || generating}
+            disabled={(!generatePrompt.trim() && !imageFile) || generating}
             className="px-4 py-2 rounded-lg text-[13px] font-medium text-white btn-brand disabled:opacity-50 flex items-center gap-2"
             style={{ background: 'var(--color-brand)' }}
           >
