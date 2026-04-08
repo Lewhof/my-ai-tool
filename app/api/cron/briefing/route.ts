@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS } from '@/lib/anthropic';
+import { sendPushToUser } from '@/lib/push';
 
 // Cron: Generate and cache daily briefings for all users
 // Schedule: 0 5 * * * (5:00 AM UTC = 7:00 AM SAST)
@@ -74,6 +75,15 @@ User context: ${notepadRes.data?.content?.slice(0, 300) || 'Not set'}`;
         date: today,
         content: briefing,
         created_at: now.toISOString(),
+      });
+
+      // Send push notification
+      const firstLine = briefing.replace(/[#*`\n]/g, ' ').trim().split('.')[0];
+      await sendPushToUser(userId, {
+        title: 'Morning Briefing',
+        body: firstLine.slice(0, 120),
+        tag: 'briefing',
+        url: '/',
       });
 
       generated++;
