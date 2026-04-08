@@ -4,10 +4,12 @@ import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import {
   Send, Loader2, Bot, User, Sparkles, Mic, MicOff, Camera, X,
   Calendar, CheckSquare, ClipboardList, FileText,
   StickyNote, Cloud, CreditCard, BookOpen, Search,
+  ChevronDown, MoreHorizontal, Archive, Trash2,
 } from 'lucide-react';
 
 interface Message {
@@ -30,14 +32,12 @@ const SLASH_COMMANDS = [
 ];
 
 const SUGGESTED_PROMPTS = [
-  { icon: Calendar, text: "What's on my calendar today?", color: 'text-blue-400' },
-  { icon: CheckSquare, text: 'Show me my pending tasks', color: 'text-green-400' },
-  { icon: ClipboardList, text: 'What items are on my whiteboard?', color: 'text-primary' },
-  { icon: FileText, text: 'Search my documents for contracts', color: 'text-purple-400' },
-  { icon: Cloud, text: "What's the weather like?", color: 'text-cyan-400' },
-  { icon: CreditCard, text: 'How much have I spent on AI this month?', color: 'text-yellow-400' },
-  { icon: StickyNote, text: 'Create a note with my meeting recap', color: 'text-orange-400' },
-  { icon: Search, text: 'Search the web for latest Next.js features', color: 'text-pink-400' },
+  { icon: Calendar, text: "What's on my calendar today?", color: 'oklch(0.60 0.20 255)' },
+  { icon: CheckSquare, text: 'Show me my pending tasks', color: 'oklch(0.55 0.18 160)' },
+  { icon: FileText, text: 'Search my documents for contracts', color: 'oklch(0.65 0.16 290)' },
+  { icon: Cloud, text: "What's the weather like?", color: 'oklch(0.62 0.18 200)' },
+  { icon: CreditCard, text: 'How much have I spent on AI this month?', color: 'var(--color-brand)' },
+  { icon: Search, text: 'Search the web for latest Next.js features', color: 'oklch(0.60 0.18 55)' },
 ];
 
 export default function AgentPage() {
@@ -51,7 +51,6 @@ export default function AgentPage() {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load conversation history on mount
   useEffect(() => {
     fetch('/api/agent/history')
       .then((r) => r.json())
@@ -63,76 +62,49 @@ export default function AgentPage() {
           })));
         }
       })
-      .catch(() => { /* no history yet */ });
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
-  // Voice input
   const toggleVoice = () => {
-    if (listening) {
-      recognitionRef.current?.stop();
-      setListening(false);
-      return;
-    }
-
-    const SpeechRecognition = (window as unknown as Record<string, unknown>).SpeechRecognition || (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert('Voice input not supported in this browser.');
-      return;
-    }
-
-    const recognition = new (SpeechRecognition as new () => SpeechRecognition)();
+    if (listening) { recognitionRef.current?.stop(); setListening(false); return; }
+    const SR = (window as unknown as Record<string, unknown>).SpeechRecognition || (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+    if (!SR) { toast.error('Voice not supported. Try Chrome or Edge.'); return; }
+    const recognition = new (SR as new () => SpeechRecognition)();
     recognition.continuous = false;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
-
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = Array.from(event.results)
-        .map((r) => r[0].transcript)
-        .join('');
-      setInput(transcript);
+      setInput(Array.from(event.results).map((r) => r[0].transcript).join(''));
     };
-
-    recognition.onend = () => {
-      setListening(false);
-    };
-
+    recognition.onend = () => setListening(false);
     recognitionRef.current = recognition;
     recognition.start();
     setListening(true);
+    toast('Listening...', { description: 'Speak now — tap mic again to stop' });
   };
 
-  // Camera/image upload
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setLoading(true);
-    setMessages((prev) => [...prev, { role: 'user', content: '📷 [Photo uploaded for analysis]' }]);
-
+    setMessages((prev) => [...prev, { role: 'user', content: '\u{1F4F7} [Photo uploaded for analysis]' }]);
     try {
-      // Send image to Gemini Vision for analysis
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('prompt', input.trim() || 'Analyze this image in detail. Describe what you see.');
-
+      formData.append('prompt', input.trim() || 'Analyze this image in detail.');
       const res = await fetch('/api/agent/vision', { method: 'POST', body: formData });
       const data = await res.json();
-
       setMessages((prev) => [...prev, { role: 'assistant', content: data.analysis || data.error || 'Could not analyze image.' }]);
     } catch {
-      setMessages((prev) => [...prev, { role: 'assistant', content: 'Error analyzing image. Please try again.' }]);
-    } finally {
-      setLoading(false);
-      setInput('');
-    }
+      setMessages((prev) => [...prev, { role: 'assistant', content: 'Error analyzing image.' }]);
+    } finally { setLoading(false); setInput(''); }
     e.target.value = '';
   };
 
-  // Slash command handler
   const processSlashCommand = (msg: string): string => {
     if (msg.startsWith('/task ')) return `Create a task: "${msg.slice(6)}"`;
     if (msg.startsWith('/note ')) return `Save a note titled "${msg.slice(6)}" with relevant content`;
@@ -151,250 +123,230 @@ export default function AgentPage() {
   const sendMessage = async (text?: string) => {
     const rawMsg = text || input.trim();
     if (!rawMsg || loading) return;
-
     const msg = processSlashCommand(rawMsg);
-
-    // Build message with quote if replying
-    const fullMsg = replyTo
-      ? `> Replying to: "${replyTo.content.slice(0, 150)}${replyTo.content.length > 150 ? '...' : ''}"\n\n${msg}`
-      : msg;
-
+    const fullMsg = replyTo ? `> Replying to: "${replyTo.content.slice(0, 150)}"\n\n${msg}` : msg;
     setInput('');
     setReplyTo(null);
     setMessages((prev) => [...prev, { role: 'user', content: fullMsg }]);
     setLoading(true);
-
     try {
       const res = await fetch('/api/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: fullMsg,
-          history: messages.slice(-20),
-        }),
+        body: JSON.stringify({ message: fullMsg, history: messages.slice(-20) }),
       });
-
       if (!res.ok) {
         const err = await res.text().catch(() => 'Agent error');
         setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${err}` }]);
         return;
       }
-
       const data = await res.json();
       setMessages((prev) => [...prev, { role: 'assistant', content: data.response || 'No response.' }]);
     } catch (err) {
       setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${err instanceof Error ? err.message : 'Network error'}` }]);
-    } finally {
-      setLoading(false);
-      inputRef.current?.focus();
-    }
+    } finally { setLoading(false); inputRef.current?.focus(); }
   };
+
+  const archiveAndClear = async () => {
+    const content = messages.map((m) => `**${m.role === 'user' ? 'You' : 'Cerebro'}:**\n${m.content}`).join('\n\n---\n\n');
+    await fetch('/api/kb', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: `Cerebro Archive \u2014 ${new Date().toLocaleDateString('en-ZA')}`, content, category: 'Reference', tags: ['cerebro', 'archive'] }),
+    });
+    await fetch('/api/agent/history', { method: 'DELETE' });
+    setMessages([]);
+    toast('Conversation archived to Knowledge Base');
+  };
+
+  const hasMessages = messages.length > 0;
 
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
-      <div className="px-6 py-3 border-b border-border flex items-center gap-3 shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-          <Bot size={18} className="text-foreground" />
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0" style={{ background: 'var(--color-surface-1)' }}>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center cerebro-pulse" style={{ background: 'var(--color-brand)' }}>
+          <Bot size={18} className="text-white" />
         </div>
-        <div>
-          <h2 className="text-foreground font-semibold text-sm">Cerebro</h2>
-          <p className="text-muted-foreground text-xs">Claude Sonnet with access to all your tools</p>
+        <div className="flex-1 min-w-0">
+          <p className="text-[14px] font-semibold text-foreground">Cerebro</p>
+          <p className="text-[11px] text-muted-foreground">Claude Sonnet &middot; access to all your tools</p>
         </div>
-        {messages.length > 0 && (
-          <div className="ml-auto flex gap-2">
-            <button
-              onClick={async () => {
-                const content = messages.map((m) => `**${m.role === 'user' ? 'You' : 'Cerebro'}:**\n${m.content}`).join('\n\n---\n\n');
-                const title = `Cerebro Archive — ${new Date().toLocaleDateString('en-ZA')}`;
-                await fetch('/api/kb', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ title, content, category: 'Reference', tags: ['cerebro', 'archive'] }),
-                });
-                await fetch('/api/agent/history', { method: 'DELETE' });
-                setMessages([]);
-                alert('Conversation archived to Knowledge Base');
-              }}
-              className="text-muted-foreground hover:text-primary text-xs px-3 py-1.5 border border-border rounded-lg transition-colors"
-            >
-              Archive & Clear
+        {hasMessages && (
+          <div className="flex items-center gap-1">
+            <button onClick={archiveAndClear}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] text-muted-foreground hover:text-foreground border border-border hover:bg-surface-2 transition-colors">
+              <Archive size={12} /> Archive
             </button>
-            <button
-              onClick={async () => {
-                if (!confirm('Clear conversation history? This cannot be undone.')) return;
-                await fetch('/api/agent/history', { method: 'DELETE' });
-                setMessages([]);
-              }}
-              className="text-muted-foreground hover:text-red-400 text-xs px-3 py-1.5 border border-border rounded-lg transition-colors"
-            >
-              Clear
+            <button onClick={async () => {
+              if (!confirm('Clear conversation?')) return;
+              await fetch('/api/agent/history', { method: 'DELETE' });
+              setMessages([]);
+              toast('Conversation cleared');
+            }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-surface-2 transition-colors">
+              <Trash2 size={14} />
             </button>
           </div>
         )}
       </div>
 
       {/* Messages */}
-      <div
-        className="flex-1 overflow-auto px-6 py-4 space-y-4"
-        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+      <div className="flex-1 overflow-y-auto"
+        onDragOver={(e) => { e.preventDefault(); }}
         onDrop={async (e) => {
           e.preventDefault();
           const file = e.dataTransfer.files?.[0];
           if (!file) return;
           if (file.type.startsWith('image/')) {
-            // Send to vision analysis
-            const fakeEvent = { target: { files: [file], value: '' } } as unknown as React.ChangeEvent<HTMLInputElement>;
-            handleImageUpload(fakeEvent);
-          } else {
-            // Upload doc and ask to analyze
-            setLoading(true);
-            setMessages((prev) => [...prev, { role: 'user', content: `📎 [File uploaded: ${file.name}]` }]);
-            const formData = new FormData();
-            formData.append('file', file);
-            const uploadRes = await fetch('/api/documents', { method: 'POST', body: formData });
-            if (uploadRes.ok) {
-              const doc = await uploadRes.json();
-              sendMessage(`I just uploaded a document called "${file.name}". Can you analyze it? Document ID: ${doc.id}`);
-            } else {
-              setMessages((prev) => [...prev, { role: 'assistant', content: 'Failed to upload file. Please try again.' }]);
-              setLoading(false);
-            }
+            handleImageUpload({ target: { files: [file], value: '' } } as unknown as React.ChangeEvent<HTMLInputElement>);
           }
         }}
       >
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-6">
-            <div className="text-center">
-              <Sparkles size={32} className="mx-auto text-primary mb-3" />
-              <h3 className="text-foreground text-lg font-semibold mb-1">What can I help you with?</h3>
-              <p className="text-muted-foreground text-sm max-w-md">I can access your calendar, tasks, documents, notes, whiteboard, and more. Just ask.</p>
+        {!hasMessages ? (
+          <div className="flex flex-col items-center justify-center h-full px-6 text-center">
+            <div className="relative w-20 h-20 rounded-3xl flex items-center justify-center mb-5 cerebro-pulse" style={{ background: 'var(--color-brand)' }}>
+              <Sparkles size={32} className="text-white" />
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg w-full">
-              {SUGGESTED_PROMPTS.map((prompt) => {
-                const Icon = prompt.icon;
+            <h2 className="text-xl font-bold text-foreground mb-2">What can I help with?</h2>
+            <p className="text-[13px] text-muted-foreground max-w-xs leading-relaxed">
+              I can access your calendar, tasks, documents, notes, whiteboard, and more. Just ask.
+            </p>
+            <div className="mt-6 grid grid-cols-2 gap-2 w-full max-w-sm">
+              {SUGGESTED_PROMPTS.map((p, i) => {
+                const Icon = p.icon;
                 return (
-                  <button
-                    key={prompt.text}
-                    onClick={() => sendMessage(prompt.text)}
-                    className="flex items-center gap-3 px-4 py-3 bg-card border border-border rounded-lg hover:border-border transition-colors text-left"
-                  >
-                    <Icon size={16} className={prompt.color} />
-                    <span className="text-foreground text-sm">{prompt.text}</span>
+                  <button key={i} onClick={() => sendMessage(p.text)}
+                    className="flex items-start gap-2.5 p-3 rounded-xl border border-border hover:bg-surface-2 transition-all text-left"
+                    style={{ background: 'var(--color-surface-1)' }}>
+                    <Icon size={14} className="shrink-0 mt-0.5" style={{ color: p.color }} />
+                    <span className="text-[12px] text-foreground/80 leading-snug">{p.text}</span>
                   </button>
                 );
               })}
             </div>
           </div>
         ) : (
-          messages.map((msg, i) => (
-            <div key={i} className={cn('flex gap-3 group', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-              {msg.role === 'assistant' && (
-                <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center shrink-0 mt-1">
-                  <Bot size={14} className="text-primary" />
-                </div>
-              )}
-              <div className={cn(
-                'max-w-2xl rounded-lg px-4 py-3',
-                msg.role === 'user'
-                  ? 'bg-primary text-foreground'
-                  : 'bg-card border border-border'
-              )}>
-                {msg.role === 'assistant' ? (
-                  <div>
-                    {/* Render images if present */}
-                    {msg.content.includes('IMAGE_GENERATED:') && (() => {
-                      const match = msg.content.match(/IMAGE_GENERATED:(https?:\/\/[^\s\n]+)/);
-                      const imageUrl = match?.[1];
-                      const textContent = msg.content.replace(/IMAGE_GENERATED:https?:\/\/[^\s\n]+\n*/, '').trim();
-                      return (
-                        <>
-                          {imageUrl && (
-                            <div className="mb-3">
-                              <img src={imageUrl} alt="Generated image" className="max-w-full rounded-lg border border-border" />
-                              <a href={imageUrl} target="_blank" download className="text-primary text-xs hover:underline mt-1 inline-block">Download image</a>
-                            </div>
-                          )}
-                          {textContent && (
-                            <div className="prose prose-invert prose-sm max-w-none">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{textContent}</ReactMarkdown>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                    {!msg.content.includes('IMAGE_GENERATED:') && (
-                      <div className="prose prose-invert prose-sm max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                      </div>
-                    )}
+          <div className="px-4 py-4 space-y-4">
+            {messages.map((msg, i) => (
+              <div key={i} className={cn('flex gap-3 animate-fade-up group', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
+                {msg.role === 'assistant' && (
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ background: 'var(--color-brand)' }}>
+                    <Bot size={14} className="text-white" />
                   </div>
-                ) : (
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                 )}
-                {/* Forward actions for assistant messages */}
-                {msg.role === 'assistant' && msg.content.length > 10 && (
-                  <div className="flex gap-1 mt-2 pt-2 border-t border-border opacity-0 group-hover:opacity-100 transition-opacity">
-                    {[
-                      { label: 'Task', action: async () => { await fetch('/api/todos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: msg.content.replace(/[#*`>\-]/g, '').trim().slice(0, 100) }) }); } },
-                      { label: 'Note', action: async () => { await fetch('/api/notes-v2', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Cerebro Note' }) }).then((r) => r.json()).then(async (n) => { if (n.id) await fetch(`/api/notes-v2/${n.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: msg.content }) }); }); } },
-                      { label: 'KB', action: async () => { await fetch('/api/kb', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: `Cerebro — ${new Date().toLocaleDateString()}`, content: msg.content, category: 'Reference', tags: ['cerebro'] }) }); } },
-                      { label: 'Board', action: async () => { await fetch('/api/whiteboard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: msg.content.replace(/[#*`>\-]/g, '').trim().slice(0, 80), description: msg.content }) }); } },
-                    ].map((fwd) => (
-                      <button key={fwd.label} onClick={async () => { await fwd.action(); alert(`Saved to ${fwd.label}`); }} className="text-muted-foreground/60 hover:text-primary text-[10px] px-1.5 py-0.5 rounded hover:bg-secondary/50 transition-colors">
-                        → {fwd.label}
-                      </button>
+                <div className={cn(
+                  'max-w-[80%] rounded-2xl px-4 py-3',
+                  msg.role === 'user' ? 'rounded-tr-sm' : 'rounded-tl-sm'
+                )} style={
+                  msg.role === 'user'
+                    ? { background: 'var(--color-brand)', color: 'white' }
+                    : { background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }
+                }>
+                  {msg.role === 'assistant' ? (
+                    <div>
+                      {msg.content.includes('IMAGE_GENERATED:') && (() => {
+                        const match = msg.content.match(/IMAGE_GENERATED:(https?:\/\/[^\s\n]+)/);
+                        const imageUrl = match?.[1];
+                        const textContent = msg.content.replace(/IMAGE_GENERATED:https?:\/\/[^\s\n]+\n*/, '').trim();
+                        return (
+                          <>
+                            {imageUrl && (
+                              <div className="mb-3">
+                                <img src={imageUrl} alt="Generated" className="max-w-full rounded-lg border border-border" />
+                                <a href={imageUrl} target="_blank" download className="text-[11px] mt-1 inline-block" style={{ color: 'var(--color-brand)' }}>Download image</a>
+                              </div>
+                            )}
+                            {textContent && <div className="prose prose-invert prose-sm max-w-none"><ReactMarkdown remarkPlugins={[remarkGfm]}>{textContent}</ReactMarkdown></div>}
+                          </>
+                        );
+                      })()}
+                      {!msg.content.includes('IMAGE_GENERATED:') && (
+                        <div className="prose prose-invert prose-sm max-w-none text-[13px] leading-relaxed">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                        </div>
+                      )}
+                      {/* Forward actions */}
+                      {msg.content.length > 10 && (
+                        <div className="flex gap-1 mt-2 pt-2 border-t border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {[
+                            { label: 'Task', fn: () => fetch('/api/todos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: msg.content.replace(/[#*`>\-]/g, '').trim().slice(0, 100) }) }) },
+                            { label: 'Note', fn: () => fetch('/api/notes-v2', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Cerebro Note', content: msg.content }) }) },
+                            { label: 'KB', fn: () => fetch('/api/kb', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: `Cerebro \u2014 ${new Date().toLocaleDateString()}`, content: msg.content, category: 'Reference', tags: ['cerebro'] }) }) },
+                            { label: 'Board', fn: () => fetch('/api/whiteboard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: msg.content.replace(/[#*`>\-]/g, '').trim().slice(0, 80), description: msg.content }) }) },
+                          ].map((fwd) => (
+                            <button key={fwd.label} onClick={async () => { await fwd.fn(); toast(`Saved to ${fwd.label}`); }}
+                              className="text-muted-foreground/60 hover:text-foreground text-[10px] px-1.5 py-0.5 rounded hover:bg-white/10 transition-colors">
+                              &rarr; {fwd.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                  )}
+                </div>
+                {/* Reply */}
+                <button onClick={() => setReplyTo({ index: i, content: msg.content, role: msg.role })}
+                  className="opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-foreground p-1 self-start mt-1 transition-opacity shrink-0" title="Reply">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 17H4V12"/><path d="M4 17L13 8C14.66 6.34 17.34 6.34 19 8C20.66 9.66 20.66 12.34 19 14L15 18"/></svg>
+                </button>
+                {msg.role === 'user' && (
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ background: 'var(--color-surface-3)' }}>
+                    <User size={14} className="text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+            ))}
+            {loading && (
+              <div className="flex gap-3 animate-fade-up">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'var(--color-brand)' }}>
+                  <Bot size={14} className="text-white" />
+                </div>
+                <div className="rounded-2xl rounded-tl-sm px-4 py-3 border border-border" style={{ background: 'var(--color-surface-2)' }}>
+                  <div className="flex items-center gap-1.5">
+                    {[0, 1, 2].map((j) => (
+                      <div key={j} className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-brand)', animation: `cerebro-bounce 1.2s ease-in-out ${j * 0.2}s infinite` }} />
                     ))}
                   </div>
-                )}
-              </div>
-              {/* Reply button */}
-              <button
-                onClick={() => setReplyTo({ index: i, content: msg.content, role: msg.role })}
-                className="opacity-0 group-hover:opacity-100 text-muted-foreground/60 hover:text-primary p-1 self-start mt-1 transition-opacity shrink-0"
-                title="Reply"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 17H4V12"/><path d="M4 17L13 8C14.66 6.34 17.34 6.34 19 8C20.66 9.66 20.66 12.34 19 14L15 18"/></svg>
-              </button>
-              {msg.role === 'user' && (
-                <div className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center shrink-0 mt-1">
-                  <User size={14} className="text-muted-foreground" />
                 </div>
-              )}
-            </div>
-          ))
-        )}
-
-        {loading && (
-          <div className="flex gap-3">
-            <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
-              <Loader2 size={14} className="text-primary animate-spin" />
-            </div>
-            <div className="bg-card border border-border rounded-lg px-4 py-3">
-              <p className="text-muted-foreground text-sm">Thinking and using tools...</p>
-            </div>
+              </div>
+            )}
+            <div ref={bottomRef} />
           </div>
         )}
-
-        <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      {/* Slash command autocomplete */}
+      {/* Suggested prompts when has messages */}
+      {hasMessages && !loading && (
+        <div className="px-4 pb-2 shrink-0">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {SUGGESTED_PROMPTS.slice(0, 4).map((p, i) => {
+              const Icon = p.icon;
+              return (
+                <button key={i} onClick={() => sendMessage(p.text)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border whitespace-nowrap text-[11px] text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors shrink-0"
+                  style={{ background: 'var(--color-surface-1)' }}>
+                  <Icon size={11} style={{ color: p.color }} /> {p.text}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Slash commands */}
       {input.startsWith('/') && !loading && (
-        <div className="px-4 py-2 border-t border-border bg-card shrink-0 max-h-48 overflow-auto">
+        <div className="px-4 py-2 border-t border-border shrink-0 max-h-48 overflow-auto" style={{ background: 'var(--color-surface-1)' }}>
           {SLASH_COMMANDS.filter((c) => c.cmd.startsWith(input.split(' ')[0])).map((cmd) => (
-            <button
-              key={cmd.cmd}
-              onClick={() => setInput(cmd.cmd + ' ')}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-secondary transition-colors text-left"
-            >
+            <button key={cmd.cmd} onClick={() => setInput(cmd.cmd + ' ')}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-surface-2 transition-colors text-left">
               <div>
-                <span className="text-primary text-sm font-mono">{cmd.cmd}</span>
-                <span className="text-muted-foreground text-xs ml-2">{cmd.desc}</span>
+                <span className="text-[13px] font-mono" style={{ color: 'var(--color-brand)' }}>{cmd.cmd}</span>
+                <span className="text-muted-foreground text-[11px] ml-2">{cmd.desc}</span>
               </div>
-              <span className="text-muted-foreground/60 text-xs">{cmd.example}</span>
+              <span className="text-muted-foreground/40 text-[10px]">{cmd.example}</span>
             </button>
           ))}
         </div>
@@ -402,59 +354,63 @@ export default function AgentPage() {
 
       {/* Reply preview */}
       {replyTo && (
-        <div className="px-4 py-2 bg-card border-t border-border flex items-start gap-2 shrink-0">
-          <div className="border-l-2 border-primary pl-3 flex-1 min-w-0">
-            <p className="text-primary text-xs font-medium mb-0.5">
+        <div className="px-4 py-2 border-t border-border flex items-start gap-2 shrink-0" style={{ background: 'var(--color-surface-1)' }}>
+          <div className="border-l-2 pl-3 flex-1 min-w-0" style={{ borderColor: 'var(--color-brand)' }}>
+            <p className="text-[11px] font-medium mb-0.5" style={{ color: 'var(--color-brand)' }}>
               Replying to {replyTo.role === 'user' ? 'yourself' : 'Cerebro'}
             </p>
-            <p className="text-muted-foreground text-xs truncate">{replyTo.content.slice(0, 100)}</p>
+            <p className="text-muted-foreground text-[11px] truncate">{replyTo.content.slice(0, 100)}</p>
           </div>
-          <button onClick={() => setReplyTo(null)} className="text-muted-foreground hover:text-foreground shrink-0 p-1">
-            <X size={14} />
-          </button>
+          <button onClick={() => setReplyTo(null)} className="text-muted-foreground hover:text-foreground shrink-0 p-1"><X size={14} /></button>
         </div>
       )}
-      <div className="border-t border-border p-3 sm:p-4 shrink-0">
+
+      {/* Input bar */}
+      <div className="px-4 pb-4 pt-2 shrink-0 border-t border-border" style={{ background: 'var(--color-surface-1)' }}>
         <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} className="hidden" />
-        <div className="flex gap-2 max-w-3xl mx-auto">
-          {/* Voice button */}
-          <button
-            onClick={toggleVoice}
-            className={cn(
-              'p-3 rounded-lg transition-colors self-end shrink-0',
-              listening ? 'bg-red-500 text-foreground animate-pulse' : 'bg-card text-muted-foreground hover:text-foreground border border-border'
+        <div className="flex items-end gap-2">
+          <button onClick={toggleVoice}
+            className={cn('w-10 h-10 rounded-xl flex items-center justify-center border transition-all duration-200 shrink-0',
+              listening ? 'border-red-400/60 text-red-400 animate-pulse' : 'border-border text-muted-foreground hover:text-foreground hover:bg-surface-2'
+            )} style={listening ? { background: 'oklch(0.62 0.22 25 / 0.15)' } : {}}>
+            {listening ? <MicOff size={16} /> : <Mic size={16} />}
+          </button>
+          <button onClick={() => fileInputRef.current?.click()}
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground border border-border hover:bg-surface-2 transition-colors shrink-0">
+            <Camera size={16} />
+          </button>
+          <div className="flex-1 relative">
+            <textarea ref={inputRef} value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+              placeholder={listening ? 'Listening\u2026 speak now' : 'Ask anything \u2014 voice, camera, or type...'}
+              rows={1} disabled={loading}
+              className={cn('w-full px-4 py-2.5 rounded-xl text-[14px] text-foreground placeholder-muted-foreground outline-none border transition-colors resize-none',
+                listening ? 'border-red-400/40' : 'border-border focus:border-white/20'
+              )} style={{ background: 'var(--color-surface-2)', minHeight: 42, maxHeight: 120 }} />
+            {listening && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {[0,1,2].map(j => <div key={j} className="w-1 rounded-full bg-red-400" style={{ height: 12, animation: `cerebro-bounce 0.8s ease-in-out ${j * 0.15}s infinite` }} />)}
+              </div>
             )}
-            title={listening ? 'Stop listening' : 'Voice input'}
-          >
-            {listening ? <MicOff size={18} /> : <Mic size={18} />}
-          </button>
-          {/* Camera button */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="p-3 rounded-lg bg-card text-muted-foreground hover:text-foreground border border-border transition-colors self-end shrink-0"
-            title="Upload image / Take photo"
-          >
-            <Camera size={18} />
-          </button>
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-            placeholder={listening ? 'Listening...' : 'Ask anything — voice, camera, or type...'}
-            rows={1}
-            className="flex-1 bg-card text-foreground border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none placeholder-muted-foreground"
-            disabled={loading}
-          />
-          <button
-            onClick={() => sendMessage()}
-            disabled={loading || !input.trim()}
-            className="bg-primary text-foreground p-3 rounded-lg hover:bg-primary transition-colors disabled:opacity-30 self-end"
-          >
-            {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+          </div>
+          <button onClick={() => sendMessage()} disabled={loading || !input.trim()}
+            className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-white transition-all shrink-0', input.trim() ? 'btn-brand' : 'opacity-30 cursor-not-allowed')}
+            style={{ background: 'var(--color-brand)' }}>
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
           </button>
         </div>
+        <p className="text-center text-[10px] text-muted-foreground/40 mt-2">
+          Cerebro can make mistakes. Verify important information.
+        </p>
       </div>
+
+      <style>{`
+        @keyframes cerebro-bounce {
+          0%, 60%, 100% { transform: translateY(0); }
+          30% { transform: translateY(-4px); }
+        }
+      `}</style>
     </div>
   );
 }
