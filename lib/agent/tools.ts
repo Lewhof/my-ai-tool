@@ -130,6 +130,51 @@ export const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
     },
   },
   {
+    name: 'complete_todos',
+    description: 'Mark one or more to-do items as complete/done. Accepts fuzzy title matches — e.g. "SARS", "golfday", "Talisman" will match tasks containing those words. Returns which tasks were matched and updated. ALWAYS use this when the user says "mark X done", "X is complete", "I finished X", etc. DO NOT claim something is complete without calling this tool first.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        titles: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of task titles or keywords to match. Can be fuzzy — e.g. ["SARS", "Talisman"] will match "Pay SARS PAYE" and "Pay Talisman". Case-insensitive, matches partial strings.',
+        },
+      },
+      required: ['titles'],
+    },
+  },
+  {
+    name: 'update_todo',
+    description: 'Update an existing to-do item (change title, description, priority, due date, status, or bucket). Match by id OR fuzzy title. Use this for any task modification other than completion — for completion use complete_todos instead.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        id: { type: 'string', description: 'The task ID (if known). If omitted, title_match is used.' },
+        title_match: { type: 'string', description: 'Fuzzy title match — case-insensitive substring search. Only used if id is not provided.' },
+        title: { type: 'string', description: 'New title' },
+        description: { type: 'string', description: 'New description' },
+        priority: { type: 'string', enum: ['low', 'medium', 'high', 'urgent'], description: 'New priority' },
+        due_date: { type: 'string', description: 'New due date YYYY-MM-DD, or empty string to clear' },
+        status: { type: 'string', enum: ['todo', 'in-progress', 'done'], description: 'New status' },
+        bucket: { type: 'string', description: 'New bucket/category' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'delete_todo',
+    description: 'Delete a to-do item. Match by id OR fuzzy title. Only use when the user explicitly says "delete", "remove", or "get rid of" a task.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        id: { type: 'string', description: 'The task ID (if known)' },
+        title_match: { type: 'string', description: 'Fuzzy title match — case-insensitive substring search. Only used if id is not provided.' },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'get_whiteboard',
     description: 'Get whiteboard/backlog items. Can filter by status.',
     input_schema: {

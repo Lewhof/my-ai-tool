@@ -66,6 +66,175 @@ export async function executeTool(
         return `Task created: "${data.title}" (ID: ${data.id})`;
       }
 
+      case 'complete_todos': {
+        const titles = (input.titles as string[]) ?? [];
+        if (titles.length === 0) return 'Error: no titles provided.';
+
+        // Fetch all active todos for this user
+        const { data: allTodos, error: fetchErr } = await supabaseAdmin
+          .from('todos')
+          .select('id, title, status')
+          .eq('user_id', userId)
+          .neq('status', 'done');
+
+        if (fetchErr) return `Error fetching tasks: ${fetchErr.message}`;
+        if (!allTodos || allTodos.length === 0) return 'No active tasks to complete.';
+
+        // Fuzzy match each requested title against active todos
+        const matched: Array<{ id: string; title: string; matchedAs: string }> = [];
+        const notFound: string[] = [];
+        const usedIds = new Set<string>();
+
+        for (const search of titles) {
+          const needle = search.toLowerCase().trim();
+          if (!needle) continue;
+
+          // Score each todo: exact match > startsWith > contains > word match
+          let best: { id: string; title: string; score: number } | null = null;
+          for (const todo of allTodos) {
+            if (usedIds.has(todo.id)) continue;
+            const hay = (todo.title || '').toLowerCase();
+            let score = 0;
+            if (hay === needle) score = 100;
+            else if (hay.startsWith(needle)) score = 80;
+            else if (hay.includes(needle)) score = 60;
+            else {
+              // Word-level match — at least one significant word overlaps
+              const needleWords = needle.split(/\s+/).filter(w => w.length > 2);
+              const hayWords = hay.split(/\s+/);
+              const overlap = needleWords.filter(nw => hayWords.some(hw => hw.includes(nw) || nw.includes(hw))).length;
+              if (overlap > 0) score = 30 + overlap * 10;
+            }
+
+            if (score > 0 && (!best || score > best.score)) {
+              best = { id: todo.id, title: todo.title, score };
+            }
+          }
+
+          if (best) {
+            matched.push({ id: best.id, title: best.title, matchedAs: search });
+            usedIds.add(best.id);
+          } else {
+            notFound.push(search);
+          }
+        }
+
+        // Apply updates
+        let completedCount = 0;
+        const completed: string[] = [];
+        for (const m of matched) {
+          const { error: updErr } = await supabaseAdmin
+            .from('todos')
+            .update({ status: 'done', updated_at: new Date().toISOString() })
+            .eq('id', m.id)
+            .eq('user_id', userId);
+          if (!updErr) {
+            completedCount++;
+            completed.push(m.title);
+          }
+        }
+
+        let result = '';
+        if (completedCount > 0) {
+          result += `Completed ${completedCount} task${completedCount !== 1 ? 's' : ''}:\n${completed.map(t => `- ${t}`).join('\n')}`;
+        } else {
+          result += 'No tasks were marked complete.';
+        }
+        if (notFound.length > 0) {
+          result += `\n\nCould not find matches for: ${notFound.join(', ')}`;
+        }
+        return result;
+      }
+
+      case 'update_todo': {
+        const id = input.id as string | undefined;
+        const titleMatch = input.title_match as string | undefined;
+
+        // Find the todo
+        let todoId = id;
+        let todoTitle = '';
+        if (!todoId && titleMatch) {
+          const { data: candidates } = await supabaseAdmin
+            .from('todos')
+            .select('id, title')
+            .eq('user_id', userId)
+            .neq('status', 'done')
+            .ilike('title', `%${titleMatch}%`)
+            .limit(5);
+
+          if (!candidates || candidates.length === 0) {
+            return `No active task found matching "${titleMatch}".`;
+          }
+          if (candidates.length > 1) {
+            return `Multiple tasks match "${titleMatch}": ${candidates.map(c => `"${c.title}"`).join(', ')}. Please be more specific.`;
+          }
+          todoId = candidates[0].id;
+          todoTitle = candidates[0].title;
+        }
+
+        if (!todoId) return 'Error: must provide id or title_match';
+
+        // Build update payload
+        const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        if (input.title !== undefined) updates.title = input.title;
+        if (input.description !== undefined) updates.description = input.description || null;
+        if (input.priority !== undefined) updates.priority = input.priority;
+        if (input.due_date !== undefined) updates.due_date = input.due_date || null;
+        if (input.status !== undefined) updates.status = input.status;
+        if (input.bucket !== undefined) updates.bucket = input.bucket;
+
+        if (Object.keys(updates).length === 1) {
+          return 'Error: no fields to update.';
+        }
+
+        const { data, error } = await supabaseAdmin
+          .from('todos')
+          .update(updates)
+          .eq('id', todoId)
+          .eq('user_id', userId)
+          .select('title, status')
+          .single();
+
+        if (error) return `Error updating task: ${error.message}`;
+        return `Updated task "${data?.title || todoTitle}" (status: ${data?.status || 'unchanged'}).`;
+      }
+
+      case 'delete_todo': {
+        const id = input.id as string | undefined;
+        const titleMatch = input.title_match as string | undefined;
+
+        let todoId = id;
+        let deletedTitle = '';
+        if (!todoId && titleMatch) {
+          const { data: candidates } = await supabaseAdmin
+            .from('todos')
+            .select('id, title')
+            .eq('user_id', userId)
+            .ilike('title', `%${titleMatch}%`)
+            .limit(5);
+
+          if (!candidates || candidates.length === 0) {
+            return `No task found matching "${titleMatch}".`;
+          }
+          if (candidates.length > 1) {
+            return `Multiple tasks match "${titleMatch}": ${candidates.map(c => `"${c.title}"`).join(', ')}. Please be more specific.`;
+          }
+          todoId = candidates[0].id;
+          deletedTitle = candidates[0].title;
+        }
+
+        if (!todoId) return 'Error: must provide id or title_match';
+
+        const { error } = await supabaseAdmin
+          .from('todos')
+          .delete()
+          .eq('id', todoId)
+          .eq('user_id', userId);
+
+        if (error) return `Error deleting task: ${error.message}`;
+        return `Deleted task "${deletedTitle || todoId}".`;
+      }
+
       case 'create_whiteboard_item': {
         const { data, error } = await supabaseAdmin.from('whiteboard').insert({
           user_id: userId,
