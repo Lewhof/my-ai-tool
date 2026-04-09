@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import {
   DollarSign, Plus, Trash2, Pencil, Upload, Loader2,
   ChevronLeft, ChevronRight, TrendingUp, TrendingDown,
-  Sparkles, X, ArrowUpCircle, ArrowDownCircle,
+  Sparkles, X, ArrowUpCircle, ArrowDownCircle, Camera, Scan,
 } from 'lucide-react';
 
 interface FinanceEntry {
@@ -68,6 +68,12 @@ export default function FinancePage() {
   const [csvText, setCsvText] = useState('');
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Receipt scanning
+  const [scanningReceipt, setScanningReceipt] = useState(false);
+  const [receiptConfidence, setReceiptConfidence] = useState<'high' | 'medium' | 'low' | null>(null);
+  const receiptFileRef = useRef<HTMLInputElement>(null);
+  const receiptCameraRef = useRef<HTMLInputElement>(null);
 
   const fetchEntries = useCallback(async () => {
     setLoading(true);
@@ -132,6 +138,7 @@ export default function FinancePage() {
     setFormType('expense');
     setEditingId(null);
     setShowForm(false);
+    setReceiptConfidence(null);
   };
 
   const startEdit = (entry: FinanceEntry) => {
@@ -143,6 +150,83 @@ export default function FinancePage() {
     setFormType(entry.type);
     setShowForm(true);
   };
+
+  // Receipt scanning — read image, send to /api/finance/receipt, prefill form
+  const scanReceipt = async (file: File) => {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image too large (max 10MB)');
+      return;
+    }
+
+    setScanningReceipt(true);
+    setReceiptConfidence(null);
+    try {
+      // Convert to base64 data URL
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed to read image'));
+        reader.readAsDataURL(file);
+      });
+
+      const res = await fetch('/api/finance/receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: dataUrl }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error(err.error || 'Could not parse receipt');
+        return;
+      }
+
+      const { parsed } = await res.json();
+
+      // Pre-fill the form
+      if (!showForm) setShowForm(true);
+      if (parsed.amount !== null) setFormAmount(String(parsed.amount));
+      if (parsed.category) setFormCategory(parsed.category);
+      if (parsed.description) setFormDesc(parsed.description);
+      if (parsed.entry_date) setFormDate(parsed.entry_date);
+      if (parsed.type) setFormType(parsed.type);
+      setReceiptConfidence(parsed.confidence);
+
+      const msg = parsed.confidence === 'high'
+        ? 'Receipt scanned — review and save'
+        : parsed.confidence === 'medium'
+          ? 'Receipt scanned — please verify the details'
+          : 'Receipt unclear — please check all fields';
+      toast.success(msg);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Receipt scan failed');
+    } finally {
+      setScanningReceipt(false);
+    }
+  };
+
+  // Handle paste of an image into the page (works while the form is open)
+  useEffect(() => {
+    if (!showForm) return;
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            scanReceipt(file);
+            return;
+          }
+        }
+      }
+    };
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showForm]);
 
   const saveEntry = async () => {
     if (!formAmount || isNaN(Number(formAmount))) {
@@ -420,6 +504,71 @@ export default function FinancePage() {
                     <X size={14} />
                   </button>
                 </div>
+                {/* Receipt scan toolbar (only on Add, not Edit) */}
+                {!editingId && (
+                  <div className="mb-3 flex items-center gap-2 flex-wrap">
+                    <input
+                      ref={receiptFileRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) scanReceipt(f);
+                        e.target.value = '';
+                      }}
+                    />
+                    <input
+                      ref={receiptCameraRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) scanReceipt(f);
+                        e.target.value = '';
+                      }}
+                    />
+
+                    <button
+                      onClick={() => receiptCameraRef.current?.click()}
+                      disabled={scanningReceipt}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors disabled:opacity-50 sm:hidden"
+                    >
+                      <Camera size={12} />
+                      Snap Receipt
+                    </button>
+
+                    <button
+                      onClick={() => receiptFileRef.current?.click()}
+                      disabled={scanningReceipt}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors disabled:opacity-50"
+                    >
+                      {scanningReceipt
+                        ? <Loader2 size={12} className="animate-spin" />
+                        : <Scan size={12} />
+                      }
+                      {scanningReceipt ? 'Scanning...' : 'Scan Receipt'}
+                    </button>
+
+                    <span className="text-[10px] text-muted-foreground/60 hidden sm:inline">
+                      Or paste an image (Ctrl+V) to auto-fill
+                    </span>
+
+                    {receiptConfidence && (
+                      <span className={cn(
+                        'text-[10px] px-1.5 py-0.5 rounded font-medium ml-auto',
+                        receiptConfidence === 'high' && 'bg-green-500/10 text-green-400',
+                        receiptConfidence === 'medium' && 'bg-yellow-500/10 text-yellow-400',
+                        receiptConfidence === 'low' && 'bg-red-500/10 text-red-400',
+                      )}>
+                        AI confidence: {receiptConfidence}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {/* Type toggle */}
                   <div className="sm:col-span-2 lg:col-span-3 flex gap-2">

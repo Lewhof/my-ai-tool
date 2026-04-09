@@ -608,7 +608,23 @@ function AgentPageInner() {
               <textarea ref={inputRef} value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                placeholder={listening ? 'Listening\u2026 speak now' : 'Ask anything...'}
+                onPaste={(e) => {
+                  // Detect pasted images from clipboard
+                  const items = e.clipboardData?.items;
+                  if (!items) return;
+                  for (const item of Array.from(items)) {
+                    if (item.type.startsWith('image/')) {
+                      const file = item.getAsFile();
+                      if (file) {
+                        e.preventDefault();
+                        toast('Pasted image \u2014 analyzing...');
+                        handleImageUpload({ target: { files: [file], value: '' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+                        return;
+                      }
+                    }
+                  }
+                }}
+                placeholder={listening ? 'Listening\u2026 speak now' : 'Ask anything (paste images with Ctrl+V)...'}
                 rows={1} disabled={loading}
                 className={cn('w-full px-3 sm:px-4 py-2.5 rounded-xl text-[14px] text-foreground placeholder-muted-foreground outline-none border transition-colors resize-none',
                   listening ? 'border-red-400/40' : 'border-border focus:border-white/20'
