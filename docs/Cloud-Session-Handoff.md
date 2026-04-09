@@ -170,13 +170,51 @@ If ERROR — get build logs and fix before telling Lew it's done. NEVER say "dep
 ### Phase 3 — Life Modules (Week 9-12)
 *Expand from work productivity to full life OS.*
 
-| # | Feature | Effort | Impact | Details |
-|---|---------|--------|--------|---------|
-| 3.1 | Finance Tracker | Medium | High | New /finance page. Manual entry + CSV import. Categories: Housing, Transport, Food, Entertainment, Subscriptions, Business, Other. Monthly bar chart by category. AI insight at top. New finance_entries table (id, user_id, amount, category, description, entry_date, type expense/income, created_at) |
-| 3.2 | Goal/OKR Tracker | Medium | Medium | New /goals page. Quarterly objectives linked to tasks. AI progress tracking. New goals table with key_results JSONB |
-| 3.3 | Web Clipper Bookmarklet | Small | Medium | Browser bookmarklet that captures any page to KB with AI-generated summary. POST to /api/kb with URL + content |
-| 3.4 | Journal/Reflection Module | Medium | Medium | New /journal page. Daily prompts, mood tracking, AI-detected patterns over weeks/months. New journal_entries table |
-| 3.5 | Relationship Health Dashboard | Small | Medium | Shows contact frequency from CRM data, follow-up suggestions. Uses existing contacts table |
+| # | Feature | Status | Details |
+|---|---------|--------|---------|
+| 3.1 | Finance Tracker | ✅ DONE | /finance page with manual + CSV import, monthly bar chart, AI insight, 9 categories, finance_entries table |
+| 3.2 | Goal/OKR Tracker | ✅ DONE | /goals page with quarterly objectives, key results (JSONB), progress tracking, AI insight, status filtering, goals table. Uses Target icon in Life group. |
+| 3.3 | Mind Library (Philosophy + Self-Improvement) | NEXT | /mind page with tabs: Today / Library / Journal / Virtues. Daily content engine (Stoicism-weighted), AI book summaries with personalized reviews, reflection journal (morning/evening), 13-virtue tracker (customizable, 13-week rotation), highlights resurfacing. Journal absorbed into this module. See full spec below. |
+| 3.4 | Web Clipper Bookmarklet | PENDING | Browser bookmarklet that captures any page to KB with AI-generated summary. POST to /api/kb with URL + content |
+| 3.5 | Relationship Health Dashboard | PENDING | Shows contact frequency from CRM data, follow-up suggestions. Uses existing contacts table |
+
+### Phase 3.3 — Mind Library — Full Spec
+
+**Name:** Mind Library. Route: `/mind`. Sidebar label: "Mind Library" under Life group.
+
+**Mission:** A daily ritual space for philosophical reflection, wisdom consumption, and self-examination — where ancient practices meet modern AI synthesis.
+
+**5 Core Features:**
+1. **Daily Content Engine** — Rotating daily quote/passage with 2-3 para commentary and reflection question. Morning card + evening review (Seneca's 3 questions). Weekly theme system cycling through Stoicism-weighted mix (Marcus Aurelius, Seneca, Epictetus, Naval Ravikant, Ryan Holiday, James Clear, Cal Newport, Taleb, Sivers, Buddhist/Taoist thinkers). Delivered via Telegram piggyback on existing briefing cron.
+2. **AI Book Reviews & Library** — Add book by ISBN/title/URL, AI generates structured summary (thesis, personalized "why it matters for you", 5-7 key ideas with quotes, counter-arguments, one action/one avoidance, related reading, 3-sentence ultra-short). Chat with book feature. Personal rating + status (want-to-read / reading / finished).
+3. **Reflection Journal** — Morning + Evening entry types, mood/energy check-in, gratitude list (3 items), pattern insights. Uses existing `notes_v2` table with `category='practice'` filter.
+4. **Virtue Tracker (Customizable)** — 13 default virtues in a Franklin-inspired 13-week rotation (4 cycles/year). Defaults: Wisdom, Justice, Courage, Temperance, Focus, Patience, Gratitude, Humility, Empathy, Integrity, Discipline, Presence, Generosity. User can add/rename/remove via Manage Virtues modal. Daily 1-5 self-rating + quarterly heatmap.
+5. **Highlights Resurfacing (Readwise-style)** — Save quotes from book summaries, journal entries, daily content. Spaced repetition surfaces 5-7 items/day in a "Today's Review" feed. Dashboard widget.
+
+**Page structure (tabs):**
+- `/mind` → Today tab (default): Morning card + Today's virtue + Highlights to review + Evening review (after 17:00)
+- Library tab: Book summaries with filter (reading/finished/want-to-read), Add book → AI summary flow
+- Journal tab: Reflection entries filtered from notes_v2
+- Virtues tab: Current week + quarterly heatmap + Manage Virtues modal
+
+**Database tables to add:**
+- `practice_daily` (id, user_id, date, week_theme, morning_content, evening_content, morning_completed_at, evening_completed_at, morning_response JSONB, evening_response JSONB, UNIQUE(user_id, date))
+- `books` (id, user_id, title, author, isbn, cover_url, status, rating, summary JSONB, personal_review, tags, added_at, finished_at)
+- `highlights` (id, user_id, content, source_type, source_id, source_title, tags, last_reviewed_at, review_count, created_at)
+- `virtue_definitions` (id, user_id, name, description, position, is_custom, active, created_at, UNIQUE(user_id, name)) — customizable per user, seed 13 defaults on first visit
+- `virtue_logs` (id, user_id, virtue, week_of, day_date, score, note, UNIQUE(user_id, day_date))
+- Reflection journal entries use existing notes_v2 with category='practice'
+
+**Integration points (critical — do NOT duplicate):**
+- Habits module exists → Mind Library points to relevant habits but does NOT own habit state
+- Tasks module exists → Mind Library can spawn nudges but NOT tasks
+- Notes module exists → Journal entries stored in notes_v2
+- Briefing → morning card included in daily briefing
+- Weekly Review (1.4) → virtue scores feed into summary
+- Cerebro → new tools: `get_daily_wisdom`, `add_book_summary`, `log_virtue`, `journal_entry`
+- Entity Links → books ↔ notes, highlights ↔ books
+
+**Cost:** ~$0.004/day (Haiku for morning/evening content) + ~$0.15-0.30 per book summary (Sonnet) + ~$0.10/quarter (virtue synthesis). Effectively free.
 
 **Success metric:** Full month of finances tracked. Quarterly OKRs set and linked to weekly tasks.
 

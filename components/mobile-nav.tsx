@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Bot, CheckSquare, FileText, MoreHorizontal, X,
   MessageSquare, Calendar, CalendarDays, Mail, StickyNote, GitFork, Zap,
   ClipboardList, BookOpen, KeyRound, Settings, CreditCard,
-  Globe, Focus, Image as ImageIcon, Wallet,
+  Globe, Focus, Image as ImageIcon, Wallet, Target,
 } from 'lucide-react';
 
 const TABS = [
@@ -31,6 +31,7 @@ const MORE_GRID = [
   { name: 'Workflows', href: '/workflows', icon: Zap },
   { name: 'Whiteboard', href: '/whiteboard', icon: ClipboardList },
   { name: 'Finance', href: '/finance', icon: Wallet },
+  { name: 'Goals', href: '/goals', icon: Target },
   { name: 'Social', href: '/social', icon: Globe },
   { name: 'AI Credits', href: '/credits', icon: CreditCard },
   { name: 'Knowledge Base', href: '/kb', icon: BookOpen },

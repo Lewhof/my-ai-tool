@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 
-const VALID_TYPES = ['todo', 'note', 'kb', 'whiteboard', 'document'];
+const VALID_TYPES = ['todo', 'note', 'kb', 'whiteboard', 'document', 'goal'];
 
 // GET: Fetch all links for an entity (both directions)
 export async function GET(req: Request) {
@@ -120,6 +120,7 @@ async function resolveTitle(userId: string, type: string, id: string): Promise<s
     kb: { table: 'knowledge_base', field: 'title' },
     whiteboard: { table: 'whiteboard', field: 'title' },
     document: { table: 'documents', field: 'name' },
+    goal: { table: 'goals', field: 'title' },
   };
 
   const config = tableMap[type];
