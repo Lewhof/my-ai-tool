@@ -7,6 +7,7 @@ import {
   DollarSign, Plus, Trash2, Pencil, Upload, Loader2,
   ChevronLeft, ChevronRight, TrendingUp, TrendingDown,
   Sparkles, X, ArrowUpCircle, ArrowDownCircle, Camera, Scan,
+  FileText, AlertCircle, CheckCircle2,
 } from 'lucide-react';
 
 interface FinanceEntry {
@@ -17,6 +18,35 @@ interface FinanceEntry {
   entry_date: string;
   type: 'expense' | 'income';
   created_at: string;
+}
+
+interface StatementTransaction {
+  date: string;
+  description: string;
+  amount: number;
+  type: 'expense' | 'income';
+  suggested_category: string;
+  raw_line?: string;
+  import_hash?: string;
+  duplicate_of?: string | null;
+}
+
+interface StatementParseResult {
+  account_info: { holder?: string | null; last4?: string | null };
+  period_start: string | null;
+  period_end: string | null;
+  currency: string;
+  transactions: StatementTransaction[];
+  stats: {
+    total: number;
+    expenses: number;
+    income: number;
+    duplicates: number;
+    total_expense_amount: number;
+    total_income_amount: number;
+    model_used: string;
+    parse_mode: 'text' | 'document';
+  };
 }
 
 const CATEGORIES = [
@@ -74,6 +104,13 @@ export default function FinancePage() {
   const [receiptConfidence, setReceiptConfidence] = useState<'high' | 'medium' | 'low' | null>(null);
   const receiptFileRef = useRef<HTMLInputElement>(null);
   const receiptCameraRef = useRef<HTMLInputElement>(null);
+
+  // Bank statement upload
+  const [statementUploading, setStatementUploading] = useState(false);
+  const [statementResult, setStatementResult] = useState<StatementParseResult | null>(null);
+  const [statementImporting, setStatementImporting] = useState(false);
+  const [statementSelected, setStatementSelected] = useState<Set<number>>(new Set());
+  const statementFileRef = useRef<HTMLInputElement>(null);
 
   const fetchEntries = useCallback(async () => {
     setLoading(true);
@@ -289,6 +326,126 @@ export default function FinancePage() {
     reader.readAsText(file);
   };
 
+  // Bank statement upload handlers
+  const parseStatement = async (file: File) => {
+    setStatementUploading(true);
+    setStatementResult(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/finance/statement/parse', {
+        method: 'POST',
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Statement parse failed');
+        if (data.hint) toast(data.hint);
+        return;
+      }
+      setStatementResult(data);
+      // Default selection: all non-duplicates
+      const selected = new Set<number>();
+      (data.transactions || []).forEach((t: StatementTransaction, i: number) => {
+        if (!t.duplicate_of) selected.add(i);
+      });
+      setStatementSelected(selected);
+      const dupNote = data.stats.duplicates > 0 ? ` (${data.stats.duplicates} already imported)` : '';
+      toast.success(`Found ${data.stats.total} transactions${dupNote}`);
+    } catch {
+      toast.error('Upload failed');
+    } finally {
+      setStatementUploading(false);
+    }
+  };
+
+  const handleStatementSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('PDF too large (max 10MB)');
+      return;
+    }
+    parseStatement(file);
+    // Reset file input so the same file can be re-uploaded after cancel
+    if (statementFileRef.current) statementFileRef.current.value = '';
+  };
+
+  const toggleStatementRow = (i: number) => {
+    setStatementSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  };
+
+  const toggleStatementAll = () => {
+    if (!statementResult) return;
+    setStatementSelected((prev) => {
+      const allNonDupe = statementResult.transactions
+        .map((t, i) => ({ t, i }))
+        .filter(({ t }) => !t.duplicate_of)
+        .map(({ i }) => i);
+      if (prev.size === allNonDupe.length) return new Set();
+      return new Set(allNonDupe);
+    });
+  };
+
+  const updateStatementCategory = (i: number, category: string) => {
+    if (!statementResult) return;
+    const next = { ...statementResult };
+    next.transactions = next.transactions.map((t, idx) => idx === i ? { ...t, suggested_category: category } : t);
+    setStatementResult(next);
+  };
+
+  const importStatement = async () => {
+    if (!statementResult || statementSelected.size === 0) {
+      toast.error('Select at least one transaction');
+      return;
+    }
+    setStatementImporting(true);
+    try {
+      const rows = Array.from(statementSelected)
+        .map((i) => {
+          const t = statementResult.transactions[i];
+          return {
+            date: t.date,
+            description: t.description,
+            amount: t.amount,
+            type: t.type,
+            category: t.suggested_category,
+            import_hash: t.import_hash,
+          };
+        });
+
+      const res = await fetch('/api/finance/statement/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactions: rows }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`Imported ${data.imported} new transaction${data.imported === 1 ? '' : 's'}${data.skipped ? ` (${data.skipped} skipped as duplicate)` : ''}`);
+        setStatementResult(null);
+          setStatementSelected(new Set());
+        fetchEntries();
+        fetchInsight();
+      } else {
+        toast.error(data.error || 'Import failed');
+      }
+    } catch {
+      toast.error('Import failed');
+    } finally {
+      setStatementImporting(false);
+    }
+  };
+
+  const cancelStatement = () => {
+    setStatementResult(null);
+    setStatementSelected(new Set());
+  };
+
   const doImport = async () => {
     if (!csvText.trim()) { toast.error('Paste or upload CSV data'); return; }
     setImporting(true);
@@ -335,7 +492,22 @@ export default function FinancePage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            ref={statementFileRef}
+            type="file"
+            accept="application/pdf,.pdf"
+            onChange={handleStatementSelect}
+            className="hidden"
+          />
+          <button
+            onClick={() => statementFileRef.current?.click()}
+            disabled={statementUploading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground border border-border hover:bg-secondary transition-colors disabled:opacity-50"
+          >
+            {statementUploading ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
+            {statementUploading ? 'Parsing…' : 'Upload Statement'}
+          </button>
           <button
             onClick={() => setShowImport(!showImport)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground border border-border hover:bg-secondary transition-colors"
@@ -755,6 +927,171 @@ export default function FinancePage() {
           </div>
         )}
       </div>
+
+      {/* ── Statement Preview Modal ── */}
+      {statementResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-background border border-border rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-foreground font-bold text-lg flex items-center gap-2">
+                  <FileText size={18} className="text-primary" />
+                  Bank Statement Preview
+                </h3>
+                <div className="text-muted-foreground text-xs mt-1 flex items-center gap-3 flex-wrap">
+                  {statementResult.account_info?.holder && <span>{statementResult.account_info.holder}</span>}
+                  {statementResult.account_info?.last4 && <span className="font-mono">••••{statementResult.account_info.last4}</span>}
+                  {statementResult.period_start && statementResult.period_end && (
+                    <span>{statementResult.period_start} → {statementResult.period_end}</span>
+                  )}
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary">{statementResult.currency}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-mono">{statementResult.stats.model_used}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{statementResult.stats.parse_mode}</span>
+                </div>
+              </div>
+              <button onClick={cancelStatement} className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Stats strip */}
+            <div className="px-6 py-3 border-b border-border bg-surface-1/50 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center shrink-0">
+              <div>
+                <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Transactions</p>
+                <p className="text-foreground font-bold">{statementResult.stats.total}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Expenses</p>
+                <p className="text-red-400 font-bold">{statementResult.stats.expenses}</p>
+                <p className="text-muted-foreground text-[10px]">R{statementResult.stats.total_expense_amount.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Income</p>
+                <p className="text-green-400 font-bold">{statementResult.stats.income}</p>
+                <p className="text-muted-foreground text-[10px]">R{statementResult.stats.total_income_amount.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Already imported</p>
+                <p className="text-yellow-400 font-bold">{statementResult.stats.duplicates}</p>
+              </div>
+            </div>
+
+            {/* Select-all bar */}
+            <div className="px-6 py-2 border-b border-border flex items-center justify-between shrink-0">
+              <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={statementSelected.size > 0 && statementSelected.size === statementResult.transactions.filter(t => !t.duplicate_of).length}
+                  onChange={toggleStatementAll}
+                  className="w-3.5 h-3.5"
+                />
+                Select all non-duplicates
+              </label>
+              <span className="text-muted-foreground text-xs">{statementSelected.size} selected</span>
+            </div>
+
+            {/* Transaction table */}
+            <div className="flex-1 overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-background border-b border-border">
+                  <tr>
+                    <th className="px-3 py-2 w-8"></th>
+                    <th className="px-3 py-2 text-left text-muted-foreground font-semibold uppercase tracking-wider">Date</th>
+                    <th className="px-3 py-2 text-left text-muted-foreground font-semibold uppercase tracking-wider">Description</th>
+                    <th className="px-3 py-2 text-right text-muted-foreground font-semibold uppercase tracking-wider">Amount</th>
+                    <th className="px-3 py-2 text-left text-muted-foreground font-semibold uppercase tracking-wider">Category</th>
+                    <th className="px-3 py-2 text-center text-muted-foreground font-semibold uppercase tracking-wider">Type</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {statementResult.transactions.map((t, i) => {
+                    const isDupe = !!t.duplicate_of;
+                    const isSelected = statementSelected.has(i);
+                    return (
+                      <tr
+                        key={i}
+                        className={cn(
+                          'hover:bg-surface-2/30 transition-colors',
+                          isDupe && 'bg-yellow-500/5',
+                          isSelected && !isDupe && 'bg-primary/5'
+                        )}
+                      >
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleStatementRow(i)}
+                            disabled={isDupe}
+                            className="w-3.5 h-3.5 disabled:opacity-40"
+                          />
+                        </td>
+                        <td className="px-3 py-2 font-mono text-muted-foreground">{t.date}</td>
+                        <td className="px-3 py-2 max-w-xs">
+                          <p className="text-foreground truncate" title={t.raw_line || t.description}>
+                            {t.description}
+                          </p>
+                          {isDupe && (
+                            <p className="text-yellow-400 text-[10px] flex items-center gap-1 mt-0.5">
+                              <AlertCircle size={10} />
+                              Already imported
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono font-medium">
+                          <span className={t.type === 'expense' ? 'text-red-400' : 'text-green-400'}>
+                            {t.type === 'expense' ? '−' : '+'}R{t.amount.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <select
+                            value={t.suggested_category}
+                            onChange={(e) => updateStatementCategory(i, e.target.value)}
+                            disabled={isDupe}
+                            className="bg-secondary border border-border rounded px-2 py-0.5 text-xs text-foreground disabled:opacity-40"
+                          >
+                            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {t.type === 'expense'
+                            ? <ArrowDownCircle size={14} className="text-red-400 inline" />
+                            : <ArrowUpCircle size={14} className="text-green-400 inline" />
+                          }
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer actions */}
+            <div className="px-6 py-4 border-t border-border flex items-center justify-between shrink-0">
+              <p className="text-muted-foreground text-xs flex items-center gap-1.5">
+                <CheckCircle2 size={12} className="text-primary" />
+                Duplicates are auto-unchecked. Edit categories inline before importing.
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={cancelStatement}
+                  className="px-4 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground border border-border hover:bg-secondary transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={importStatement}
+                  disabled={statementImporting || statementSelected.size === 0}
+                  className="flex items-center gap-1.5 px-5 py-2 rounded-lg text-xs bg-primary text-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {statementImporting ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                  Import {statementSelected.size} transaction{statementSelected.size === 1 ? '' : 's'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
