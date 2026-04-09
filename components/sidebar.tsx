@@ -9,7 +9,7 @@ import {
   Calendar, CalendarDays, Mail, KeyRound, Settings, MessageSquare,
   Zap, BookOpen, Image as ImageIcon, Focus, StickyNote, GitFork,
   ClipboardList, CreditCard, ChevronLeft, ChevronRight, Globe,
-  Wallet, Target,
+  Wallet, Target, Brain,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +40,7 @@ const SIDEBAR_GROUPS = [
     items: [
       { name: 'Finance', href: '/finance', icon: Wallet },
       { name: 'Goals', href: '/goals', icon: Target },
+      { name: 'Mind Library', href: '/mind', icon: Brain },
     ],
   },
   {

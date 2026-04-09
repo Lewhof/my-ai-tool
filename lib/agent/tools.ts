@@ -175,6 +175,53 @@ export const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
     },
   },
   {
+    name: 'get_daily_wisdom',
+    description: 'Get today\'s Mind Library morning reflection — the daily Stoic/philosophy content tied to this week\'s virtue. Use when the user asks "what\'s today\'s reflection", "daily wisdom", "morning card", or mentions Mind Library.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'log_virtue',
+    description: 'Log a daily self-rating (1-5) for this week\'s virtue in Mind Library. Use when the user says "score my virtue", "log 4 on [virtue]", "rate myself on today\'s virtue", etc.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        score: { type: 'number', description: 'Score 1-5. 1 = did not practice, 5 = embodied fully.' },
+        note: { type: 'string', description: 'Optional reflection note.' },
+      },
+      required: ['score'],
+    },
+  },
+  {
+    name: 'add_book',
+    description: 'Add a book to the Mind Library and generate a full AI summary with personalized review. Accepts title + author, or a single search query. Use when the user says "add book X", "summarize [book]", "I just finished [book]", etc. Returns the book\'s key ideas.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title: { type: 'string', description: 'Book title' },
+        author: { type: 'string', description: 'Book author (optional)' },
+        query: { type: 'string', description: 'Alternative: single search string like "Atomic Habits James Clear". Used if title/author are not provided.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'save_highlight',
+    description: 'Save a quote or highlight to the Mind Library for spaced-repetition resurfacing. Use when the user says "save this quote", "highlight this", or wants to remember something meaningful.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        content: { type: 'string', description: 'The quote or highlight text' },
+        source_title: { type: 'string', description: 'Where it came from (book title, conversation, etc.)' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Optional tags' },
+      },
+      required: ['content'],
+    },
+  },
+  {
     name: 'get_whiteboard',
     description: 'Get whiteboard/backlog items. Can filter by status.',
     input_schema: {
