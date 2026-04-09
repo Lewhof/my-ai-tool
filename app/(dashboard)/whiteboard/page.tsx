@@ -139,23 +139,39 @@ export default function WhiteboardPage() {
         e.preventDefault();
         const file = item.getAsFile();
         if (!file) return;
-        const formData = new FormData();
-        formData.append('file', file);
-        const res = await fetch('/api/notes-v2/upload', { method: 'POST', body: formData });
-        const data = await res.json();
-        if (data.url) {
-          const existing = items.find((i) => i.id === itemId);
-          const newDesc = (existing?.description || '') + `\n![screenshot](${data.url})`;
-          await fetch(`/api/whiteboard/${itemId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ description: newDesc }),
-          });
-          fetchItems();
-        }
+        await uploadFileToItem(file, itemId, true);
         return;
       }
     }
+  };
+
+  /**
+   * Upload a file (image, PDF, doc, etc.) to a whiteboard item.
+   * Images are added as ![screenshot](url), other files as [filename](url).
+   */
+  const uploadFileToItem = async (file: File, itemId: string, isImage: boolean) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch('/api/notes-v2/upload', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!data.url) return;
+
+    const existing = items.find((i) => i.id === itemId);
+    const markdown = isImage
+      ? `\n![screenshot](${data.url})`
+      : `\n[📎 ${file.name}](${data.url})`;
+
+    const newDesc = (existing?.description || '') + markdown;
+
+    // Update local state immediately so the modal reflects it
+    setEditDesc(newDesc);
+
+    await fetch(`/api/whiteboard/${itemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: newDesc }),
+    });
+    fetchItems();
   };
 
   const pushToClaude = async (item: WhiteboardItem) => {
@@ -370,9 +386,31 @@ export default function WhiteboardPage() {
               <label className="text-foreground text-sm block mb-1">Description / Scope</label>
               <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={8} className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none" placeholder="Paste screenshots with Ctrl+V" />
             </div>
-            <p className="text-muted-foreground/60 text-xs">Tip: Paste screenshots directly (Ctrl+V) — they'll be uploaded and added to the description.</p>
-            <div className="flex gap-2">
+            <p className="text-muted-foreground/60 text-xs">Tip: Paste screenshots (Ctrl+V) or attach files (PDF, docs, images) to the description.</p>
+
+            {/* Hidden file input — accepts images, PDFs, docs */}
+            <input
+              id="whiteboard-file-upload"
+              type="file"
+              accept="image/*,.pdf,.doc,.docx,.txt,.md,.csv,.xlsx"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (file && editingItemId) {
+                  await uploadFileToItem(file, editingItemId, file.type.startsWith('image/'));
+                }
+                e.target.value = '';
+              }}
+            />
+
+            <div className="flex gap-2 flex-wrap">
               <button onClick={saveEdit} className="bg-primary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary">Save</button>
+              <button
+                onClick={() => document.getElementById('whiteboard-file-upload')?.click()}
+                className="text-muted-foreground px-4 py-2 rounded-lg text-sm border border-border hover:text-foreground hover:bg-secondary transition-colors flex items-center gap-1.5"
+              >
+                📎 Attach File
+              </button>
               <button onClick={() => setEditingItemId(null)} className="text-muted-foreground px-4 py-2 rounded-lg text-sm hover:text-foreground">Cancel</button>
             </div>
           </div>

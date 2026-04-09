@@ -547,15 +547,26 @@ export async function executeTool(
       }
 
       case 'web_search': {
-        const query = input.query as string;
+        const query = (input.query as string)?.trim();
+        if (!query) return 'Error: query required for web search.';
+
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) return 'No search API configured. Add GEMINI_API_KEY to environment.';
 
-        // Try with retry on 429
-        for (let attempt = 0; attempt < 2; attempt++) {
+        // Cache layer: same normalized query within 1 hour returns instantly
+        const { hashInput, getCached, setCached } = await import('@/lib/ai-cache');
+        const cacheKey = hashInput(query);
+        const cached = await getCached<{ text: string }>('search.expand', cacheKey);
+        if (cached?.text) return cached.text;
+
+        // Exponential backoff: 3 attempts with 1s, 3s, 8s
+        const delays = [1000, 3000, 8000];
+        let lastErr = '';
+
+        for (let attempt = 0; attempt < 3; attempt++) {
           try {
             const res = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
               {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -567,23 +578,35 @@ export async function executeTool(
             );
 
             if (res.status === 429) {
-              if (attempt === 0) {
-                await new Promise(r => setTimeout(r, 2000)); // Wait 2s and retry
+              lastErr = '429';
+              if (attempt < 2) {
+                await new Promise(r => setTimeout(r, delays[attempt]));
                 continue;
               }
-              return 'Web search is temporarily rate-limited. Please try again in a minute.';
+              return 'Web search rate limit exceeded after 3 attempts. The Gemini free tier is capped at 10 requests/minute. Wait 60 seconds and try again, or upgrade your Gemini API plan.';
             }
 
-            if (!res.ok) return `Web search failed (HTTP ${res.status}). Try again later.`;
+            if (!res.ok) {
+              lastErr = `HTTP ${res.status}`;
+              return `Web search failed (${lastErr}). Try again in a moment.`;
+            }
+
             const data = await res.json();
             const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            return text || 'No results found.';
+            if (!text) return 'No results found.';
+
+            // Cache the result for 1 hour (search results are semi-stable)
+            await setCached('search.expand', cacheKey, { text }, 3600);
+            return text;
           } catch (err) {
-            if (attempt === 0) continue;
-            return 'Web search failed due to a network error.';
+            lastErr = err instanceof Error ? err.message : 'network';
+            if (attempt < 2) {
+              await new Promise(r => setTimeout(r, delays[attempt]));
+              continue;
+            }
           }
         }
-        return 'Web search failed after retries.';
+        return `Web search failed after 3 attempts (${lastErr}).`;
       }
 
       case 'get_emails': {

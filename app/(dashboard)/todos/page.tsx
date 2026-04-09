@@ -40,7 +40,7 @@ const PRIORITY_LABELS: Record<string, string> = {
 
 export default function TodosPage() {
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [viewMode, setViewMode] = useState<'planner' | 'table'>('planner');
+  const [viewMode, setViewMode] = useState<'planner' | 'table'>('table');
   const [showAdd, setShowAdd] = useState(false);
   const [addToColumn, setAddToColumn] = useState('todo');
   const [newTitle, setNewTitle] = useState('');
