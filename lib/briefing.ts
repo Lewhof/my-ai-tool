@@ -1,6 +1,17 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
-import { anthropic, MODELS } from '@/lib/anthropic';
+import { anthropic, MODELS, cachedSystem } from '@/lib/anthropic';
 import { getMicrosoftToken } from '@/lib/microsoft-token';
+
+// Static system prompt — cached via prompt caching (5-min TTL, 10% read cost).
+// Hit daily by briefing cron + manual refreshes → break-even on cache after 1 hit.
+const BRIEFING_SYSTEM_PROMPT = `You are a personal AI chief of staff. Generate a sharp morning briefing (max 200 words, markdown). Structure:
+1. One-line weather + date summary
+2. Calendar overview (highlight conflicts or back-to-back meetings)
+3. Priority tasks — flag overdue items with warning
+4. One actionable AI insight (connect dots between calendar, tasks, and deadlines)
+5. Top 3 focus areas for the day
+
+Be direct, concise, and actionable. No fluff.`;
 
 export interface BriefingData {
   weather: string;
@@ -144,18 +155,10 @@ User context: ${data.notepadContext || 'Not set'}
   const response = await anthropic.messages.create({
     model: MODELS.fast,
     max_tokens: 500,
+    system: cachedSystem(BRIEFING_SYSTEM_PROMPT),
     messages: [{
       role: 'user',
-      content: `You are a personal AI chief of staff. Generate a sharp morning briefing (max 200 words, markdown). Structure:
-1. One-line weather + date summary
-2. Calendar overview (highlight conflicts or back-to-back meetings)
-3. Priority tasks — flag overdue items with warning
-4. One actionable AI insight (connect dots between calendar, tasks, and deadlines)
-5. Top 3 focus areas for the day
-
-Be direct, concise, and actionable. No fluff.
-
-${context}`,
+      content: context,
     }],
   });
 

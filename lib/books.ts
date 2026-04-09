@@ -1,4 +1,44 @@
-import { anthropic, MODELS } from '@/lib/anthropic';
+import { anthropic, MODELS, cachedSystem } from '@/lib/anthropic';
+
+// Static instructions — cached. The dynamic part (book title/author/context) goes in the user message.
+const BOOK_SUMMARY_SYSTEM_PROMPT = `You are writing a structured, high-retention summary of a book for a serious reader. Depth over breadth — the goal is metabolized insight, not a shallow sample.
+
+The reader is a COO/entrepreneur. Bias "why_it_matters" and "action" toward operational leverage, team leadership, and long-term decision-making.
+
+Return ONLY valid JSON in this exact structure. No markdown, no code fences, no commentary:
+
+{
+  "thesis": "One crisp sentence capturing the core argument.",
+  "why_it_matters": "Two sentences on why this book is worth the reader's time specifically (as a COO/entrepreneur). Be concrete.",
+  "key_ideas": [
+    {
+      "concept": "Short name for the idea (3-6 words)",
+      "quote": "A real or faithful paraphrase quote from the book that crystallizes the idea.",
+      "when_to_apply": "A specific situation or trigger where this framework fires."
+    }
+  ],
+  "counter_arguments": "2-3 sentences on what the book gets wrong, oversimplifies, or where it's weakest. Be honest.",
+  "action": "One specific action to start doing based on this book.",
+  "avoidance": "One specific thing to stop doing based on this book.",
+  "ultra_short": "A 3-sentence version of the entire summary for spaced-repetition review."
+}
+
+Rules:
+- Include exactly 5-7 key ideas.
+- Each "concept" should be a reusable mental model, not a vague theme.
+- Each "quote" should feel like the book's voice, not generic.
+- "when_to_apply" must be a concrete situational trigger, not abstract.
+- "counter_arguments" must be real — do not sugar-coat. If the book is widely praised but has known weaknesses, say so.
+- Respond with ONLY the JSON object.`;
+
+const PERSONAL_REVIEW_SYSTEM_PROMPT = `You are writing a personal review layer on top of a book summary for a specific reader.
+
+Write a 150-200 word personal review that:
+1. Opens with how the book's thesis connects to ONE specific thing in the reader's current context
+2. Picks 2 of the key ideas most relevant to the reader right now and explains why
+3. Ends with one concrete thing the reader should do this week
+
+No preamble. No markdown headings. Plain readable prose.`;
 
 export interface BookSummary {
   thesis: string;
@@ -54,44 +94,16 @@ export async function generateBookSummary(
   userContext?: string
 ): Promise<BookSummary> {
   const contextLine = userContext
-    ? `\nThe reader is a COO/entrepreneur. Current context: ${userContext.slice(0, 300)}`
-    : '\nThe reader is a COO/entrepreneur — bias "why it matters" and "action" toward operational leverage, team leadership, and long-term decision-making.';
+    ? `\nUser's current context: ${userContext.slice(0, 300)}`
+    : '';
 
   const response = await anthropic.messages.create({
     model: MODELS.smart,
     max_tokens: 2500,
+    system: cachedSystem(BOOK_SUMMARY_SYSTEM_PROMPT),
     messages: [{
       role: 'user',
-      content: `You are writing a structured, high-retention summary of a book for a serious reader. Depth over breadth — the goal is metabolized insight, not a shallow sample.
-
-Book: "${title}" by ${author}
-${contextLine}
-
-Return ONLY valid JSON in this exact structure. No markdown, no code fences, no commentary:
-
-{
-  "thesis": "One crisp sentence capturing the core argument.",
-  "why_it_matters": "Two sentences on why this book is worth the reader's time specifically (as a COO/entrepreneur). Be concrete.",
-  "key_ideas": [
-    {
-      "concept": "Short name for the idea (3-6 words)",
-      "quote": "A real or faithful paraphrase quote from the book that crystallizes the idea.",
-      "when_to_apply": "A specific situation or trigger where this framework fires."
-    }
-  ],
-  "counter_arguments": "2-3 sentences on what the book gets wrong, oversimplifies, or where it's weakest. Be honest.",
-  "action": "One specific action to start doing based on this book.",
-  "avoidance": "One specific thing to stop doing based on this book.",
-  "ultra_short": "A 3-sentence version of the entire summary for spaced-repetition review."
-}
-
-Rules:
-- Include exactly 5-7 key ideas.
-- Each "concept" should be a reusable mental model, not a vague theme.
-- Each "quote" should feel like the book's voice, not generic.
-- "when_to_apply" must be a concrete situational trigger, not abstract.
-- "counter_arguments" must be real — do not sugar-coat. If the book is widely praised but has known weaknesses, say so.
-- Respond with ONLY the JSON object.`,
+      content: `Book: "${title}" by ${author}${contextLine}`,
     }],
   });
 
@@ -123,22 +135,10 @@ export async function generatePersonalReview(
     const response = await anthropic.messages.create({
       model: MODELS.smart,
       max_tokens: 600,
+      system: cachedSystem(PERSONAL_REVIEW_SYSTEM_PROMPT),
       messages: [{
         role: 'user',
-        content: `You are writing a personal review layer on top of a book summary for a specific reader.
-
-Book: "${book.title}" by ${book.author}
-Thesis: ${book.summary.thesis}
-
-Reader context:
-${userContext.slice(0, 800)}
-
-Write a 150-200 word personal review that:
-1. Opens with how the book's thesis connects to ONE specific thing in the reader's current context
-2. Picks 2 of the key ideas most relevant to the reader right now and explains why
-3. Ends with one concrete thing the reader should do this week
-
-No preamble. No markdown headings. Plain readable prose.`,
+        content: `Book: "${book.title}" by ${book.author}\nThesis: ${book.summary.thesis}\n\nReader context:\n${userContext.slice(0, 800)}`,
       }],
     });
 

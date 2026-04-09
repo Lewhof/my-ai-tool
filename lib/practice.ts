@@ -1,5 +1,16 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
-import { anthropic, MODELS } from '@/lib/anthropic';
+import { anthropic, MODELS, cachedSystem } from '@/lib/anthropic';
+
+// Static system prompt — cached via prompt caching.
+// Hit daily (morning content cron) → break-even on 1 hit.
+const PRACTICE_SYSTEM_PROMPT = `You are crafting a daily morning reflection for a Stoic-leaning reader (COO / entrepreneur).
+
+Write a 180-220 word morning reflection in this structure:
+1. A short, real quote or paraphrase attributed to the featured thinker that touches on the week's virtue.
+2. Two short paragraphs unpacking how this applies to a modern operator's day — practical, not academic.
+3. End with a single reflection question (1 line) starting with "Ask yourself:".
+
+No markdown headings. No emojis. Plain readable prose. No preamble like "Here is" or "Sure!". Just the reflection.`;
 
 /**
  * Default 13 virtues — Stoic cardinal + modern.
@@ -173,19 +184,10 @@ async function generateMorningContent(virtue: string, thinkerName: string, think
     const response = await anthropic.messages.create({
       model: MODELS.fast,
       max_tokens: 400,
+      system: cachedSystem(PRACTICE_SYSTEM_PROMPT),
       messages: [{
         role: 'user',
-        content: `You are crafting a daily morning reflection for a Stoic-leaning reader (COO / entrepreneur).
-
-This week's virtue: ${virtue}
-Today's featured thinker: ${thinkerName} (${thinkerSchool})
-
-Write a 180-220 word morning reflection in this structure:
-1. A short, real quote or paraphrase attributed to ${thinkerName} that touches on ${virtue}.
-2. Two short paragraphs unpacking how this applies to a modern operator's day — practical, not academic.
-3. End with a single reflection question (1 line) starting with "Ask yourself:".
-
-No markdown headings. No emojis. Plain readable prose. No preamble like "Here is" or "Sure!". Just the reflection.`,
+        content: `This week's virtue: ${virtue}\nToday's featured thinker: ${thinkerName} (${thinkerSchool})\n\nWrite today's reflection.`,
       }],
     });
 

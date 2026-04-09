@@ -1,11 +1,9 @@
 import { after } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import type Anthropic from '@anthropic-ai/sdk';
 import { sendTelegramMessage } from '@/lib/telegram';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { extractArticle, isBookUrl } from '@/lib/extract';
-import { anthropic as heliconeAnthropic, MODELS } from '@/lib/anthropic';
-
-const anthropic = new Anthropic();
+import { anthropic, anthropic as heliconeAnthropic, MODELS, pickModel } from '@/lib/anthropic';
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN!;
 const GITHUB_OWNER = process.env.GITHUB_OWNER!;
@@ -210,7 +208,7 @@ async function processMessage(chatId: number, userText: string, imageBase64?: st
   userContent.push({ type: 'text', text: `Current files:\n${filesContext}\n\nRequest: ${userText}` });
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: pickModel('code-gen'),
     max_tokens: 8000,
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userContent }],

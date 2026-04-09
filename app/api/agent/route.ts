@@ -1,24 +1,16 @@
 import { auth } from '@clerk/nextjs/server';
 import { after } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import { anthropic } from '@/lib/anthropic';
+import { anthropic, cachedSystem, pickModel } from '@/lib/anthropic';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { AGENT_TOOLS } from '@/lib/agent/tools';
 import { executeTool } from '@/lib/agent/executor';
 
-function getSystemPrompt() {
-  const now = new Date();
-  const sast = new Date(now.getTime() + 2 * 60 * 60 * 1000); // UTC+2
-  const dateStr = sast.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const timeStr = sast.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
-
-  return `You are Cerebro — the Lewhof AI Master Agent. A personal AI assistant with access to the user's full productivity stack.
-
-CURRENT DATE & TIME:
-- Today is ${dateStr}
-- Current time is ${timeStr} SAST (South Africa Standard Time, UTC+2)
-- ALWAYS use this date/time when referring to "today", "now", "this week", etc.
-- When creating calendar events or tasks with dates, use this as reference
+// ── STATIC portion of the Cerebro system prompt ──
+// This is cached via prompt caching (5-min TTL). Never reference
+// current time / date / user state here — only static rules & tool descriptions.
+// Break-even on cache: 1 hit. Cerebro is called dozens of times per day.
+const CEREBRO_STATIC_PROMPT = `You are Cerebro — the Lewhof AI Master Agent. A personal AI assistant with access to the user's full productivity stack.
 
 IMPORTANT — MEMORY & PERSISTENCE:
 - You HAVE persistent conversation history. Your past conversations are saved and loaded each session.
@@ -67,6 +59,25 @@ CRITICAL — TASK DEDUPLICATION:
 - When the user says "approve", "cancel", "go", "yes" — these are task approval commands, NOT requests to create new tasks
 - Do NOT interpret approval/status words as new task requests
 - If unsure whether a task already exists, check the whiteboard or task queue first`;
+
+/**
+ * Build the Cerebro system prompt as a cached+dynamic block array.
+ * The static portion is cached (90% discount on reads).
+ * The dynamic portion (current time) is added fresh each request.
+ */
+function getSystemPrompt(): Anthropic.Messages.TextBlockParam[] {
+  const now = new Date();
+  const sast = new Date(now.getTime() + 2 * 60 * 60 * 1000); // UTC+2
+  const dateStr = sast.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const timeStr = sast.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+  const dynamic = `CURRENT DATE & TIME:
+- Today is ${dateStr}
+- Current time is ${timeStr} SAST (South Africa Standard Time, UTC+2)
+- ALWAYS use this date/time when referring to "today", "now", "this week", etc.
+- When creating calendar events or tasks with dates, use this as reference`;
+
+  return cachedSystem(CEREBRO_STATIC_PROMPT, dynamic);
 }
 
 export async function POST(req: Request) {
@@ -284,7 +295,7 @@ export async function POST(req: Request) {
     iterations++;
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: pickModel('agent.tools'),
       max_tokens: 4096,
       system: getSystemPrompt(),
       tools: AGENT_TOOLS,
