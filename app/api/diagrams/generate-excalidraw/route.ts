@@ -135,8 +135,8 @@ export async function POST(req: Request) {
     const rawElements = raw as RawElement[];
 
     const now = Date.now();
-    const elements = rawElements.flatMap((el) => {
-      const base = {
+    const elements: Record<string, unknown>[] = rawElements.flatMap((el): Record<string, unknown>[] => {
+      const base: Record<string, unknown> = {
         ...el,
         seed: Math.floor(Math.random() * 2 ** 31),
         version: 1,
