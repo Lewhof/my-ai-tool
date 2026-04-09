@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   Sparkles, Download, Image as ImageIcon, Loader2, Zap,
-  CheckCircle2, XCircle, AlertTriangle, Wand2, RefreshCw,
+  CheckCircle2, XCircle, AlertTriangle, Wand2, RefreshCw, Trash2,
 } from 'lucide-react';
 
 interface Provider {
@@ -30,6 +30,15 @@ interface GenerationResult {
   attempts: GenerationAttempt[];
 }
 
+interface GalleryItem {
+  id: string;
+  prompt: string;
+  url: string | null;
+  provider: string | null;
+  source: 'cerebro' | 'image_lab';
+  created_at: string;
+}
+
 type Size = 'square' | 'landscape' | 'portrait';
 
 export default function ImageLabPage() {
@@ -39,9 +48,22 @@ export default function ImageLabPage() {
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [error, setError] = useState<{ message: string; attempts?: GenerationAttempt[] } | null>(null);
-  const [history, setHistory] = useState<Array<{ prompt: string; image: string; provider: string }>>([]);
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [galleryLoading, setGalleryLoading] = useState(true);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [providersLoading, setProvidersLoading] = useState(true);
+
+  const loadGallery = async () => {
+    try {
+      const res = await fetch('/api/images');
+      const data = await res.json();
+      setGallery(data.images ?? []);
+    } catch {
+      // non-fatal
+    } finally {
+      setGalleryLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetch('/api/images/providers')
@@ -51,6 +73,7 @@ export default function ImageLabPage() {
       })
       .catch(() => { toast.error('Could not load providers'); })
       .finally(() => setProvidersLoading(false));
+    loadGallery();
   }, []);
 
   const generate = async () => {
@@ -75,15 +98,25 @@ export default function ImageLabPage() {
 
       setResult(data);
       if (data.image) {
-        setHistory(prev => [
-          { prompt, image: data.image, provider: data.provider },
-          ...prev,
-        ].slice(0, 20));
+        // Refresh gallery from DB — the new row is now persisted
+        loadGallery();
       }
     } catch (err) {
       setError({ message: err instanceof Error ? err.message : 'Network error' });
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const deleteGalleryItem = async (id: string) => {
+    const snapshot = gallery;
+    setGallery(prev => prev.filter(g => g.id !== id));
+    try {
+      const res = await fetch(`/api/images?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('delete failed');
+    } catch {
+      setGallery(snapshot);
+      toast.error('Could not delete image');
     }
   };
 
@@ -349,21 +382,71 @@ export default function ImageLabPage() {
               </div>
             )}
 
-            {/* History */}
-            {history.length > 0 && (
+            {/* Gallery */}
+            {gallery.length > 0 && (
               <div>
-                <p className="text-muted-foreground text-[11px] uppercase tracking-wider font-semibold mb-2">Recent Generations</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-muted-foreground text-[11px] uppercase tracking-wider font-semibold">
+                    Gallery ({gallery.length})
+                  </p>
+                  <p className="text-muted-foreground/60 text-[10px]">
+                    Includes images from Cerebro
+                  </p>
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {history.map((item, i) => (
+                  {gallery.map((item) => (
                     <div
-                      key={i}
-                      className="bg-card border border-border rounded-lg overflow-hidden group cursor-pointer hover:border-primary/40 transition-colors"
-                      onClick={() => setResult({ image: item.image, provider: item.provider, attempts: [] })}
+                      key={item.id}
+                      className="bg-card border border-border rounded-lg overflow-hidden group relative hover:border-primary/40 transition-colors"
                     >
-                      <img src={item.image} alt={item.prompt} className="w-full h-32 object-cover" />
+                      {item.url ? (
+                        <img
+                          src={item.url}
+                          alt={item.prompt}
+                          className="w-full h-32 object-cover cursor-pointer"
+                          onClick={() => setResult({ image: item.url!, provider: item.provider || 'unknown', attempts: [] })}
+                        />
+                      ) : (
+                        <div className="w-full h-32 flex items-center justify-center bg-background">
+                          <ImageIcon size={24} className="text-muted-foreground/40" />
+                        </div>
+                      )}
+
+                      {/* Hover actions */}
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {item.url && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); downloadImage(item.url!, item.prompt.slice(0, 30) || 'image'); }}
+                            className="bg-background/80 backdrop-blur text-foreground p-1.5 rounded hover:bg-background transition-colors"
+                            title="Download"
+                          >
+                            <Download size={12} />
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteGalleryItem(item.id); }}
+                          className="bg-background/80 backdrop-blur text-red-400 p-1.5 rounded hover:bg-background transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+
+                      {/* Source badge */}
+                      <div className="absolute top-2 left-2">
+                        <span className={cn(
+                          'text-[9px] px-1.5 py-0.5 rounded font-medium backdrop-blur',
+                          item.source === 'cerebro'
+                            ? 'bg-primary/30 text-primary'
+                            : 'bg-background/80 text-muted-foreground'
+                        )}>
+                          {item.source === 'cerebro' ? 'Cerebro' : 'Lab'}
+                        </span>
+                      </div>
+
                       <div className="px-3 py-2">
                         <p className="text-muted-foreground text-[11px] truncate">{item.prompt}</p>
-                        <p className="text-muted-foreground/60 text-[10px] mt-0.5">{item.provider}</p>
+                        <p className="text-muted-foreground/60 text-[10px] mt-0.5">{item.provider || '—'}</p>
                       </div>
                     </div>
                   ))}
@@ -372,7 +455,7 @@ export default function ImageLabPage() {
             )}
 
             {/* Empty state */}
-            {!result && !error && !generating && history.length === 0 && (
+            {!result && !error && !generating && gallery.length === 0 && !galleryLoading && (
               <div className="bg-card border border-dashed border-border rounded-xl p-8 text-center">
                 <ImageIcon size={32} className="mx-auto text-muted-foreground/40 mb-2" />
                 <p className="text-muted-foreground text-sm">Enter a prompt and click Generate to create an image</p>

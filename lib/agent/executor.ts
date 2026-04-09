@@ -483,6 +483,15 @@ async function executeToolInner(
             const { data: signed } = await supabaseAdmin.storage.from('notes').createSignedUrl(fileName, 31536000);
             const url = signed?.signedUrl;
 
+            // Persist metadata so the image survives chat clears and shows in the gallery
+            await supabaseAdmin.from('generated_images').insert({
+              user_id: userId,
+              prompt: imgPrompt,
+              storage_path: fileName,
+              provider: 'gemini',
+              source: 'cerebro',
+            });
+
             return `IMAGE_GENERATED:${url}\n\n${text || `Image generated for: "${imgPrompt}"`}`;
           }
 
