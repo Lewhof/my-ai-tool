@@ -1,56 +1,40 @@
 import { auth } from '@clerk/nextjs/server';
+import { generateWithFallback } from '@/lib/image-providers';
+import type { ImageSize } from '@/lib/image-providers';
 
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
-  const { prompt } = await req.json();
+  const { prompt, provider, size } = await req.json() as {
+    prompt?: string;
+    provider?: string; // optional — specific provider id, or 'auto'
+    size?: ImageSize;
+  };
+
   if (!prompt?.trim()) return Response.json({ error: 'Prompt required' }, { status: 400 });
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return Response.json({ error: 'Gemini API key not configured' }, { status: 500 });
+  const isAuto = !provider || provider === 'auto';
+  const { finalResult, attempts } = await generateWithFallback(
+    { prompt, size: size || 'square' },
+    isAuto ? undefined : provider
+  );
 
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
+  if (!finalResult.success) {
+    return Response.json(
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseModalities: ['TEXT', 'IMAGE'],
-          },
-        }),
-      }
+        error: finalResult.error,
+        errorType: finalResult.errorType,
+        attempts,
+      },
+      { status: 500 }
     );
-
-    if (!res.ok) {
-      const err = await res.text();
-      return Response.json({ error: `Gemini error ${res.status}: ${err.slice(0, 200)}` }, { status: res.status });
-    }
-
-    const data = await res.json();
-    const parts = data.candidates?.[0]?.content?.parts ?? [];
-
-    let text = '';
-    let imageData = '';
-    let mimeType = '';
-
-    for (const part of parts) {
-      if (part.text) text += part.text;
-      if (part.inlineData) {
-        imageData = part.inlineData.data;
-        mimeType = part.inlineData.mimeType || 'image/png';
-      }
-    }
-
-    return Response.json({
-      text,
-      image: imageData ? `data:${mimeType};base64,${imageData}` : null,
-      mimeType,
-    });
-  } catch (err) {
-    return Response.json({ error: err instanceof Error ? err.message : 'Generation failed' }, { status: 500 });
   }
+
+  return Response.json({
+    image: finalResult.image,
+    text: finalResult.text,
+    provider: attempts[attempts.length - 1]?.provider,
+    attempts,
+  });
 }

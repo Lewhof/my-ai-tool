@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
@@ -47,7 +48,9 @@ const SUGGESTED_PROMPTS = [
   { icon: Search, text: 'Search the web for latest Next.js features', color: 'oklch(0.60 0.18 55)' },
 ];
 
-export default function AgentPage() {
+function AgentPageInner() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -57,6 +60,7 @@ export default function AgentPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const initialPromptHandled = useRef(false);
 
   const loadHistory = () => {
     fetch('/api/agent/history')
@@ -80,6 +84,20 @@ export default function AgentPage() {
     const poll = setInterval(loadHistory, 10000);
     return () => clearInterval(poll);
   }, []);
+
+  // Handle inbound ?prompt= from Dashboard Cerebro widget — auto-send once
+  useEffect(() => {
+    if (initialPromptHandled.current) return;
+    const promptParam = searchParams.get('prompt');
+    if (promptParam && promptParam.trim()) {
+      initialPromptHandled.current = true;
+      // Clean the URL so refresh doesn't re-send
+      router.replace('/agent');
+      // Auto-send the prompt
+      sendMessage(promptParam);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -387,16 +405,16 @@ export default function AgentPage() {
             </div>
           </div>
         ) : (
-          <div className="px-4 py-4 space-y-4">
+          <div className="px-3 sm:px-4 py-4 space-y-4 max-w-3xl mx-auto w-full">
             {messages.map((msg, i) => (
-              <div key={i} className={cn('flex gap-3 animate-fade-up group', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
+              <div key={i} className={cn('flex gap-2 sm:gap-3 animate-fade-up group', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
                 {msg.role === 'assistant' && (
                   <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ background: 'var(--color-brand)' }}>
                     <Bot size={14} className="text-white" />
                   </div>
                 )}
                 <div className={cn(
-                  'max-w-[80%] rounded-2xl px-4 py-3',
+                  'max-w-[90%] sm:max-w-[85%] rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3',
                   msg.role === 'user' ? 'rounded-tr-sm' : 'rounded-tl-sm'
                 )} style={
                   msg.role === 'user'
@@ -572,43 +590,45 @@ export default function AgentPage() {
       )}
 
       {/* Input bar */}
-      <div className="px-4 pb-4 pt-2 shrink-0 border-t border-border" style={{ background: 'var(--color-surface-1)' }}>
+      <div className="px-2 sm:px-4 pb-3 sm:pb-4 pt-2 shrink-0 border-t border-border" style={{ background: 'var(--color-surface-1)' }}>
         <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} className="hidden" />
-        <div className="flex items-end gap-2">
-          <button onClick={toggleVoice}
-            className={cn('w-10 h-10 rounded-xl flex items-center justify-center border transition-all duration-200 shrink-0',
-              listening ? 'border-red-400/60 text-red-400 animate-pulse' : 'border-border text-muted-foreground hover:text-foreground hover:bg-surface-2'
-            )} style={listening ? { background: 'oklch(0.62 0.22 25 / 0.15)' } : {}}>
-            {listening ? <MicOff size={16} /> : <Mic size={16} />}
-          </button>
-          <button onClick={() => fileInputRef.current?.click()}
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground border border-border hover:bg-surface-2 transition-colors shrink-0">
-            <Camera size={16} />
-          </button>
-          <div className="flex-1 relative">
-            <textarea ref={inputRef} value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-              placeholder={listening ? 'Listening\u2026 speak now' : 'Ask anything \u2014 voice, camera, or type...'}
-              rows={1} disabled={loading}
-              className={cn('w-full px-4 py-2.5 rounded-xl text-[14px] text-foreground placeholder-muted-foreground outline-none border transition-colors resize-none',
-                listening ? 'border-red-400/40' : 'border-border focus:border-white/20'
-              )} style={{ background: 'var(--color-surface-2)', minHeight: 42, maxHeight: 120 }} />
-            {listening && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                {[0,1,2].map(j => <div key={j} className="w-1 rounded-full bg-red-400" style={{ height: 12, animation: `cerebro-bounce 0.8s ease-in-out ${j * 0.15}s infinite` }} />)}
-              </div>
-            )}
+        <div className="max-w-3xl mx-auto w-full">
+          <div className="flex items-end gap-1.5 sm:gap-2">
+            <button onClick={toggleVoice}
+              className={cn('w-10 h-10 rounded-xl flex items-center justify-center border transition-all duration-200 shrink-0',
+                listening ? 'border-red-400/60 text-red-400 animate-pulse' : 'border-border text-muted-foreground hover:text-foreground hover:bg-surface-2'
+              )} style={listening ? { background: 'oklch(0.62 0.22 25 / 0.15)' } : {}}>
+              {listening ? <MicOff size={16} /> : <Mic size={16} />}
+            </button>
+            <button onClick={() => fileInputRef.current?.click()}
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground border border-border hover:bg-surface-2 transition-colors shrink-0">
+              <Camera size={16} />
+            </button>
+            <div className="flex-1 relative min-w-0">
+              <textarea ref={inputRef} value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                placeholder={listening ? 'Listening\u2026 speak now' : 'Ask anything...'}
+                rows={1} disabled={loading}
+                className={cn('w-full px-3 sm:px-4 py-2.5 rounded-xl text-[14px] text-foreground placeholder-muted-foreground outline-none border transition-colors resize-none',
+                  listening ? 'border-red-400/40' : 'border-border focus:border-white/20'
+                )} style={{ background: 'var(--color-surface-2)', minHeight: 42, maxHeight: 120 }} />
+              {listening && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  {[0,1,2].map(j => <div key={j} className="w-1 rounded-full bg-red-400" style={{ height: 12, animation: `cerebro-bounce 0.8s ease-in-out ${j * 0.15}s infinite` }} />)}
+                </div>
+              )}
+            </div>
+            <button onClick={() => sendMessage()} disabled={loading || !input.trim()}
+              className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-white transition-all shrink-0', input.trim() ? 'btn-brand' : 'opacity-30 cursor-not-allowed')}
+              style={{ background: 'var(--color-brand)' }}>
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            </button>
           </div>
-          <button onClick={() => sendMessage()} disabled={loading || !input.trim()}
-            className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-white transition-all shrink-0', input.trim() ? 'btn-brand' : 'opacity-30 cursor-not-allowed')}
-            style={{ background: 'var(--color-brand)' }}>
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-          </button>
+          <p className="text-center text-[10px] text-muted-foreground/40 mt-2">
+            Cerebro can make mistakes. Verify important information.
+          </p>
         </div>
-        <p className="text-center text-[10px] text-muted-foreground/40 mt-2">
-          Cerebro can make mistakes. Verify important information.
-        </p>
       </div>
 
       <style>{`
@@ -618,5 +638,17 @@ export default function AgentPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function AgentPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center h-full">
+        <Loader2 size={24} className="animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <AgentPageInner />
+    </Suspense>
   );
 }

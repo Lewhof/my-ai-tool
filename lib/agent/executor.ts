@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { getMicrosoftToken } from '@/lib/microsoft-token';
 
 export async function executeTool(
   toolName: string,
@@ -15,28 +16,41 @@ export async function executeTool(
 
         const { data: accounts } = await supabaseAdmin
           .from('calendar_accounts')
-          .select('access_token, label')
+          .select('id, label, alias, provider')
           .eq('user_id', userId);
 
         if (!accounts?.length) return 'No calendar accounts connected. Go to Settings > Connections to add one.';
 
-        const allEvents = [];
+        const allEvents: Array<{ time: string; subject: string; label: string; startIso: string }> = [];
         for (const acc of accounts) {
           try {
+            const token = await getMicrosoftToken(userId, acc.id);
+            if (!token) continue;
+
             const res = await fetch(
               `https://graph.microsoft.com/v1.0/me/calendarview?startDateTime=${start}&endDateTime=${end}&$orderby=start/dateTime&$top=20&$select=subject,start,end,location`,
-              { headers: { Authorization: `Bearer ${acc.access_token}` } }
+              { headers: { Authorization: `Bearer ${token}` } }
             );
             if (res.ok) {
               const data = await res.json();
+              const label = acc.alias || acc.label || 'Calendar';
               for (const e of data.value ?? []) {
-                allEvents.push(`${e.start?.dateTime?.slice(11, 16)} - ${e.subject} (${acc.label})`);
+                const startIso = e.start?.dateTime || '';
+                allEvents.push({
+                  time: startIso.slice(11, 16),
+                  subject: e.subject,
+                  label,
+                  startIso,
+                });
               }
             }
           } catch { /* skip failed account */ }
         }
 
-        return allEvents.length > 0 ? `Calendar events:\n${allEvents.join('\n')}` : 'No events found for this period.';
+        allEvents.sort((a, b) => a.startIso.localeCompare(b.startIso));
+        return allEvents.length > 0
+          ? `Calendar events:\n${allEvents.map(e => `${e.time} - ${e.subject} (${e.label})`).join('\n')}`
+          : 'No events found for this period.';
       }
 
       case 'create_todo': {
@@ -261,22 +275,55 @@ export async function executeTool(
       case 'get_emails': {
         const folder = (input.folder as string) || 'inbox';
         const limit = (input.limit as number) || 10;
-        const { data: accounts } = await supabaseAdmin.from('calendar_accounts').select('access_token').eq('user_id', userId).eq('is_default', true).limit(1);
-        const token = accounts?.[0]?.access_token;
-        if (!token) return 'No Microsoft account connected. Go to Settings > Connections.';
+
+        // Fetch from ALL Microsoft accounts (personal + work)
+        const { data: accounts } = await supabaseAdmin
+          .from('calendar_accounts')
+          .select('id, label, alias, email, provider')
+          .eq('user_id', userId)
+          .in('provider', ['microsoft', 'microsoft-work']);
+
+        if (!accounts || accounts.length === 0) {
+          return 'No Microsoft account connected. Go to Settings > Connections.';
+        }
 
         const folderMap: Record<string, string> = { inbox: 'inbox', sent: 'sentitems', drafts: 'drafts' };
-        const res = await fetch(
-          `https://graph.microsoft.com/v1.0/me/mailFolders/${folderMap[folder] || 'inbox'}/messages?$top=${limit}&$orderby=receivedDateTime desc&$select=subject,from,receivedDateTime,isRead,bodyPreview`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (!res.ok) return `Failed to fetch emails (${res.status}).`;
-        const data = await res.json();
-        const emails = (data.value ?? []).map((e: Record<string, unknown>) => {
-          const from = (e.from as Record<string, Record<string, string>>)?.emailAddress;
-          return `- ${e.isRead ? '' : '[UNREAD] '}${e.subject} — from ${from?.name || from?.address || 'unknown'} (${(e.bodyPreview as string)?.slice(0, 80)})`;
-        });
-        return emails.length > 0 ? `Emails (${folder}):\n${emails.join('\n')}` : 'No emails found.';
+        const graphFolder = folderMap[folder] || 'inbox';
+        const perAccountLimit = Math.max(5, Math.ceil(limit / accounts.length));
+
+        type EmailEntry = { label: string; line: string; date: string; isRead: boolean };
+        const allEmails: EmailEntry[] = [];
+
+        for (const account of accounts) {
+          try {
+            const token = await getMicrosoftToken(userId, account.id);
+            if (!token) continue;
+
+            const res = await fetch(
+              `https://graph.microsoft.com/v1.0/me/mailFolders/${graphFolder}/messages?$top=${perAccountLimit}&$orderby=receivedDateTime desc&$select=subject,from,receivedDateTime,isRead,bodyPreview`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            if (!res.ok) continue;
+            const data = await res.json();
+            const label = account.alias || account.label || 'Email';
+
+            for (const e of (data.value ?? []) as Record<string, unknown>[]) {
+              const from = (e.from as Record<string, Record<string, string>>)?.emailAddress;
+              const unread = e.isRead ? '' : '[UNREAD] ';
+              const line = `- ${unread}[${label}] ${e.subject} — from ${from?.name || from?.address || 'unknown'} (${(e.bodyPreview as string)?.slice(0, 80)})`;
+              allEmails.push({ label, line, date: e.receivedDateTime as string, isRead: !!e.isRead });
+            }
+          } catch { /* skip failing account */ }
+        }
+
+        if (allEmails.length === 0) return 'No emails found across connected accounts.';
+
+        // Sort by date desc, cap at requested limit
+        allEmails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const top = allEmails.slice(0, limit);
+        const unreadCount = allEmails.filter(e => !e.isRead).length;
+
+        return `Emails (${folder}, ${accounts.length} account${accounts.length > 1 ? 's' : ''}, ${unreadCount} unread):\n${top.map(e => e.line).join('\n')}`;
       }
 
       case 'triage_emails': {

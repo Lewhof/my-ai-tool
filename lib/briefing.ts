@@ -4,13 +4,14 @@ import { getMicrosoftToken } from '@/lib/microsoft-token';
 
 export interface BriefingData {
   weather: string;
-  calendarEvents: Array<{ subject: string; start: string; end: string }>;
+  calendarEvents: Array<{ subject: string; start: string; end: string; accountLabel?: string }>;
   todos: Array<{ title: string; priority: string; due_date: string | null; status: string }>;
   overdueTasks: Array<{ title: string; due_date: string }>;
   dueTodayTasks: Array<{ title: string; priority: string }>;
   whiteboardItems: Array<{ title: string; status: string; priority: string; created_at: string }>;
   staleItems: Array<{ title: string }>;
   unreadEmails: number;
+  unreadByAccount: Array<{ label: string; email: string; count: number }>;
   notepadContext: string;
 }
 
@@ -45,7 +46,7 @@ export async function gatherBriefingData(userId: string): Promise<BriefingData> 
   const today = now.toISOString().split('T')[0];
 
   // Parallel data fetching
-  const [todosRes, whiteboardRes, notepadRes, weatherRes, calendarData, unreadEmails] = await Promise.all([
+  const [todosRes, whiteboardRes, notepadRes, weatherRes, calendarData, emailData] = await Promise.all([
     supabaseAdmin
       .from('todos')
       .select('title, status, priority, due_date')
@@ -70,8 +71,8 @@ export async function gatherBriefingData(userId: string): Promise<BriefingData> 
       .single(),
 
     fetchWeather(),
-    fetchCalendarEvents(userId),
-    fetchUnreadEmailCount(userId),
+    fetchAllCalendarEvents(userId),
+    fetchAllUnreadEmailCounts(userId),
   ]);
 
   const todos = todosRes.data ?? [];
@@ -90,7 +91,8 @@ export async function gatherBriefingData(userId: string): Promise<BriefingData> 
     dueTodayTasks,
     whiteboardItems: whiteboard,
     staleItems,
-    unreadEmails,
+    unreadEmails: emailData.total,
+    unreadByAccount: emailData.breakdown,
     notepadContext: notepadRes.data?.content?.slice(0, 500) || '',
   };
 }
@@ -106,17 +108,23 @@ export async function generateBriefing(userId: string, data: BriefingData): Prom
     timeZone: 'Africa/Johannesburg',
   });
 
+  const emailBreakdown = data.unreadByAccount.length > 0
+    ? data.unreadByAccount.map(a => `  ${a.label} (${a.email}): ${a.count}`).join('\n')
+    : `  Total: ${data.unreadEmails}`;
+
   const context = `
 Today: ${dateStr}
 Weather: ${data.weather || 'Unknown'}
-Unread emails: ${data.unreadEmails}
+Unread emails (${data.unreadEmails} total across all accounts):
+${emailBreakdown}
 
 Calendar (${data.calendarEvents.length} events today):
 ${data.calendarEvents.length > 0
     ? data.calendarEvents.map(e => {
       const start = new Date(e.start).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg' });
       const end = new Date(e.end).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg' });
-      return `- ${start}-${end}: ${e.subject}`;
+      const label = e.accountLabel ? ` [${e.accountLabel}]` : '';
+      return `- ${start}-${end}: ${e.subject}${label}`;
     }).join('\n')
     : 'No events scheduled'}
 
@@ -216,7 +224,8 @@ export function formatBriefingForTelegram(result: BriefingResult): string {
   if (data.calendarEvents.length > 0) {
     for (const e of data.calendarEvents.slice(0, 6)) {
       const start = new Date(e.start).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg' });
-      msg += `  \u2022 ${start} - ${e.subject}\n`;
+      const label = e.accountLabel ? ` [${e.accountLabel}]` : '';
+      msg += `  \u2022 ${start} - ${e.subject}${label}\n`;
     }
   } else {
     msg += `  Clear day - no meetings\n`;
@@ -236,8 +245,14 @@ export function formatBriefingForTelegram(result: BriefingResult): string {
   }
   msg += '\n';
 
-  // Email
-  msg += `\u{1F4E7} *Unread Emails:* ${stats.unreadEmails}\n\n`;
+  // Email (per-account breakdown if multiple accounts)
+  msg += `\u{1F4E7} *Unread Emails:* ${stats.unreadEmails}\n`;
+  if (data.unreadByAccount.length > 1) {
+    for (const acc of data.unreadByAccount) {
+      msg += `  \u2022 ${acc.label}: ${acc.count}\n`;
+    }
+  }
+  msg += '\n';
 
   // AI Insight (the generated briefing, sanitized for Telegram)
   const sanitized = sanitizeForTelegram(result.briefing);
@@ -264,10 +279,25 @@ async function fetchWeather(): Promise<string> {
   }
 }
 
-async function fetchCalendarEvents(userId: string): Promise<Array<{ subject: string; start: string; end: string }>> {
+/**
+ * Get all active Microsoft accounts for a user (both personal and work).
+ */
+async function getAllMicrosoftAccounts(userId: string) {
+  const { data } = await supabaseAdmin
+    .from('calendar_accounts')
+    .select('id, label, alias, email, provider')
+    .eq('user_id', userId)
+    .in('provider', ['microsoft', 'microsoft-work']);
+  return data ?? [];
+}
+
+/**
+ * Fetch today's calendar events from ALL connected Microsoft accounts.
+ */
+async function fetchAllCalendarEvents(userId: string): Promise<Array<{ subject: string; start: string; end: string; accountLabel?: string }>> {
   try {
-    const token = await getMicrosoftToken(userId);
-    if (!token) return [];
+    const accounts = await getAllMicrosoftAccounts(userId);
+    if (accounts.length === 0) return [];
 
     const now = new Date();
     const startOfDay = new Date(now);
@@ -275,35 +305,77 @@ async function fetchCalendarEvents(userId: string): Promise<Array<{ subject: str
     const endOfDay = new Date(now);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const res = await fetch(
-      `https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=${startOfDay.toISOString()}&endDateTime=${endOfDay.toISOString()}&$orderby=start/dateTime&$top=20&$select=subject,start,end`,
-      { headers: { Authorization: `Bearer ${token}` } }
+    const allEvents = await Promise.all(
+      accounts.map(async (account) => {
+        try {
+          const token = await getMicrosoftToken(userId, account.id);
+          if (!token) return [];
+
+          const res = await fetch(
+            `https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=${startOfDay.toISOString()}&endDateTime=${endOfDay.toISOString()}&$orderby=start/dateTime&$top=20&$select=subject,start,end`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (!res.ok) return [];
+          const data = await res.json();
+          const label = account.alias || account.label || '';
+          return (data.value ?? []).map((e: { subject: string; start: { dateTime: string }; end: { dateTime: string } }) => ({
+            subject: e.subject,
+            start: e.start.dateTime,
+            end: e.end.dateTime,
+            accountLabel: label,
+          }));
+        } catch {
+          return [];
+        }
+      })
     );
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.value ?? []).map((e: { subject: string; start: { dateTime: string }; end: { dateTime: string } }) => ({
-      subject: e.subject,
-      start: e.start.dateTime,
-      end: e.end.dateTime,
-    }));
+
+    // Flatten, dedupe by subject+start (same meeting on multiple accounts), sort chronologically
+    const flat = allEvents.flat();
+    const seen = new Set<string>();
+    const deduped = flat.filter(e => {
+      const key = `${e.subject}|${e.start}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return deduped.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
   } catch {
     return [];
   }
 }
 
-async function fetchUnreadEmailCount(userId: string): Promise<number> {
+/**
+ * Fetch unread email counts from ALL connected Microsoft accounts.
+ */
+async function fetchAllUnreadEmailCounts(userId: string): Promise<{ total: number; breakdown: Array<{ label: string; email: string; count: number }> }> {
   try {
-    const token = await getMicrosoftToken(userId);
-    if (!token) return 0;
+    const accounts = await getAllMicrosoftAccounts(userId);
+    if (accounts.length === 0) return { total: 0, breakdown: [] };
 
-    const res = await fetch(
-      'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$filter=isRead eq false&$count=true&$top=1',
-      { headers: { Authorization: `Bearer ${token}`, Prefer: 'odata.maxpagesize=1' } }
+    const counts = await Promise.all(
+      accounts.map(async (account) => {
+        try {
+          const token = await getMicrosoftToken(userId, account.id);
+          if (!token) return { label: account.alias || account.label || 'Email', email: account.email, count: 0 };
+
+          const res = await fetch(
+            'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$filter=isRead eq false&$count=true&$top=1',
+            { headers: { Authorization: `Bearer ${token}`, Prefer: 'odata.maxpagesize=1' } }
+          );
+          if (!res.ok) return { label: account.alias || account.label || 'Email', email: account.email, count: 0 };
+          const data = await res.json();
+          const count = data['@odata.count'] ?? data.value?.length ?? 0;
+          return { label: account.alias || account.label || 'Email', email: account.email, count };
+        } catch {
+          return { label: account.alias || account.label || 'Email', email: account.email, count: 0 };
+        }
+      })
     );
-    if (!res.ok) return 0;
-    const data = await res.json();
-    return data['@odata.count'] ?? data.value?.length ?? 0;
+
+    const total = counts.reduce((sum, c) => sum + c.count, 0);
+    return { total, breakdown: counts };
   } catch {
-    return 0;
+    return { total: 0, breakdown: [] };
   }
 }
