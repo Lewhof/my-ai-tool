@@ -5,6 +5,7 @@ import { anthropic, cachedSystem, pickModel } from '@/lib/anthropic';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { AGENT_TOOLS } from '@/lib/agent/tools';
 import { executeTool } from '@/lib/agent/executor';
+import { getLearnedRules, bumpRuleHits } from '@/lib/agent/evolution';
 
 // ── STATIC portion of the Cerebro system prompt ──
 // This is cached via prompt caching (5-min TTL). Never reference
@@ -63,20 +64,21 @@ CRITICAL — TASK DEDUPLICATION:
 /**
  * Build the Cerebro system prompt as a cached+dynamic block array.
  * The static portion is cached (90% discount on reads).
- * The dynamic portion (current time) is added fresh each request.
+ * The dynamic portion (current time + learned rules) is added fresh each request.
  */
-function getSystemPrompt(): Anthropic.Messages.TextBlockParam[] {
+function getSystemPrompt(learnedRules: string): Anthropic.Messages.TextBlockParam[] {
   const now = new Date();
   const sast = new Date(now.getTime() + 2 * 60 * 60 * 1000); // UTC+2
   const dateStr = sast.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const timeStr = sast.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
 
-  const dynamic = `CURRENT DATE & TIME:
+  const timeBlock = `CURRENT DATE & TIME:
 - Today is ${dateStr}
 - Current time is ${timeStr} SAST (South Africa Standard Time, UTC+2)
 - ALWAYS use this date/time when referring to "today", "now", "this week", etc.
 - When creating calendar events or tasks with dates, use this as reference`;
 
+  const dynamic = learnedRules ? `${timeBlock}\n\n${learnedRules}` : timeBlock;
   return cachedSystem(CEREBRO_STATIC_PROMPT, dynamic);
 }
 
@@ -285,6 +287,9 @@ export async function POST(req: Request) {
     { role: 'user', content: message + kbContext + notepadContext },
   ];
 
+  // Load learned rules once per turn and inject into the system prompt.
+  const learnedRules = await getLearnedRules(userId);
+
   // Agentic loop — keep calling tools until the model stops
   let finalResponse = '';
   let iterations = 0;
@@ -297,7 +302,7 @@ export async function POST(req: Request) {
     const response = await anthropic.messages.create({
       model: pickModel('agent.tools'),
       max_tokens: 4096,
-      system: getSystemPrompt(),
+      system: getSystemPrompt(learnedRules),
       tools: AGENT_TOOLS,
       messages: currentMessages,
     });
@@ -346,57 +351,65 @@ export async function POST(req: Request) {
     }
   }
 
-  // Save conversation to persistent history
-  after(async () => {
-    try {
-      // Get or create the agent thread
-      let { data: thread } = await supabaseAdmin
+  // Save conversation synchronously so we can return the assistant_message_id
+  // (the feedback UI needs it to attach thumbs/corrections). Wrapped in try/catch
+  // so a history failure never breaks the response.
+  let assistantMessageId: string | null = null;
+  try {
+    let { data: thread } = await supabaseAdmin
+      .from('chat_threads')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('agent_thread', true)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!thread) {
+      const { data: created } = await supabaseAdmin
         .from('chat_threads')
+        .insert({ user_id: userId, title: 'Cerebro History', model: 'claude-sonnet', agent_thread: true })
         .select('id')
-        .eq('user_id', userId)
-        .eq('agent_thread', true)
-        .order('updated_at', { ascending: false })
-        .limit(1)
         .single();
+      thread = created;
+    }
 
-      if (!thread) {
-        const { data: created } = await supabaseAdmin
-          .from('chat_threads')
-          .insert({ user_id: userId, title: 'Cerebro History', model: 'claude-sonnet', agent_thread: true })
-          .select('id')
-          .single();
-        thread = created;
-      }
+    if (thread) {
+      await supabaseAdmin.from('chat_messages').insert({
+        thread_id: thread.id,
+        role: 'user',
+        content: message,
+      });
 
-      if (thread) {
-        // Save user message
-        await supabaseAdmin.from('chat_messages').insert({
-          thread_id: thread.id,
-          role: 'user',
-          content: message,
-        });
-
-        // Save agent response
-        if (finalResponse) {
-          await supabaseAdmin.from('chat_messages').insert({
+      if (finalResponse) {
+        const { data: assistantRow } = await supabaseAdmin
+          .from('chat_messages')
+          .insert({
             thread_id: thread.id,
             role: 'assistant',
             content: finalResponse,
             model: 'claude-sonnet',
-          });
-        }
-
-        // Update thread timestamp
-        await supabaseAdmin
-          .from('chat_threads')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', thread.id);
+          })
+          .select('id')
+          .single();
+        assistantMessageId = assistantRow?.id ?? null;
       }
-    } catch { /* silent — don't break the response if history save fails */ }
-  });
+
+      await supabaseAdmin
+        .from('chat_threads')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', thread.id);
+    }
+  } catch { /* silent — don't break the response if history save fails */ }
+
+  // Fire-and-forget: bump hit counters on rules whose text matches the response.
+  if (finalResponse) {
+    after(async () => { await bumpRuleHits(userId, finalResponse); });
+  }
 
   return Response.json({
     response: finalResponse,
     iterations,
+    assistant_message_id: assistantMessageId,
   });
 }

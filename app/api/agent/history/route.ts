@@ -20,7 +20,7 @@ export async function GET() {
   // Get last 50 messages
   const { data: messages } = await supabaseAdmin
     .from('chat_messages')
-    .select('role, content, created_at')
+    .select('id, role, content, created_at')
     .eq('thread_id', thread.id)
     .order('created_at', { ascending: true })
     .limit(50);

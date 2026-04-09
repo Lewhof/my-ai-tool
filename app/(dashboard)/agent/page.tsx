@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
@@ -11,11 +12,14 @@ import {
   Calendar, CheckSquare, ClipboardList, FileText,
   StickyNote, Cloud, CreditCard, BookOpen, Search,
   ChevronDown, MoreHorizontal, Archive, Trash2,
+  Brain, ThumbsUp, ThumbsDown,
 } from 'lucide-react';
 
 interface Message {
+  id?: string;
   role: 'user' | 'assistant';
   content: string;
+  feedback?: 'up' | 'down';
 }
 
 const SLASH_COMMANDS = [
@@ -67,7 +71,8 @@ function AgentPageInner() {
       .then((r) => r.json())
       .then((data) => {
         if (data.messages?.length) {
-          const newMsgs = data.messages.map((m: { role: string; content: string }) => ({
+          const newMsgs = data.messages.map((m: { id?: string; role: string; content: string }) => ({
+            id: m.id,
             role: m.role as 'user' | 'assistant',
             content: m.content,
           }));
@@ -76,6 +81,25 @@ function AgentPageInner() {
         }
       })
       .catch(() => {});
+  };
+
+  const sendFeedback = async (messageId: string, rating: 'up' | 'down', msgIndex: number) => {
+    let correction: string | null = null;
+    if (rating === 'down') {
+      correction = prompt('What should I have done differently? (Optional — leave blank to just flag)');
+      if (correction === null) return; // user cancelled
+    }
+    const res = await fetch('/api/agent/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_id: messageId, rating, correction_text: correction || null }),
+    });
+    if (res.ok) {
+      setMessages((prev) => prev.map((m, i) => i === msgIndex ? { ...m, feedback: rating } : m));
+      toast.success(rating === 'up' ? 'Thanks for the feedback' : 'Feedback captured — review in Brain');
+    } else {
+      toast.error('Feedback failed');
+    }
   };
 
   useEffect(() => {
@@ -319,7 +343,11 @@ function AgentPageInner() {
         return;
       }
       const data = await res.json();
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.response || 'No response.' }]);
+      setMessages((prev) => [...prev, {
+        id: data.assistant_message_id,
+        role: 'assistant',
+        content: data.response || 'No response.',
+      }]);
     } catch (err) {
       setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${err instanceof Error ? err.message : 'Network error'}` }]);
     } finally { setLoading(false); inputRef.current?.focus(); }
@@ -350,23 +378,30 @@ function AgentPageInner() {
           <p className="text-[14px] font-semibold text-foreground">Cerebro</p>
           <p className="text-[11px] text-muted-foreground">Claude Sonnet &middot; access to all your tools</p>
         </div>
-        {hasMessages && (
-          <div className="flex items-center gap-1">
-            <button onClick={archiveAndClear}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] text-muted-foreground hover:text-foreground border border-border hover:bg-surface-2 transition-colors">
-              <Archive size={12} /> Archive
-            </button>
-            <button onClick={async () => {
-              if (!confirm('Clear conversation?')) return;
-              await fetch('/api/agent/history', { method: 'DELETE' });
-              setMessages([]);
-              toast('Conversation cleared');
-            }}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-surface-2 transition-colors">
-              <Trash2 size={14} />
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-1">
+          <Link href="/agent/brain"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] text-muted-foreground hover:text-foreground border border-border hover:bg-surface-2 transition-colors"
+            title="Cerebro Brain — rules, metrics, corrections">
+            <Brain size={12} /> Brain
+          </Link>
+          {hasMessages && (
+            <>
+              <button onClick={archiveAndClear}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] text-muted-foreground hover:text-foreground border border-border hover:bg-surface-2 transition-colors">
+                <Archive size={12} /> Archive
+              </button>
+              <button onClick={async () => {
+                if (!confirm('Clear conversation?')) return;
+                await fetch('/api/agent/history', { method: 'DELETE' });
+                setMessages([]);
+                toast('Conversation cleared');
+              }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-surface-2 transition-colors">
+                <Trash2 size={14} />
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Messages */}
@@ -487,9 +522,9 @@ function AgentPageInner() {
                           </div>
                         );
                       })()}
-                      {/* Forward actions */}
+                      {/* Forward actions + feedback thumbs */}
                       {msg.content.length > 10 && (
-                        <div className="flex gap-1 mt-2 pt-2 border-t border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
                           {[
                             { label: 'Task', fn: () => fetch('/api/todos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: msg.content.replace(/[#*`>\-]/g, '').trim().slice(0, 100) }) }) },
                             { label: 'Note', fn: () => fetch('/api/notes-v2', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Cerebro Note', content: msg.content }) }) },
@@ -501,6 +536,30 @@ function AgentPageInner() {
                               &rarr; {fwd.label}
                             </button>
                           ))}
+                          {msg.id && (
+                            <div className="ml-auto flex gap-0.5">
+                              <button
+                                onClick={() => msg.id && sendFeedback(msg.id, 'up', i)}
+                                title="Helpful"
+                                className={cn(
+                                  'p-1 rounded hover:bg-white/10 transition-colors',
+                                  msg.feedback === 'up' ? 'text-emerald-400' : 'text-muted-foreground/60 hover:text-foreground'
+                                )}
+                              >
+                                <ThumbsUp size={11} />
+                              </button>
+                              <button
+                                onClick={() => msg.id && sendFeedback(msg.id, 'down', i)}
+                                title="Not helpful — teach me"
+                                className={cn(
+                                  'p-1 rounded hover:bg-white/10 transition-colors',
+                                  msg.feedback === 'down' ? 'text-red-400' : 'text-muted-foreground/60 hover:text-foreground'
+                                )}
+                              >
+                                <ThumbsDown size={11} />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

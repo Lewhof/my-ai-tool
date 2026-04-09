@@ -9,7 +9,7 @@ import {
   Calendar, CalendarDays, Mail, KeyRound, Settings, MessageSquare,
   Zap, BookOpen, Image as ImageIcon, Focus, StickyNote, GitFork,
   ClipboardList, CreditCard, ChevronLeft, ChevronRight, Globe,
-  Wallet, Target, Brain, Activity,
+  Wallet, Target, Brain, Activity, Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +19,7 @@ const SIDEBAR_GROUPS = [
     items: [
       { name: 'Dashboard', href: '/', icon: LayoutDashboard },
       { name: 'Cerebro', href: '/agent', icon: Bot, isBrand: true },
+      { name: 'Cerebro Brain', href: '/agent/brain', icon: Sparkles },
       { name: 'Social', href: '/social', icon: Globe },
     ],
   },
@@ -70,6 +71,8 @@ export default function Sidebar() {
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
+    // /agent should not match /agent/brain — treat top-level agent as exact + its plain children only
+    if (href === '/agent') return pathname === '/agent';
     return pathname.startsWith(href);
   };
 

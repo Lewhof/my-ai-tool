@@ -291,4 +291,16 @@ export const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
       required: ['title'],
     },
   },
+  {
+    name: 'save_learned_rule',
+    description: 'Save a behavior rule to your own long-term memory. Use this proactively when the user teaches you a preference, corrects you, or tells you how you should behave in the future (e.g. "always use bullet lists", "never send calendar invites without asking", "prefer South African spelling"). The rule will be auto-injected into your system prompt on every future turn. Do NOT use this for one-off facts — use save_note or search_kb for those.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        rule: { type: 'string', description: 'A short, actionable rule in second-person imperative (e.g. "Always confirm before deleting tasks"). Max ~200 chars.' },
+        category: { type: 'string', enum: ['do', 'dont', 'prefer'], description: '"do" = must do, "dont" = must not do, "prefer" = soft preference. Default: prefer.' },
+      },
+      required: ['rule'],
+    },
+  },
 ];

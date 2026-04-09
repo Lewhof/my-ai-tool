@@ -1,7 +1,35 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { getMicrosoftToken } from '@/lib/microsoft-token';
+import { recordToolMetric } from '@/lib/agent/evolution';
 
 export async function executeTool(
+  toolName: string,
+  input: Record<string, unknown>,
+  userId: string
+): Promise<string> {
+  const start = Date.now();
+  let success = true;
+  let errorMsg: string | undefined;
+  try {
+    const result = await executeToolInner(toolName, input, userId);
+    // Many tools return `Error: ...` strings rather than throwing — treat those
+    // as failures for metrics purposes so the dashboard reflects reality.
+    if (typeof result === 'string' && /^(error|tool error|unknown tool)/i.test(result.trim())) {
+      success = false;
+      errorMsg = result.slice(0, 300);
+    }
+    return result;
+  } catch (err) {
+    success = false;
+    errorMsg = err instanceof Error ? err.message : 'unknown';
+    return `Tool error: ${errorMsg}`;
+  } finally {
+    // Fire-and-forget metric — never blocks the request.
+    void recordToolMetric(userId, toolName, Date.now() - start, success, errorMsg);
+  }
+}
+
+async function executeToolInner(
   toolName: string,
   input: Record<string, unknown>,
   userId: string
@@ -704,6 +732,39 @@ export async function executeTool(
         });
 
         return `Development task queued for Claude Code: "${title}" (ID: ${data.id}). It will be picked up in the next Claude Code session.`;
+      }
+
+      case 'save_learned_rule': {
+        const rule = (input.rule as string | undefined)?.trim();
+        const category = (input.category as string | undefined) || 'prefer';
+        if (!rule) return 'Error: rule text required';
+        if (!['do', 'dont', 'prefer'].includes(category)) {
+          return 'Error: category must be do, dont, or prefer';
+        }
+
+        // Dedup: skip if an identical active rule already exists
+        const { data: existing } = await supabaseAdmin
+          .from('cerebro_rules')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('rule', rule)
+          .eq('active', true)
+          .limit(1);
+
+        if (existing?.length) {
+          return `Rule already exists: "${rule}"`;
+        }
+
+        const { error } = await supabaseAdmin.from('cerebro_rules').insert({
+          user_id: userId,
+          rule,
+          category,
+          source: 'self',
+          active: true,
+        });
+
+        if (error) return `Error saving rule: ${error.message}`;
+        return `Saved ${category} rule: "${rule}". I'll apply this in future conversations.`;
       }
 
       default:
