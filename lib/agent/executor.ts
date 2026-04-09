@@ -100,9 +100,9 @@ export async function executeTool(
             else if (hay.includes(needle)) score = 60;
             else {
               // Word-level match — at least one significant word overlaps
-              const needleWords = needle.split(/\s+/).filter(w => w.length > 2);
-              const hayWords = hay.split(/\s+/);
-              const overlap = needleWords.filter(nw => hayWords.some(hw => hw.includes(nw) || nw.includes(hw))).length;
+              const needleWords: string[] = needle.split(/\s+/).filter((w: string) => w.length > 2);
+              const hayWords: string[] = hay.split(/\s+/);
+              const overlap = needleWords.filter((nw: string) => hayWords.some((hw: string) => hw.includes(nw) || nw.includes(hw))).length;
               if (overlap > 0) score = 30 + overlap * 10;
             }
 
