@@ -8,6 +8,16 @@
   "theme_color": "#2E2318",
   "orientation": "portrait-primary",
   "categories": ["productivity", "utilities"],
+  "share_target": {
+    "action": "/capture",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
   "icons": [
     {
       "src": "/icon-192.png",
