@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import {
   DollarSign, Zap, Clock, AlertTriangle, CheckCircle, BarChart3,
-  Server, Database, Users, GitBranch,
+  Server, Database, Users, GitBranch, Sparkles, ExternalLink,
+  RefreshCw, Trash2, Layers,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 function formatCost(cost: number): string {
   if (cost < 0.01) return `$${cost.toFixed(4)}`;
@@ -33,6 +35,15 @@ function modelColorText(model: string): string {
   return 'text-muted-foreground';
 }
 
+function tierBadge(tier: 'fast' | 'smart' | 'deep') {
+  const map = {
+    fast: { label: 'FAST', cls: 'bg-green-500/20 text-green-400 border-green-500/30' },
+    smart: { label: 'SMART', cls: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+    deep: { label: 'DEEP', cls: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+  } as const;
+  return map[tier];
+}
+
 function StatusCard({ name, icon: Icon, status, detail }: { name: string; icon: typeof Zap; status: string; detail: string }) {
   const ok = status === 'connected';
   return (
@@ -49,17 +60,69 @@ function StatusCard({ name, icon: Icon, status, detail }: { name: string; icon: 
 
 const PERIOD_TABS = ['Today', '7 days', '30 days', '90 days'];
 
+type StackRow = {
+  task: string;
+  model: string;
+  tier: 'fast' | 'smart' | 'deep';
+  provider: string;
+  useCase: string;
+  inputCostPer1M: number;
+  outputCostPer1M: number;
+};
+
+type ProviderStatus = {
+  id: string;
+  name: string;
+  configured: boolean;
+  status: 'connected' | 'error' | 'not_configured';
+  balance?: string;
+  usage?: string;
+  plan?: string;
+  message?: string;
+  link?: string;
+};
+
+type CacheStat = {
+  scope: string;
+  entries: number;
+  total_hits: number;
+  avg_hits_per_entry: number;
+  oldest_entry: string | null;
+  newest_entry: string | null;
+};
+
 export default function CreditsPage() {
   const [apiData, setApiData] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [activePeriod, setActivePeriod] = useState('30 days');
+  const [stack, setStack] = useState<StackRow[] | null>(null);
+  const [providers, setProviders] = useState<ProviderStatus[] | null>(null);
+  const [cacheStats, setCacheStats] = useState<CacheStat[] | null>(null);
+  const [cachePurging, setCachePurging] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/credits')
-      .then((r) => r.json())
-      .then((d) => { setApiData(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
+  const loadAll = () => {
+    setLoading(true);
+    fetch('/api/credits').then((r) => r.json()).then((d) => { setApiData(d); setLoading(false); }).catch(() => setLoading(false));
+    fetch('/api/ai-stack/stack').then((r) => r.json()).then((d) => setStack(d.stack)).catch(() => {});
+    fetch('/api/ai-stack/providers').then((r) => r.json()).then((d) => setProviders(d.providers)).catch(() => {});
+    fetch('/api/admin/cache-stats').then((r) => r.json()).then((d) => setCacheStats(d.stats || [])).catch(() => {});
+  };
+
+  useEffect(() => { loadAll(); }, []);
+
+  const purgeCache = async () => {
+    setCachePurging(true);
+    try {
+      const res = await fetch('/api/admin/cache-stats', { method: 'POST' });
+      const data = await res.json();
+      toast.success(`Purged ${data.purged ?? 0} expired entries`);
+      fetch('/api/admin/cache-stats').then((r) => r.json()).then((d) => setCacheStats(d.stats || []));
+    } catch {
+      toast.error('Purge failed');
+    } finally {
+      setCachePurging(false);
+    }
+  };
 
   // Extract data safely
   const helicone = apiData?.helicone as Record<string, unknown> | undefined;
@@ -70,7 +133,6 @@ export default function CreditsPage() {
   const clerk = apiData?.clerk as { status: string; plan?: string; totalUsers?: number } | undefined;
   const github = apiData?.github as { status: string; repo?: string; size?: number; commits?: number; defaultBranch?: string } | undefined;
 
-  // Cast period to concrete type
   const p = period as {
     totalCost: number;
     totalRequests: number;
@@ -85,25 +147,99 @@ export default function CreditsPage() {
   } | undefined;
   const hasPeriodData = p && p.totalRequests > 0;
 
+  // Group stack by tier for the visualizer
+  const stackByTier = stack ? {
+    fast: stack.filter((s) => s.tier === 'fast'),
+    smart: stack.filter((s) => s.tier === 'smart'),
+    deep: stack.filter((s) => s.tier === 'deep'),
+  } : null;
+
+  // Cache stats totals
+  const cacheTotals = (cacheStats ?? []).reduce(
+    (acc, s) => ({ entries: acc.entries + s.entries, hits: acc.hits + s.total_hits }),
+    { entries: 0, hits: 0 }
+  );
+  // Rough $ savings: each cache hit ≈ $0.0005 (Haiku classification avg)
+  const estSavings = cacheTotals.hits * 0.0005;
+
   return (
-    <div className="p-6 space-y-6 max-w-6xl">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">AI Credits & Usage</h2>
-        <p className="text-muted-foreground text-sm mt-1">Full stack metrics across all services</p>
+    <div className="p-6 space-y-8 max-w-6xl">
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">AI & Stack</h2>
+          <p className="text-muted-foreground text-sm mt-1">Full stack: providers, usage, routing, cache, infrastructure</p>
+        </div>
+        <button onClick={loadAll} className="text-muted-foreground hover:text-foreground text-xs px-3 py-1.5 border border-border rounded-lg flex items-center gap-2 transition-colors">
+          <RefreshCw size={12} /> Refresh
+        </button>
       </div>
 
       {/* ── Service Status ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <StatusCard name="Anthropic" icon={Zap} status={loading ? 'loading' : helicone?.status === 'connected' ? 'connected' : 'error'} detail={hasPeriodData ? `${p!.totalRequests} requests` : helicone?.status === 'connected' ? 'No usage yet' : String(helicone?.message || 'Not connected')} />
-        <StatusCard name="Vercel" icon={Server} status={loading ? 'loading' : vercel?.status === 'connected' ? 'connected' : 'error'} detail={vercel?.plan as string || 'Checking...'} />
-        <StatusCard name="Supabase" icon={Database} status={loading ? 'loading' : supabase?.status === 'connected' ? 'connected' : 'error'} detail={supabase?.tables ? `${supabase.tables} tables, ${supabase.totalRows} rows` : 'Checking...'} />
-        <StatusCard name="Clerk" icon={Users} status={loading ? 'loading' : clerk?.status === 'connected' ? 'connected' : 'error'} detail={clerk?.plan as string || 'Checking...'} />
-        <StatusCard name="GitHub" icon={GitBranch} status={loading ? 'loading' : github?.status === 'connected' ? 'connected' : 'error'} detail={github?.repo as string || 'Checking...'} />
+      <div>
+        <h3 className="text-foreground font-semibold mb-3">Connectors</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <StatusCard name="Anthropic" icon={Zap} status={loading ? 'loading' : helicone?.status === 'connected' ? 'connected' : 'error'} detail={hasPeriodData ? `${p!.totalRequests} requests` : helicone?.status === 'connected' ? 'No usage yet' : String(helicone?.message || 'Not connected')} />
+          <StatusCard name="Vercel" icon={Server} status={loading ? 'loading' : vercel?.status === 'connected' ? 'connected' : 'error'} detail={vercel?.plan as string || 'Checking...'} />
+          <StatusCard name="Supabase" icon={Database} status={loading ? 'loading' : supabase?.status === 'connected' ? 'connected' : 'error'} detail={supabase?.tables ? `${supabase.tables} tables, ${supabase.totalRows} rows` : 'Checking...'} />
+          <StatusCard name="Clerk" icon={Users} status={loading ? 'loading' : clerk?.status === 'connected' ? 'connected' : 'error'} detail={clerk?.plan as string || 'Checking...'} />
+          <StatusCard name="GitHub" icon={GitBranch} status={loading ? 'loading' : github?.status === 'connected' ? 'connected' : 'error'} detail={github?.repo as string || 'Checking...'} />
+          {/* Non-Anthropic AI providers */}
+          {providers?.map((pr) => (
+            <StatusCard
+              key={pr.id}
+              name={pr.name}
+              icon={Sparkles}
+              status={pr.status === 'connected' ? 'connected' : pr.status === 'not_configured' ? 'error' : 'error'}
+              detail={pr.balance || pr.usage || pr.message || (pr.status === 'not_configured' ? 'Not configured' : 'Error')}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* ── Stack Visualisation ── */}
+      <div>
+        <h3 className="text-foreground font-semibold mb-1 flex items-center gap-2">
+          <Layers size={16} /> Routing Stack
+        </h3>
+        <p className="text-muted-foreground text-xs mb-3">Hand-coded task → model mapping. No classifier, zero overhead.</p>
+        {stackByTier ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {(['fast', 'smart', 'deep'] as const).map((tier) => {
+              const rows = stackByTier[tier];
+              const badge = tierBadge(tier);
+              const modelName = rows[0]?.model || (tier === 'fast' ? 'claude-haiku-4-5' : tier === 'smart' ? 'claude-sonnet-4-6' : 'claude-opus-4-6');
+              const cost = rows[0] ? `$${rows[0].inputCostPer1M}/$${rows[0].outputCostPer1M}` : '—';
+              return (
+                <div key={tier} className="bg-card border border-border rounded-lg overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${badge.cls}`}>{badge.label}</span>
+                      <span className={`text-xs font-mono ${modelColorText(modelName)}`}>{modelName}</span>
+                    </div>
+                    <span className="text-muted-foreground text-[10px]">{cost}/1M</span>
+                  </div>
+                  <div className="p-2 space-y-1">
+                    {rows.length === 0 ? (
+                      <p className="text-muted-foreground/60 text-xs p-2 italic">Reserved — no tasks assigned</p>
+                    ) : rows.map((r) => (
+                      <div key={r.task} className="px-2 py-1.5 rounded hover:bg-surface-2 group" title={r.useCase}>
+                        <p className="text-foreground text-xs font-mono">{r.task}</p>
+                        <p className="text-muted-foreground/60 text-[10px] group-hover:text-muted-foreground truncate">{r.useCase}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm">Loading stack map...</p>
+        )}
       </div>
 
       {/* ── AI Usage ── */}
       <div>
-        <h3 className="text-foreground font-semibold mb-3">AI Usage (Anthropic via Helicone)</h3>
+        <h3 className="text-foreground font-semibold mb-3">Usage (Anthropic via Helicone)</h3>
         <div className="flex gap-2 mb-4">
           {PERIOD_TABS.map((tab) => (
             <button key={tab} onClick={() => setActivePeriod(tab)} className={cn('px-4 py-2 rounded-full text-sm font-medium border transition-colors', activePeriod === tab ? 'bg-white text-background border-white' : 'text-muted-foreground border-border hover:border-white/15')}>
@@ -117,14 +253,14 @@ export default function CreditsPage() {
         ) : !hasPeriodData ? (
           <div className="bg-card border border-border rounded-lg p-6 text-center space-y-3">
             <Zap size={24} className="mx-auto text-muted-foreground/60 mb-2" />
-            <p className="text-muted-foreground text-sm">AI usage data not available via API.</p>
+            <p className="text-muted-foreground text-sm">AI usage data not available via API for this period.</p>
             <p className="text-muted-foreground/60 text-xs">Helicone free tier may not support API queries. View your usage directly:</p>
             <a
               href="https://us.helicone.ai/requests"
               target="_blank"
               className="inline-flex items-center gap-2 bg-primary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary transition-colors"
             >
-              Open Helicone Dashboard
+              Open Helicone Dashboard <ExternalLink size={12} />
             </a>
           </div>
         ) : (
@@ -184,6 +320,103 @@ export default function CreditsPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Other AI Providers (Non-Anthropic) ── */}
+      {providers && providers.length > 0 && (
+        <div>
+          <h3 className="text-foreground font-semibold mb-3">Other AI Providers</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {providers.map((pr) => (
+              <div key={pr.id} className="bg-card border border-border rounded-lg p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-foreground font-semibold text-sm">{pr.name}</h4>
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${pr.status === 'connected' ? 'bg-green-500/20 text-green-400' : pr.status === 'not_configured' ? 'bg-muted text-muted-foreground' : 'bg-red-500/20 text-red-400'}`}>
+                    {pr.status === 'connected' ? 'Connected' : pr.status === 'not_configured' ? 'Not configured' : 'Error'}
+                  </span>
+                </div>
+                <div className="space-y-1.5 text-xs">
+                  {pr.plan && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Plan</span>
+                      <span className="text-foreground">{pr.plan}</span>
+                    </div>
+                  )}
+                  {pr.balance && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Balance</span>
+                      <span className="text-green-400 font-medium">{pr.balance}</span>
+                    </div>
+                  )}
+                  {pr.usage && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Usage</span>
+                      <span className="text-foreground">{pr.usage}</span>
+                    </div>
+                  )}
+                  {pr.message && !pr.balance && !pr.usage && (
+                    <p className="text-muted-foreground/70 text-[11px] italic">{pr.message}</p>
+                  )}
+                </div>
+                {pr.link && (
+                  <a href={pr.link} target="_blank" className="mt-3 inline-flex items-center gap-1 text-primary text-[11px] hover:underline">
+                    Manage <ExternalLink size={10} />
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Response Cache (Phase 4.2) ── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-foreground font-semibold">Response Cache (Tier 1 exact-match)</h3>
+          <button onClick={purgeCache} disabled={cachePurging} className="text-muted-foreground hover:text-red-400 text-xs px-3 py-1.5 border border-border rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50">
+            <Trash2 size={12} /> {cachePurging ? 'Purging...' : 'Purge expired'}
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="bg-card border border-border rounded-lg p-4">
+            <p className="text-muted-foreground text-xs mb-1">Cached Entries</p>
+            <p className="text-foreground text-2xl font-bold">{cacheTotals.entries.toLocaleString()}</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-4">
+            <p className="text-muted-foreground text-xs mb-1">Total Hits</p>
+            <p className="text-foreground text-2xl font-bold">{cacheTotals.hits.toLocaleString()}</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-4">
+            <p className="text-muted-foreground text-xs mb-1">Est. Saved</p>
+            <p className="text-green-400 text-2xl font-bold">{formatCost(estSavings)}</p>
+          </div>
+        </div>
+        {cacheStats && cacheStats.length > 0 ? (
+          <div className="bg-card border border-border rounded-lg overflow-hidden">
+            <table className="w-full">
+              <thead><tr className="border-b border-border">
+                {['Scope', 'Entries', 'Hits', 'Avg Hits/Entry', 'Oldest'].map((h, i) => (
+                  <th key={h} className={`text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody className="divide-y divide-border">
+                {cacheStats.map((s) => (
+                  <tr key={s.scope} className="hover:bg-secondary/30">
+                    <td className="px-5 py-3 text-foreground text-sm font-mono">{s.scope}</td>
+                    <td className="px-5 py-3 text-right text-foreground text-sm">{s.entries.toLocaleString()}</td>
+                    <td className="px-5 py-3 text-right text-foreground text-sm">{s.total_hits.toLocaleString()}</td>
+                    <td className="px-5 py-3 text-right text-muted-foreground text-sm">{s.avg_hits_per_entry.toFixed(2)}</td>
+                    <td className="px-5 py-3 text-right text-muted-foreground text-sm">{s.oldest_entry ? new Date(s.oldest_entry).toLocaleDateString() : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-lg p-6 text-center">
+            <p className="text-muted-foreground text-sm">Cache is empty — first hits will land here once Cerebro/search/clip classifiers fire.</p>
           </div>
         )}
       </div>

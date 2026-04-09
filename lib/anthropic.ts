@@ -85,6 +85,59 @@ export function pickModel(task: TaskType): string {
 }
 
 /**
+ * Task-to-model mapping metadata for UI visualization.
+ * Returns every TaskType with its assigned model, tier, provider, use case and typical latency.
+ * Used by /ai-stack page to render the hand-coded routing table.
+ */
+export function getStackMap(): Array<{
+  task: TaskType;
+  model: string;
+  tier: 'fast' | 'smart' | 'deep';
+  provider: string;
+  useCase: string;
+  inputCostPer1M: number;
+  outputCostPer1M: number;
+}> {
+  const rows: Array<{
+    task: TaskType;
+    useCase: string;
+  }> = [
+    { task: 'classify',       useCase: 'Short-input structured JSON classification' },
+    { task: 'extract',        useCase: 'Receipt / document field extraction' },
+    { task: 'brief',          useCase: 'One-liner insight, small summary' },
+    { task: 'content',        useCase: 'Morning reflection, daily content' },
+    { task: 'triage',         useCase: 'Email triage, content routing' },
+    { task: 'search-expand',  useCase: 'Search query synonym expansion' },
+    { task: 'draft',          useCase: 'Email drafts, quick replies' },
+    { task: 'vision.receipt', useCase: 'Receipt photo parsing' },
+    { task: 'vision.general', useCase: 'General image analysis' },
+    { task: 'plan',           useCase: 'Daily planner, multi-step scheduling' },
+    { task: 'summary.book',   useCase: 'Book summaries, long structured output' },
+    { task: 'summary.long',   useCase: 'Document analysis, weekly review' },
+    { task: 'tone-profile',   useCase: 'Writing style extraction' },
+    { task: 'agent.tools',    useCase: 'Cerebro agent loop, tool use' },
+    { task: 'code-gen',       useCase: 'Task executor, dev bot code generation' },
+    { task: 'vision.diagram', useCase: 'Diagram generation from image' },
+    { task: 'deep-reasoning', useCase: 'Reserved — deepest reasoning' },
+  ];
+
+  return rows.map((r) => {
+    const model = pickModel(r.task);
+    const tier: 'fast' | 'smart' | 'deep' = model === MODELS.fast ? 'fast' : model === MODELS.smart ? 'smart' : 'deep';
+    const pricing = tier === 'fast' ? { i: 1, o: 5 } : tier === 'smart' ? { i: 3, o: 15 } : { i: 5, o: 25 };
+    return {
+      task: r.task,
+      model,
+      tier,
+      provider: 'Anthropic',
+      useCase: r.useCase,
+      inputCostPer1M: pricing.i,
+      outputCostPer1M: pricing.o,
+    };
+  });
+}
+
+/**
  * Build a system prompt with automatic prompt caching on the static prefix.
  *
  * Usage:

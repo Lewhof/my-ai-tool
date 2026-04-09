@@ -9,7 +9,7 @@ import {
   Calendar, CalendarDays, Mail, KeyRound, Settings, MessageSquare,
   Zap, BookOpen, Image as ImageIcon, Focus, StickyNote, GitFork,
   ClipboardList, CreditCard, ChevronLeft, ChevronRight, Globe,
-  Wallet, Target, Brain,
+  Wallet, Target, Brain, Activity,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -38,6 +38,7 @@ const SIDEBAR_GROUPS = [
   {
     label: 'Life',
     items: [
+      { name: 'Wellness', href: '/wellness', icon: Activity },
       { name: 'Finance', href: '/finance', icon: Wallet },
       { name: 'Goals', href: '/goals', icon: Target },
       { name: 'Mind Library', href: '/mind', icon: Brain },
@@ -57,7 +58,7 @@ const SIDEBAR_GROUPS = [
     items: [
       { name: 'Vault', href: '/vault', icon: KeyRound },
       { name: 'Knowledge Base', href: '/kb', icon: BookOpen },
-      { name: 'AI Credits', href: '/credits', icon: CreditCard },
+      { name: 'AI & Stack', href: '/credits', icon: CreditCard },
       { name: 'Settings', href: '/settings', icon: Settings },
     ],
   },

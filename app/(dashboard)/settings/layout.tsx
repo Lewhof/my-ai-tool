@@ -3,13 +3,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { User, Link2, Bot, FileText, Palette, Shield, Zap } from 'lucide-react';
+import { User, Link2, Bot, FileText, Palette, Shield, Zap, BarChart3 } from 'lucide-react';
 
 const SECTIONS = [
   { id: '/settings', label: 'General', icon: User },
   { id: '/settings/connections', label: 'Connections', icon: Link2 },
   { id: '/settings/capture', label: 'Capture', icon: Zap },
   { id: '/settings/ai', label: 'AI & Models', icon: Bot },
+  { id: '/settings/analytics', label: 'Website Analytics', icon: BarChart3 },
   { id: '/settings/documents', label: 'Documents', icon: FileText },
   { id: '/settings/theme', label: 'Appearance', icon: Palette },
   { id: '/settings/privacy', label: 'Privacy', icon: Shield },
