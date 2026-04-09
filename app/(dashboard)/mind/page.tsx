@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   Brain, Sun, Moon, BookOpen, Flame, Sparkles, Plus, Loader2, X, Trash2,
-  Quote, Check, Search, CheckCircle2, BookMarked, Edit3, Settings,
+  Quote, Check, Search, CheckCircle2, BookMarked, Settings, Save, Tag,
+  Copy, MessageSquareQuote, Pencil,
 } from 'lucide-react';
 
 interface DailyContent {
@@ -70,10 +71,89 @@ interface VirtueLog {
   note: string | null;
 }
 
-type Tab = 'today' | 'library' | 'journal' | 'virtues';
+type Tab = 'today' | 'library' | 'quotes' | 'virtues';
+
+interface SearchSource {
+  n: number;
+  kind: 'highlight' | 'book';
+  id: string;
+  title: string;
+  snippet: string;
+}
+
+interface SearchResult {
+  answer: string;
+  sources: SearchSource[];
+  model_used: string;
+  cached: boolean;
+  searched: { highlights: number; books: number };
+}
 
 export default function MindLibraryPage() {
   const [tab, setTab] = useState<Tab>('today');
+
+  // Library search state (persistent across tabs)
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
+
+  const runSearch = async () => {
+    const q = searchQuery.trim();
+    if (!q) return;
+    setSearching(true);
+    setSearchResult(null);
+    setSearchOpen(true);
+    try {
+      const res = await fetch('/api/mind/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSearchResult(data);
+      } else {
+        toast.error(data.error || 'Search failed');
+      }
+    } catch {
+      toast.error('Search failed');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const copyAnswer = () => {
+    if (!searchResult?.answer) return;
+    navigator.clipboard.writeText(searchResult.answer);
+    toast.success('Copied to clipboard');
+  };
+
+  const saveAnswerAsNote = async () => {
+    if (!searchResult?.answer) return;
+    try {
+      // 1. Create an empty note with a title
+      const createRes = await fetch('/api/notes-v2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: `Mind search: ${searchQuery}` }),
+      });
+      if (!createRes.ok) throw new Error('create failed');
+      const note = await createRes.json();
+
+      // 2. PATCH with full content
+      const content = `**Question:** ${searchQuery}\n\n${searchResult.answer}\n\n---\n\n**Sources (${searchResult.sources.length}):**\n${searchResult.sources.map(s => `[${s.n}] ${s.title}`).join('\n')}`;
+      const patchRes = await fetch(`/api/notes-v2/${note.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      if (patchRes.ok) toast.success('Saved to Notes');
+      else toast.error('Note created but content not saved');
+    } catch {
+      toast.error('Save failed');
+    }
+  };
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -85,7 +165,31 @@ export default function MindLibraryPage() {
           </div>
           <div>
             <h2 className="text-xl font-bold text-foreground">Mind Library</h2>
-            <p className="text-muted-foreground text-xs mt-0.5">Daily ritual, book summaries, reflection, virtue</p>
+            <p className="text-muted-foreground text-xs mt-0.5">Daily ritual, book summaries, quotes, virtue</p>
+          </div>
+        </div>
+
+        {/* Library search bar */}
+        <div className="flex-1 min-w-0 max-w-md order-last md:order-none w-full md:w-auto">
+          <div className="relative">
+            <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') runSearch(); }}
+              placeholder="Ask your library..."
+              disabled={searching}
+              className="w-full bg-background border border-border rounded-lg pl-8 pr-12 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+            />
+            {searching && <Loader2 size={12} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />}
+            {!searching && searchQuery && (
+              <button
+                onClick={runSearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-primary font-semibold px-1.5 py-0.5 rounded bg-primary/10 hover:bg-primary/20"
+              >
+                ⏎
+              </button>
+            )}
           </div>
         </div>
 
@@ -94,7 +198,7 @@ export default function MindLibraryPage() {
           {([
             { id: 'today' as const, label: 'Today', icon: Sun },
             { id: 'library' as const, label: 'Library', icon: BookOpen },
-            { id: 'journal' as const, label: 'Journal', icon: Edit3 },
+            { id: 'quotes' as const, label: 'Quotes', icon: MessageSquareQuote },
             { id: 'virtues' as const, label: 'Virtues', icon: Flame },
           ]).map(t => {
             const Icon = t.icon;
@@ -119,8 +223,126 @@ export default function MindLibraryPage() {
       <div className="flex-1 overflow-auto">
         {tab === 'today' && <TodayTab />}
         {tab === 'library' && <LibraryTab />}
-        {tab === 'journal' && <JournalTab />}
+        {tab === 'quotes' && <QuotesTab />}
         {tab === 'virtues' && <VirtuesTab />}
+      </div>
+
+      {/* Search overlay */}
+      {searchOpen && (
+        <SearchOverlay
+          query={searchQuery}
+          searching={searching}
+          result={searchResult}
+          onClose={() => { setSearchOpen(false); setSearchResult(null); }}
+          onCopy={copyAnswer}
+          onSave={saveAnswerAsNote}
+        />
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// SEARCH OVERLAY
+// ═══════════════════════════════════════════════
+function SearchOverlay({
+  query, searching, result, onClose, onCopy, onSave,
+}: {
+  query: string;
+  searching: boolean;
+  result: SearchResult | null;
+  onClose: () => void;
+  onCopy: () => void;
+  onSave: () => void;
+}) {
+  // Render answer with inline citation chips
+  const renderAnswer = (text: string) => {
+    const parts = text.split(/(\[\^\d+\])/g);
+    return parts.map((p, i) => {
+      const m = p.match(/^\[\^(\d+)\]$/);
+      if (m) {
+        return (
+          <sup key={i} className="text-primary font-semibold text-[10px] bg-primary/10 rounded px-1 py-0.5 mx-0.5">
+            {m[1]}
+          </sup>
+        );
+      }
+      return <span key={i}>{p}</span>;
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-20 bg-black/60 backdrop-blur-sm">
+      <div className="bg-background border border-border rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden shadow-2xl">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <Sparkles size={16} className="text-primary shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Library search</p>
+              <p className="text-foreground text-sm font-semibold truncate">&ldquo;{query}&rdquo;</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          {searching ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <Loader2 size={24} className="animate-spin text-primary" />
+              <p className="text-muted-foreground text-sm">Searching your library…</p>
+            </div>
+          ) : result ? (
+            <>
+              {/* Answer */}
+              <div className="bg-card border border-border rounded-xl p-5">
+                <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">
+                  {renderAnswer(result.answer)}
+                </p>
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border">
+                  <button onClick={onCopy} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-2 py-1 border border-border rounded transition-colors">
+                    <Copy size={10} /> Copy
+                  </button>
+                  <button onClick={onSave} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-2 py-1 border border-border rounded transition-colors">
+                    <Save size={10} /> Save as note
+                  </button>
+                  <span className="ml-auto text-[10px] text-muted-foreground/60 flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded font-mono">{result.model_used}</span>
+                    {result.cached && <span className="px-1.5 py-0.5 bg-green-500/10 text-green-400 rounded">cached</span>}
+                  </span>
+                </div>
+              </div>
+
+              {/* Sources */}
+              {result.sources.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Sources ({result.sources.length})</h4>
+                  <div className="space-y-2">
+                    {result.sources.map((s) => (
+                      <div key={`${s.kind}-${s.id}`} className="bg-card border border-border rounded-lg p-3 flex items-start gap-3">
+                        <span className="text-primary font-semibold text-[10px] bg-primary/10 rounded px-1.5 py-0.5 shrink-0 mt-0.5">
+                          {s.n}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-foreground text-xs font-medium truncate">
+                            {s.kind === 'highlight' ? '💬 ' : '📘 '}
+                            {s.title}
+                          </p>
+                          <p className="text-muted-foreground text-[11px] mt-1 line-clamp-2 italic">&ldquo;{s.snippet}&rdquo;</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-muted-foreground text-sm text-center py-8">No result yet.</p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -565,6 +787,28 @@ function BookDetail({ book, onBack, onStatusChange, onDelete }: {
   onDelete: (id: string) => void;
 }) {
   const summary = book.summary;
+  const [savedIdx, setSavedIdx] = useState<Set<number>>(new Set());
+
+  const saveKeyIdeaAsHighlight = async (idx: number, idea: { concept: string; quote: string }) => {
+    const tag = idea.concept.toLowerCase().replace(/\s+/g, '-').slice(0, 40);
+    const res = await fetch('/api/highlights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: idea.quote,
+        source_type: 'book',
+        source_id: book.id,
+        source_title: book.title,
+        tags: [tag],
+      }),
+    });
+    if (res.ok) {
+      setSavedIdx(prev => new Set(prev).add(idx));
+      toast.success('Saved to Quotes');
+    } else {
+      toast.error('Failed to save');
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -641,13 +885,31 @@ function BookDetail({ book, onBack, onStatusChange, onDelete }: {
           <div className="bg-card border border-border rounded-xl p-5">
             <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">Key Ideas</h3>
             <div className="space-y-4">
-              {summary.key_ideas.map((idea, i) => (
-                <div key={i} className="border-l-2 border-primary/40 pl-4">
-                  <p className="text-foreground text-sm font-semibold">{idea.concept}</p>
-                  <p className="text-foreground/80 text-xs italic mt-1">&ldquo;{idea.quote}&rdquo;</p>
-                  <p className="text-muted-foreground text-[11px] mt-1">When to apply: {idea.when_to_apply}</p>
-                </div>
-              ))}
+              {summary.key_ideas.map((idea, i) => {
+                const saved = savedIdx.has(i);
+                return (
+                  <div key={i} className="border-l-2 border-primary/40 pl-4 group">
+                    <p className="text-foreground text-sm font-semibold">{idea.concept}</p>
+                    <div className="flex items-start gap-2 mt-1">
+                      <p className="text-foreground/80 text-xs italic flex-1">&ldquo;{idea.quote}&rdquo;</p>
+                      <button
+                        onClick={() => saveKeyIdeaAsHighlight(i, idea)}
+                        disabled={saved}
+                        title={saved ? 'Saved to Quotes' : 'Save as quote'}
+                        className={cn(
+                          'shrink-0 p-1 rounded transition-all',
+                          saved
+                            ? 'text-green-400 cursor-default'
+                            : 'text-muted-foreground/40 hover:text-primary opacity-0 group-hover:opacity-100'
+                        )}
+                      >
+                        {saved ? <CheckCircle2 size={12} /> : <Save size={12} />}
+                      </button>
+                    </div>
+                    <p className="text-muted-foreground text-[11px] mt-1">When to apply: {idea.when_to_apply}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -685,27 +947,371 @@ function BookDetail({ book, onBack, onStatusChange, onDelete }: {
 }
 
 // ═══════════════════════════════════════════════
-// JOURNAL TAB (reuses notes_v2 with category='practice')
+// QUOTES TAB
 // ═══════════════════════════════════════════════
-function JournalTab() {
+function QuotesTab() {
+  const [quotes, setQuotes] = useState<Highlight[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'book' | 'manual' | 'article' | 'web_clip'>('all');
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [clientSearch, setClientSearch] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+
+  // Add form state
+  const [newContent, setNewContent] = useState('');
+  const [newSource, setNewSource] = useState('');
+  const [newTags, setNewTags] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Edit state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [editTags, setEditTags] = useState('');
+
+  // Bulk-from-books banner
+  const [showBulkBanner, setShowBulkBanner] = useState(true);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [bookCount, setBookCount] = useState(0);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/highlights?limit=300');
+      if (res.ok) {
+        const data = await res.json();
+        setQuotes(data.highlights || []);
+      }
+      // Check how many books the user has to decide bulk-import banner visibility
+      const bRes = await fetch('/api/books');
+      if (bRes.ok) {
+        const bData = await bRes.json();
+        setBookCount((bData.books || []).length);
+      }
+    } catch { /* silent */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const addQuote = async () => {
+    if (!newContent.trim()) return;
+    setSaving(true);
+    const tagsArr = newTags.split(',').map(t => t.trim()).filter(Boolean);
+    const res = await fetch('/api/highlights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: newContent.trim(),
+        source_type: 'manual',
+        source_title: newSource.trim() || null,
+        tags: tagsArr,
+      }),
+    });
+    if (res.ok) {
+      toast.success('Quote saved');
+      setNewContent('');
+      setNewSource('');
+      setNewTags('');
+      setShowAdd(false);
+      load();
+    } else {
+      toast.error('Failed to save');
+    }
+    setSaving(false);
+  };
+
+  const deleteQuote = async (id: string) => {
+    if (!confirm('Delete this quote?')) return;
+    await fetch(`/api/highlights?id=${id}`, { method: 'DELETE' });
+    setQuotes(prev => prev.filter(q => q.id !== id));
+    toast.success('Deleted');
+  };
+
+  const reviewQuote = async (id: string) => {
+    await fetch('/api/highlights', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action: 'review' }),
+    });
+    setQuotes(prev => prev.map(q => q.id === id ? { ...q, review_count: q.review_count + 1, last_reviewed_at: new Date().toISOString() } : q));
+  };
+
+  const copyQuote = (content: string) => {
+    navigator.clipboard.writeText(content);
+    toast.success('Copied');
+  };
+
+  const startEdit = (q: Highlight) => {
+    setEditingId(q.id);
+    setEditContent(q.content);
+    setEditTags((q.tags || []).join(', '));
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    const tagsArr = editTags.split(',').map(t => t.trim()).filter(Boolean);
+    const res = await fetch('/api/highlights', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: editingId, content: editContent, tags: tagsArr }),
+    });
+    if (res.ok) {
+      toast.success('Updated');
+      setEditingId(null);
+      load();
+    }
+  };
+
+  const importFromBooks = async () => {
+    setBulkImporting(true);
+    const res = await fetch('/api/highlights?mode=from-books', { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) {
+      if (data.added > 0) {
+        toast.success(`Imported ${data.added} quote${data.added === 1 ? '' : 's'} from your books${data.skipped ? ` (${data.skipped} already existed)` : ''}`);
+      } else {
+        toast(data.message || 'Nothing new to import');
+      }
+      setShowBulkBanner(false);
+      load();
+    } else {
+      toast.error(data.error || 'Import failed');
+    }
+    setBulkImporting(false);
+  };
+
+  // Derived data
+  const allTags = Array.from(new Set(quotes.flatMap(q => q.tags || []))).sort();
+  const filtered = quotes.filter(q => {
+    if (sourceFilter !== 'all' && q.source_type !== sourceFilter) return false;
+    if (tagFilter && !(q.tags || []).includes(tagFilter)) return false;
+    if (clientSearch.trim()) {
+      const q_ = clientSearch.toLowerCase();
+      if (!q.content.toLowerCase().includes(q_) && !(q.source_title || '').toLowerCase().includes(q_)) return false;
+    }
+    return true;
+  });
+
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="bg-card border border-dashed border-border rounded-xl p-10 text-center">
-        <Edit3 size={28} className="mx-auto text-muted-foreground/40 mb-2" />
-        <p className="text-foreground text-sm font-semibold">Reflection Journal</p>
-        <p className="text-muted-foreground text-xs mt-1">
-          Your morning reflections and evening reviews are automatically saved to this journal.
-        </p>
-        <p className="text-muted-foreground/60 text-[11px] mt-3">
-          View them in the Today tab, or browse your full history in Notes.
-        </p>
-        <a
-          href="/notes"
-          className="inline-flex items-center gap-1.5 mt-4 text-primary text-xs hover:text-primary/80"
+    <div className="p-6 max-w-4xl mx-auto space-y-4">
+      {/* Bulk import banner — only if user has books AND empty/low highlights */}
+      {showBulkBanner && bookCount > 0 && quotes.length < 5 && !loading && (
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center gap-3">
+          <Sparkles size={16} className="text-primary shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-foreground text-sm font-medium">You have {bookCount} book{bookCount === 1 ? '' : 's'} with key quotes already summarized</p>
+            <p className="text-muted-foreground text-xs">Import every key quote from your library as a highlight (deduped).</p>
+          </div>
+          <button
+            onClick={importFromBooks}
+            disabled={bulkImporting}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-primary text-foreground font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 shrink-0"
+          >
+            {bulkImporting ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+            Import
+          </button>
+          <button
+            onClick={() => setShowBulkBanner(false)}
+            className="text-muted-foreground/60 hover:text-foreground p-1"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() => setShowAdd(v => !v)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-primary text-foreground font-medium hover:bg-primary/90 transition-colors"
         >
-          Open Notes
-        </a>
+          <Plus size={12} />
+          Add quote
+        </button>
+
+        {/* Source filter */}
+        <div className="flex items-center gap-0.5 p-0.5 rounded-lg border border-border">
+          {(['all', 'book', 'manual', 'article', 'web_clip'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => setSourceFilter(s)}
+              className={cn(
+                'px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors',
+                sourceFilter === s ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {s === 'all' ? 'All' : s === 'web_clip' ? 'Web clip' : s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {/* Client search */}
+        <div className="relative flex-1 min-w-[140px] max-w-[240px]">
+          <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/60" />
+          <input
+            value={clientSearch}
+            onChange={(e) => setClientSearch(e.target.value)}
+            placeholder="Filter quotes…"
+            className="w-full bg-background border border-border rounded-lg pl-7 pr-2 py-1.5 text-[11px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+
+        <span className="text-muted-foreground text-[11px] ml-auto">{filtered.length} of {quotes.length}</span>
       </div>
+
+      {/* Tag chips */}
+      {allTags.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Tag size={11} className="text-muted-foreground/60" />
+          <button
+            onClick={() => setTagFilter(null)}
+            className={cn(
+              'text-[10px] px-2 py-0.5 rounded-full border transition-colors',
+              !tagFilter ? 'bg-primary/10 text-primary border-primary/30' : 'text-muted-foreground border-border hover:text-foreground'
+            )}
+          >
+            All tags
+          </button>
+          {allTags.slice(0, 20).map(t => (
+            <button
+              key={t}
+              onClick={() => setTagFilter(tagFilter === t ? null : t)}
+              className={cn(
+                'text-[10px] px-2 py-0.5 rounded-full border transition-colors',
+                tagFilter === t ? 'bg-primary/10 text-primary border-primary/30' : 'text-muted-foreground border-border hover:text-foreground'
+              )}
+            >
+              #{t}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Add form */}
+      {showAdd && (
+        <div className="bg-card border border-border rounded-xl p-4 space-y-2">
+          <textarea
+            value={newContent}
+            onChange={(e) => setNewContent(e.target.value)}
+            placeholder="The quote itself..."
+            rows={3}
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm placeholder:text-muted-foreground/50 resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <div className="flex gap-2 flex-wrap">
+            <input
+              value={newSource}
+              onChange={(e) => setNewSource(e.target.value)}
+              placeholder="Source (e.g. Meditations — Marcus Aurelius)"
+              className="flex-1 min-w-[200px] bg-background border border-border rounded-lg px-3 py-1.5 text-foreground text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <input
+              value={newTags}
+              onChange={(e) => setNewTags(e.target.value)}
+              placeholder="tags, comma, separated"
+              className="flex-1 min-w-[160px] bg-background border border-border rounded-lg px-3 py-1.5 text-foreground text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowAdd(false)} className="text-muted-foreground text-xs px-3 py-1.5">Cancel</button>
+            <button
+              onClick={addQuote}
+              disabled={saving || !newContent.trim()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-primary text-foreground font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* List */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 size={22} className="animate-spin text-primary" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-card border border-dashed border-border rounded-xl p-12 text-center">
+          <Quote size={28} className="mx-auto text-muted-foreground/40 mb-2" />
+          <p className="text-foreground text-sm font-semibold">
+            {quotes.length === 0 ? 'No quotes yet' : 'No quotes match your filters'}
+          </p>
+          {quotes.length === 0 && (
+            <p className="text-muted-foreground text-xs mt-1">
+              Add a quote manually, or import every key quote from your book library.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(q => (
+            <div key={q.id} className="bg-card border border-border rounded-xl p-4 group hover:border-border/80 transition-colors">
+              {editingId === q.id ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    rows={3}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <input
+                    value={editTags}
+                    onChange={(e) => setEditTags(e.target.value)}
+                    placeholder="tags, comma, separated"
+                    className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setEditingId(null)} className="text-muted-foreground text-xs px-3 py-1">Cancel</button>
+                    <button onClick={saveEdit} className="flex items-center gap-1.5 px-3 py-1 rounded text-xs bg-primary text-foreground font-medium">
+                      <Save size={11} />
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-start gap-3">
+                    <Quote size={14} className="text-muted-foreground/40 shrink-0 mt-0.5" />
+                    <p className="text-foreground text-sm italic flex-1 min-w-0 leading-relaxed">&ldquo;{q.content}&rdquo;</p>
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
+                      <button onClick={() => reviewQuote(q.id)} title="Mark reviewed" className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-green-400">
+                        <CheckCircle2 size={12} />
+                      </button>
+                      <button onClick={() => copyQuote(q.content)} title="Copy" className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground">
+                        <Copy size={12} />
+                      </button>
+                      <button onClick={() => startEdit(q)} title="Edit" className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground">
+                        <Pencil size={12} />
+                      </button>
+                      <button onClick={() => deleteQuote(q.id)} title="Delete" className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-red-400">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 flex-wrap pl-6">
+                    {q.source_title && <span className="text-muted-foreground text-[11px]">— {q.source_title}</span>}
+                    {q.source_type && q.source_type !== 'manual' && (
+                      <span className="text-[9px] text-muted-foreground/60 uppercase tracking-wider">{q.source_type}</span>
+                    )}
+                    {(q.tags || []).map(t => (
+                      <button
+                        key={t}
+                        onClick={() => setTagFilter(t)}
+                        className="text-[10px] text-primary/80 hover:text-primary"
+                      >
+                        #{t}
+                      </button>
+                    ))}
+                    {q.review_count > 0 && (
+                      <span className="ml-auto text-[10px] text-muted-foreground/60">Reviewed {q.review_count}×</span>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
