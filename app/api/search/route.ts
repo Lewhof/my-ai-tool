@@ -1,6 +1,9 @@
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS } from '@/lib/anthropic';
+import { getCached, setCached, hashInput } from '@/lib/ai-cache';
+
+const SEARCH_EXPAND_TTL = 7 * 24 * 60 * 60; // 7 days — synonyms are stable
 
 export async function GET(req: Request) {
   const { userId } = await auth();
@@ -62,8 +65,16 @@ export async function GET(req: Request) {
 
 /**
  * Use AI to expand a search query with synonyms/related terms.
+ * Cached for 7 days — synonym suggestions for the same normalized query are stable.
  */
 async function expandSearchQuery(query: string): Promise<string | null> {
+  const cacheKey = hashInput(query);
+
+  // 1. Cache check
+  const cached = await getCached<{ expanded: string }>('search.expand', cacheKey);
+  if (cached?.expanded) return cached.expanded;
+
+  // 2. AI call on miss
   try {
     const response = await anthropic.messages.create({
       model: MODELS.fast,
@@ -74,7 +85,12 @@ async function expandSearchQuery(query: string): Promise<string | null> {
       }],
     });
     const text = response.content[0].type === 'text' ? response.content[0].text.trim() : null;
-    return text && text.length < 50 ? text : null;
+    if (text && text.length < 50) {
+      // 3. Store in cache
+      await setCached('search.expand', cacheKey, { expanded: text }, SEARCH_EXPAND_TTL);
+      return text;
+    }
+    return null;
   } catch {
     return null;
   }

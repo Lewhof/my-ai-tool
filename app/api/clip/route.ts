@@ -3,6 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS } from '@/lib/anthropic';
 import { extractArticle, isBookUrl, canonicalizeUrl } from '@/lib/extract';
 import { generateBookSummary, lookupBookMetadata, generatePersonalReview } from '@/lib/books';
+import { getCached, setCached, hashInput } from '@/lib/ai-cache';
+
+const CLIP_CLASSIFY_TTL = 7 * 24 * 60 * 60; // 7 days — URL content is semi-stable
 
 type Destination = 'kb' | 'book' | 'highlight' | 'task' | 'whiteboard' | 'note';
 
@@ -149,6 +152,18 @@ async function classifyContent(args: {
     ? `\n\nUser selection (prioritize this — it's what they highlighted):\n"${args.selection.slice(0, 1000)}"`
     : '';
 
+  // Cache key: hash of URL + title + selection (content excluded — it shifts too much)
+  // Same URL + same selection → same classification. If content has changed significantly,
+  // the 7-day TTL + cache eviction catches it.
+  const cacheKey = hashInput({
+    url: args.url,
+    title: args.title,
+    selection: args.selection || '',
+  });
+
+  const cached = await getCached<Classification>('clip.classify', cacheKey);
+  if (cached) return cached;
+
   const response = await anthropic.messages.create({
     model: MODELS.fast,
     max_tokens: 300,
@@ -185,7 +200,12 @@ Return ONLY valid JSON:
   const text = response.content[0].type === 'text' ? response.content[0].text : '';
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error('Could not parse classification');
-  return JSON.parse(match[0]) as Classification;
+  const classification = JSON.parse(match[0]) as Classification;
+
+  // Store in cache
+  await setCached('clip.classify', cacheKey, classification, CLIP_CLASSIFY_TTL);
+
+  return classification;
 }
 
 // ─────────────────────────────────────────────
