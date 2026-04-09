@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import {
   DollarSign, Zap, Clock, AlertTriangle, CheckCircle, BarChart3,
   Server, Database, Users, GitBranch, Sparkles, ExternalLink,
-  RefreshCw, Trash2, Layers,
+  RefreshCw, Trash2, Layers, Wallet, Edit3, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -99,6 +99,10 @@ export default function CreditsPage() {
   const [providers, setProviders] = useState<ProviderStatus[] | null>(null);
   const [cacheStats, setCacheStats] = useState<CacheStat[] | null>(null);
   const [cachePurging, setCachePurging] = useState(false);
+  const [showBalanceModal, setShowBalanceModal] = useState(false);
+  const [balanceInput, setBalanceInput] = useState('');
+  const [thresholdInput, setThresholdInput] = useState('5');
+  const [savingBalance, setSavingBalance] = useState(false);
 
   const loadAll = () => {
     setLoading(true);
@@ -132,6 +136,67 @@ export default function CreditsPage() {
   const supabase = apiData?.supabase as { status: string; plan?: string; tables?: number; totalRows?: number; tableBreakdown?: Array<{ table: string; rows: number }>; dbSize?: string; dbSizeBytes?: number; dbSizeLimit?: string; storageFiles?: number; storageBytes?: number; storageLimit?: string } | undefined;
   const clerk = apiData?.clerk as { status: string; plan?: string; totalUsers?: number } | undefined;
   const github = apiData?.github as { status: string; repo?: string; size?: number; commits?: number; defaultBranch?: string } | undefined;
+  const anthropicBalance = apiData?.anthropicBalance as {
+    configured: boolean;
+    startingBalance?: number;
+    setAt?: string;
+    spentSince?: number;
+    remaining?: number;
+    alertThreshold?: number;
+    lowBalance?: boolean;
+  } | undefined;
+
+  const openBalanceModal = () => {
+    if (anthropicBalance?.configured) {
+      setBalanceInput(String(anthropicBalance.remaining ?? anthropicBalance.startingBalance ?? ''));
+      setThresholdInput(String(anthropicBalance.alertThreshold ?? 5));
+    } else {
+      setBalanceInput('');
+      setThresholdInput('5');
+    }
+    setShowBalanceModal(true);
+  };
+
+  const saveBalance = async () => {
+    const balance = Number(balanceInput);
+    const threshold = Number(thresholdInput);
+    if (!Number.isFinite(balance) || balance < 0) {
+      toast.error('Balance must be a non-negative number');
+      return;
+    }
+    setSavingBalance(true);
+    try {
+      const res = await fetch('/api/credits/balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ balance, threshold }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast.success('Balance saved');
+      setShowBalanceModal(false);
+      loadAll();
+    } catch (e) {
+      toast.error(`Failed to save: ${e instanceof Error ? e.message : 'unknown'}`);
+    } finally {
+      setSavingBalance(false);
+    }
+  };
+
+  const clearBalance = async () => {
+    if (!confirm('Stop tracking Anthropic balance?')) return;
+    setSavingBalance(true);
+    try {
+      const res = await fetch('/api/credits/balance', { method: 'DELETE' });
+      if (!res.ok) throw new Error(await res.text());
+      toast.success('Balance tracking cleared');
+      setShowBalanceModal(false);
+      loadAll();
+    } catch (e) {
+      toast.error(`Failed to clear: ${e instanceof Error ? e.message : 'unknown'}`);
+    } finally {
+      setSavingBalance(false);
+    }
+  };
 
   const p = period as {
     totalCost: number;
@@ -172,6 +237,81 @@ export default function CreditsPage() {
         <button onClick={loadAll} className="text-muted-foreground hover:text-foreground text-xs px-3 py-1.5 border border-border rounded-lg flex items-center gap-2 transition-colors">
           <RefreshCw size={12} /> Refresh
         </button>
+      </div>
+
+      {/* ── Anthropic Balance Hero ── */}
+      <div
+        className={cn(
+          'rounded-xl border p-6 transition-all',
+          anthropicBalance?.configured && anthropicBalance.lowBalance
+            ? 'bg-red-500/5 border-red-500/40 shadow-[0_0_32px_-8px_rgba(239,68,68,0.4)]'
+            : 'bg-card border-border'
+        )}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4 min-w-0">
+            <div className={cn(
+              'w-12 h-12 rounded-lg flex items-center justify-center shrink-0',
+              anthropicBalance?.configured && anthropicBalance.lowBalance
+                ? 'bg-red-500/20 text-red-400'
+                : 'bg-primary/15 text-primary'
+            )}>
+              <Wallet size={22} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-foreground font-semibold">Anthropic Credit</h3>
+                {anthropicBalance?.configured && anthropicBalance.lowBalance && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-red-500/20 text-red-400 border-red-500/30">
+                    LOW BALANCE
+                  </span>
+                )}
+              </div>
+              {anthropicBalance?.configured ? (
+                <>
+                  <div className="flex items-baseline gap-2">
+                    <span className={cn(
+                      'text-3xl font-bold',
+                      anthropicBalance.lowBalance ? 'text-red-400' : 'text-foreground'
+                    )}>
+                      {formatCost(anthropicBalance.remaining ?? 0)}
+                    </span>
+                    <span className="text-muted-foreground text-sm">remaining</span>
+                  </div>
+                  <p className="text-muted-foreground text-xs mt-1">
+                    Starting {formatCost(anthropicBalance.startingBalance ?? 0)} ·
+                    Spent {formatCost(anthropicBalance.spentSince ?? 0)} since{' '}
+                    {anthropicBalance.setAt
+                      ? new Date(anthropicBalance.setAt).toLocaleDateString()
+                      : '—'}
+                    {' · '}Alert below {formatCost(anthropicBalance.alertThreshold ?? 5)}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-muted-foreground text-sm">Not tracking balance yet.</p>
+                  <p className="text-muted-foreground/70 text-xs mt-1">
+                    Anthropic has no public balance API. Enter your current balance from{' '}
+                    <a
+                      href="https://console.anthropic.com/settings/billing"
+                      target="_blank"
+                      className="text-primary hover:underline"
+                    >
+                      console.anthropic.com
+                    </a>
+                    {' '}after a top-up and we&apos;ll subtract Helicone spend from it.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={openBalanceModal}
+            className="text-muted-foreground hover:text-foreground text-xs px-3 py-1.5 border border-border rounded-lg flex items-center gap-2 transition-colors shrink-0"
+          >
+            <Edit3 size={12} /> {anthropicBalance?.configured ? 'Update' : 'Set balance'}
+          </button>
+        </div>
       </div>
 
       {/* ── Service Status ── */}
@@ -514,6 +654,92 @@ export default function CreditsPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Balance Modal ── */}
+      {showBalanceModal && (
+        <div
+          className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => !savingBalance && setShowBalanceModal(false)}
+        >
+          <div
+            className="bg-card border border-border rounded-xl p-6 max-w-md w-full space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-foreground font-semibold flex items-center gap-2">
+                  <Wallet size={16} /> Anthropic Balance
+                </h3>
+                <p className="text-muted-foreground text-xs mt-1">
+                  Enter your current remaining credit from{' '}
+                  <a
+                    href="https://console.anthropic.com/settings/billing"
+                    target="_blank"
+                    className="text-primary hover:underline"
+                  >
+                    console.anthropic.com
+                  </a>
+                  . Helicone spend will be subtracted from this.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowBalanceModal(false)}
+                disabled={savingBalance}
+                className="text-muted-foreground hover:text-foreground shrink-0"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-muted-foreground text-xs mb-1 block">Current balance (USD)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={balanceInput}
+                  onChange={(e) => setBalanceInput(e.target.value)}
+                  placeholder="50.00"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-primary"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-muted-foreground text-xs mb-1 block">Alert when below (USD)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={thresholdInput}
+                  onChange={(e) => setThresholdInput(e.target.value)}
+                  placeholder="5.00"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-primary"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={saveBalance}
+                disabled={savingBalance || !balanceInput}
+                className="flex-1 bg-primary text-background font-medium text-sm px-4 py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {savingBalance ? 'Saving...' : 'Save'}
+              </button>
+              {anthropicBalance?.configured && (
+                <button
+                  onClick={clearBalance}
+                  disabled={savingBalance}
+                  className="text-red-400 hover:text-red-300 text-xs px-3 py-2 border border-red-500/30 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Stop tracking
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

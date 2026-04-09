@@ -7,6 +7,7 @@ import {
   ChevronRight, TrendingUp, Cpu, Database,
   ArrowUpRight, Plus, Mic, MicOff,
   StickyNote, Save, Pin, Calendar, BookOpen,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRelativeDate, truncate } from '@/lib/utils';
@@ -39,6 +40,12 @@ interface CreditsData {
   vercel?: { status?: string; error?: string };
   supabase?: { status: string; tier: string };
   clerk?: { status: string; tier: string };
+  anthropicBalance?: {
+    configured: boolean;
+    remaining?: number;
+    alertThreshold?: number;
+    lowBalance?: boolean;
+  };
 }
 
 function formatCost(cost: number): string {
@@ -218,6 +225,28 @@ export default function DashboardPage() {
 
   return (
     <div className="p-4 lg:p-6 space-y-4 animate-fade-up">
+      {/* Low Anthropic Balance Warning */}
+      {credits?.anthropicBalance?.configured && credits.anthropicBalance.lowBalance && (
+        <Link
+          href="/credits"
+          className="flex items-center gap-3 rounded-2xl border border-red-500/40 bg-red-500/5 px-5 py-3 hover:bg-red-500/10 transition-colors"
+        >
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-red-500/20 text-red-400 shrink-0">
+            <AlertTriangle size={16} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-semibold text-red-400">Anthropic credit running low</p>
+            <p className="text-[11px] text-muted-foreground">
+              {formatCost(credits.anthropicBalance.remaining ?? 0)} remaining
+              {credits.anthropicBalance.alertThreshold !== undefined &&
+                ` · below ${formatCost(credits.anthropicBalance.alertThreshold)} threshold`}
+              {' · '}Top up at console.anthropic.com
+            </p>
+          </div>
+          <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+        </Link>
+      )}
+
       {/* Cerebro Hero Card */}
       <div className="relative rounded-2xl overflow-hidden" style={{ minHeight: 160 }}>
         <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, oklch(0.10 0.012 255 / 0.92) 0%, oklch(0.10 0.012 255 / 0.75) 100%)' }} />

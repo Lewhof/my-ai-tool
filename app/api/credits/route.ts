@@ -1,10 +1,18 @@
 import { auth } from '@clerk/nextjs/server';
+import { supabaseAdmin } from '@/lib/supabase-server';
 
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
   const results: Record<string, unknown> = {};
+  // Raw Helicone requests are captured during section 1 and reused by the
+  // balance calculation at the bottom of this handler.
+  let heliconeRequests: Array<{
+    response_cost_usd?: number;
+    request_created_at?: string;
+    created_at?: string;
+  }> = [];
 
   // ── 1. Helicone (AI Usage) ──
   try {
@@ -31,6 +39,7 @@ export async function GET() {
       if (res.ok) {
         const data = await res.json();
         const requests = data.data ?? [];
+        heliconeRequests = requests;
 
         const now = Date.now();
         const periods: Record<string, { cost: number; requests: number; inputTokens: number; outputTokens: number; latencySum: number; errors: number; models: Record<string, { cost: number; requests: number; inputTokens: number; outputTokens: number; latencySum: number }> }> = {
@@ -248,6 +257,46 @@ export async function GET() {
     }
   } catch {
     results.github = { status: 'error' };
+  }
+
+  // ── 6. Anthropic balance (manual entry + Helicone spend since set_at) ──
+  // Anthropic does not expose account balance via any public API. Users record
+  // their current balance after topping up, and we subtract observed spend.
+  try {
+    const { data: billing } = await supabaseAdmin
+      .from('billing_state')
+      .select('starting_balance_usd, set_at, alert_threshold_usd')
+      .eq('user_id', userId)
+      .eq('provider', 'anthropic')
+      .maybeSingle();
+
+    if (billing) {
+      const setAt = new Date(billing.set_at).getTime();
+      const spentSince = heliconeRequests
+        .filter(r => {
+          const ts = new Date(r.request_created_at ?? r.created_at ?? 0).getTime();
+          return ts >= setAt;
+        })
+        .reduce((sum, r) => sum + (r.response_cost_usd ?? 0), 0);
+
+      const starting = Number(billing.starting_balance_usd);
+      const threshold = Number(billing.alert_threshold_usd);
+      const remaining = Math.max(0, starting - spentSince);
+
+      results.anthropicBalance = {
+        configured: true,
+        startingBalance: starting,
+        setAt: billing.set_at,
+        spentSince: Math.round(spentSince * 10000) / 10000,
+        remaining: Math.round(remaining * 10000) / 10000,
+        alertThreshold: threshold,
+        lowBalance: remaining < threshold,
+      };
+    } else {
+      results.anthropicBalance = { configured: false };
+    }
+  } catch (e) {
+    results.anthropicBalance = { configured: false, error: String(e) };
   }
 
   return Response.json(results);

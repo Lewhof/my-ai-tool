@@ -533,17 +533,56 @@ async function executeToolInner(
       case 'get_credits': {
         const heliconeKey = process.env.HELICONE_API_KEY;
         if (!heliconeKey) return 'Helicone not configured.';
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+
+        // Fetch enough history to cover both 30-day window and any
+        // balance-set date (users may set balance earlier than 30d ago).
+        const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000).toISOString();
+        const thirtyDaysAgoMs = Date.now() - 30 * 86400000;
         const res = await fetch('https://api.helicone.ai/v1/request/query', {
           method: 'POST',
           headers: { Authorization: `Bearer ${heliconeKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filter: { request: { created_at: { gte: thirtyDaysAgo } } }, limit: 500 }),
+          body: JSON.stringify({ filter: { request: { created_at: { gte: ninetyDaysAgo } } }, limit: 2000 }),
         });
         if (!res.ok) return 'Could not fetch credits data.';
         const data = await res.json();
-        const requests = data.data ?? [];
-        const totalCost = requests.reduce((sum: number, r: Record<string, number>) => sum + (r.response_cost_usd ?? 0), 0);
-        return `AI Usage (30 days): ${requests.length} requests, $${totalCost.toFixed(4)} total cost`;
+        const requests: Array<{
+          response_cost_usd?: number;
+          request_created_at?: string;
+          created_at?: string;
+        }> = data.data ?? [];
+
+        // 30-day usage summary
+        const recent = requests.filter(r => {
+          const ts = new Date(r.request_created_at ?? r.created_at ?? 0).getTime();
+          return ts >= thirtyDaysAgoMs;
+        });
+        const totalCost = recent.reduce((sum, r) => sum + (r.response_cost_usd ?? 0), 0);
+
+        // Anthropic balance (manual entry)
+        const { data: billing } = await supabaseAdmin
+          .from('billing_state')
+          .select('starting_balance_usd, set_at, alert_threshold_usd')
+          .eq('user_id', userId)
+          .eq('provider', 'anthropic')
+          .maybeSingle();
+
+        let balanceLine = '\nAnthropic balance: not configured. User can set it on /credits page.';
+        if (billing) {
+          const setAt = new Date(billing.set_at).getTime();
+          const spentSince = requests
+            .filter(r => {
+              const ts = new Date(r.request_created_at ?? r.created_at ?? 0).getTime();
+              return ts >= setAt;
+            })
+            .reduce((sum, r) => sum + (r.response_cost_usd ?? 0), 0);
+          const starting = Number(billing.starting_balance_usd);
+          const threshold = Number(billing.alert_threshold_usd);
+          const remaining = Math.max(0, starting - spentSince);
+          const lowFlag = remaining < threshold ? ' ⚠ LOW' : '';
+          balanceLine = `\nAnthropic balance: $${remaining.toFixed(4)} remaining${lowFlag} (started at $${starting.toFixed(2)} on ${new Date(billing.set_at).toLocaleDateString()}, spent $${spentSince.toFixed(4)} since).`;
+        }
+
+        return `AI Usage (30 days): ${recent.length} requests, $${totalCost.toFixed(4)} total cost.${balanceLine}`;
       }
 
       case 'search_kb': {

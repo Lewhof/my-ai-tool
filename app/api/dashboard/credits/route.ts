@@ -1,10 +1,16 @@
 import { auth } from '@clerk/nextjs/server';
+import { supabaseAdmin } from '@/lib/supabase-server';
 
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
   const results: Record<string, unknown> = {};
+  let heliconeRequests: Array<{
+    response_cost_usd?: number;
+    request_created_at?: string;
+    created_at?: string;
+  }> = [];
 
   // 1. Helicone — AI usage costs (last 30 days)
   try {
@@ -31,6 +37,7 @@ export async function GET() {
     if (heliconeRes.ok) {
       const heliconeData = await heliconeRes.json();
       const requests = heliconeData.data ?? [];
+      heliconeRequests = requests;
       let totalCost = 0;
       let totalRequests = 0;
       let totalTokens = 0;
@@ -99,6 +106,41 @@ export async function GET() {
 
   // 4. Clerk — basic info
   results.clerk = { status: 'connected', tier: 'Free (dev keys)' };
+
+  // 5. Anthropic balance (manual entry + Helicone spend since set_at)
+  try {
+    const { data: billing } = await supabaseAdmin
+      .from('billing_state')
+      .select('starting_balance_usd, set_at, alert_threshold_usd')
+      .eq('user_id', userId)
+      .eq('provider', 'anthropic')
+      .maybeSingle();
+
+    if (billing) {
+      const setAt = new Date(billing.set_at).getTime();
+      const spentSince = heliconeRequests
+        .filter(r => {
+          const ts = new Date(r.request_created_at ?? r.created_at ?? 0).getTime();
+          return ts >= setAt;
+        })
+        .reduce((sum, r) => sum + (r.response_cost_usd ?? 0), 0);
+
+      const starting = Number(billing.starting_balance_usd);
+      const threshold = Number(billing.alert_threshold_usd);
+      const remaining = Math.max(0, starting - spentSince);
+
+      results.anthropicBalance = {
+        configured: true,
+        remaining: Math.round(remaining * 10000) / 10000,
+        alertThreshold: threshold,
+        lowBalance: remaining < threshold,
+      };
+    } else {
+      results.anthropicBalance = { configured: false };
+    }
+  } catch {
+    results.anthropicBalance = { configured: false };
+  }
 
   return Response.json(results);
 }
