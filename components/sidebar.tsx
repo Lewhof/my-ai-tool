@@ -9,6 +9,7 @@ import {
   Calendar, CalendarDays, Mail, KeyRound, Settings, MessageSquare,
   Zap, BookOpen, Image as ImageIcon, Focus, StickyNote, GitFork,
   ClipboardList, CreditCard, ChevronLeft, ChevronRight, Globe,
+  Wallet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -32,6 +33,12 @@ const SIDEBAR_GROUPS = [
       { name: 'Notes', href: '/notes', icon: StickyNote },
       { name: 'Documents', href: '/documents', icon: FileText },
       { name: 'Focus', href: '/focus', icon: Focus },
+    ],
+  },
+  {
+    label: 'Life',
+    items: [
+      { name: 'Finance', href: '/finance', icon: Wallet },
     ],
   },
   {
