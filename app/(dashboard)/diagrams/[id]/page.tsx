@@ -12,10 +12,19 @@ import { getLayoutedElements } from '@/lib/diagrams/auto-layout';
 import { toPng, toSvg } from 'html-to-image';
 
 const DiagramCanvas = dynamic(() => import('@/components/diagrams/diagram-canvas'), { ssr: false });
+const ExcalidrawEditor = dynamic(() => import('@/components/diagrams/excalidraw-editor'), { ssr: false });
+
+type DiagramRecord = {
+  name: string;
+  type?: 'flow' | 'excalidraw';
+  nodes: Node[];
+  edges: Edge[];
+  excalidraw_scene?: { elements: unknown[]; appState?: Record<string, unknown>; files?: Record<string, unknown> } | null;
+};
 
 export default function DiagramViewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [diagram, setDiagram] = useState<{ name: string; nodes: Node[]; edges: Edge[] } | null>(null);
+  const [diagram, setDiagram] = useState<DiagramRecord | null>(null);
   const [isSaved, setIsSaved] = useState(true);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -178,6 +187,16 @@ export default function DiagramViewPage({ params }: { params: Promise<{ id: stri
   }, [id]);
 
   if (!diagram) return <div className="p-6 text-muted-foreground">Loading diagram...</div>;
+
+  if (diagram.type === 'excalidraw') {
+    return (
+      <ExcalidrawEditor
+        id={id}
+        initialName={diagram.name}
+        initialScene={diagram.excalidraw_scene ?? { elements: [], appState: {}, files: {} }}
+      />
+    );
+  }
 
   return (
     <div className="h-full flex flex-col min-h-0">

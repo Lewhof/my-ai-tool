@@ -5,16 +5,19 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { formatRelativeDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
-import { Sparkles, Loader2, Upload, Image as ImageIcon, X } from 'lucide-react';
+import { Sparkles, Loader2, Upload, Image as ImageIcon, X, ChevronDown, Workflow, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Diagram {
   id: string;
   name: string;
   description: string | null;
+  type?: 'flow' | 'excalidraw';
   created_at: string;
   updated_at: string;
 }
+
+type Engine = 'flow' | 'excalidraw';
 
 export default function DiagramsPage() {
   const router = useRouter();
@@ -24,6 +27,8 @@ export default function DiagramsPage() {
   const [generating, setGenerating] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
+  const [generateEngine, setGenerateEngine] = useState<Engine>('flow');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDiagrams = useCallback(async () => {
@@ -36,11 +41,15 @@ export default function DiagramsPage() {
     fetchDiagrams();
   }, [fetchDiagrams]);
 
-  const createDiagram = async () => {
+  const createDiagram = async (engine: Engine = 'flow') => {
+    setNewMenuOpen(false);
+    const payload = engine === 'excalidraw'
+      ? { name: 'Untitled Excalidraw', type: 'excalidraw', excalidraw_scene: { elements: [], appState: {}, files: {} } }
+      : { name: 'Untitled Diagram', type: 'flow', nodes: [], edges: [] };
     const res = await fetch('/api/diagrams', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Untitled Diagram', nodes: [], edges: [] }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (data.id) router.push(`/diagrams/${data.id}`);
@@ -82,10 +91,44 @@ export default function DiagramsPage() {
     if (!generatePrompt.trim() && !imageFile) return;
     setGenerating(true);
     try {
-      let genRes: Response;
+      const name = (generatePrompt || 'Image diagram').slice(0, 50);
 
+      if (generateEngine === 'excalidraw') {
+        // Excalidraw generation doesn't support image input yet — prompt only.
+        if (imageFile) {
+          throw new Error('Image input is not supported for Excalidraw yet. Use a text prompt.');
+        }
+        const genRes = await fetch('/api/diagrams/generate-excalidraw', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: generatePrompt }),
+        });
+        if (!genRes.ok) {
+          const errData = await genRes.json().catch(() => ({}));
+          throw new Error(errData.error || `Generation failed (${genRes.status})`);
+        }
+        const { elements } = await genRes.json();
+        const saveRes = await fetch('/api/diagrams', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            description: generatePrompt,
+            type: 'excalidraw',
+            excalidraw_scene: { elements, appState: {}, files: {} },
+          }),
+        });
+        const saved = await saveRes.json();
+        if (saved.id) {
+          toast('Excalidraw diagram generated');
+          router.push(`/diagrams/${saved.id}`);
+        }
+        return;
+      }
+
+      // Default: React Flow generation (text or image)
+      let genRes: Response;
       if (imageFile) {
-        // Send image + prompt via FormData
         const formData = new FormData();
         formData.append('image', imageFile);
         formData.append('prompt', generatePrompt || 'Convert this image into a diagram');
@@ -104,11 +147,10 @@ export default function DiagramsPage() {
       }
       const { nodes, edges } = await genRes.json();
 
-      const name = (generatePrompt || 'Image diagram').slice(0, 50);
       const saveRes = await fetch('/api/diagrams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description: generatePrompt, nodes, edges }),
+        body: JSON.stringify({ name, description: generatePrompt, type: 'flow', nodes, edges }),
       });
       const saved = await saveRes.json();
       if (saved.id) {
@@ -143,21 +185,76 @@ export default function DiagramsPage() {
             <Sparkles size={14} />
             Generate with AI
           </button>
-          <button
-            onClick={createDiagram}
-            className="bg-primary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary transition-colors"
-          >
-            + New Diagram
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setNewMenuOpen(!newMenuOpen)}
+              className="bg-primary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary transition-colors flex items-center gap-1.5"
+            >
+              + New Diagram <ChevronDown size={14} />
+            </button>
+            {newMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setNewMenuOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 w-52 bg-card border border-border rounded-lg shadow-lg z-50 overflow-hidden">
+                  <button
+                    onClick={() => createDiagram('flow')}
+                    className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-secondary/40 transition-colors text-left"
+                  >
+                    <Workflow size={14} className="text-blue-400 mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-foreground text-xs font-medium">Flow diagram</p>
+                      <p className="text-muted-foreground text-[10px]">Nodes &amp; edges, auto-layout</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => createDiagram('excalidraw')}
+                    className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-secondary/40 transition-colors text-left border-t border-border"
+                  >
+                    <Pencil size={14} className="text-purple-400 mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-foreground text-xs font-medium">Excalidraw</p>
+                      <p className="text-muted-foreground text-[10px]">Hand-drawn, free-form</p>
+                    </div>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
       {/* AI Generate */}
       {showGenerate && (
         <div className="rounded-2xl border border-border p-5 space-y-3 animate-fade-up" style={{ background: 'var(--color-surface-1)' }}>
-          <div className="flex items-center gap-2">
-            <Sparkles size={14} style={{ color: 'var(--color-brand)' }} />
-            <span className="text-[13px] font-semibold text-foreground">AI Diagram Generator</span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Sparkles size={14} style={{ color: 'var(--color-brand)' }} />
+              <span className="text-[13px] font-semibold text-foreground">AI Diagram Generator</span>
+            </div>
+            <div className="flex items-center gap-1 p-0.5 rounded-lg border border-border" style={{ background: 'var(--color-surface-2)' }}>
+              <button
+                onClick={() => setGenerateEngine('flow')}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium transition-colors',
+                  generateEngine === 'flow'
+                    ? 'bg-blue-500/20 text-blue-400'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Workflow size={11} /> Flow
+              </button>
+              <button
+                onClick={() => setGenerateEngine('excalidraw')}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium transition-colors',
+                  generateEngine === 'excalidraw'
+                    ? 'bg-purple-500/20 text-purple-400'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Pencil size={11} /> Excalidraw
+              </button>
+            </div>
           </div>
           <div onPaste={handlePaste} onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}>
             <textarea
@@ -244,9 +341,21 @@ export default function DiagramsPage() {
               className="bg-card border border-border rounded-lg p-4 hover:border-border transition-colors group cursor-pointer"
               onClick={() => router.push(`/diagrams/${diagram.id}`)}
             >
-              <p className="text-foreground font-medium mb-1">{diagram.name}</p>
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <p className="text-foreground font-medium min-w-0 truncate">{diagram.name}</p>
+                <span
+                  className={cn(
+                    'text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0',
+                    diagram.type === 'excalidraw'
+                      ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+                      : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                  )}
+                >
+                  {diagram.type === 'excalidraw' ? 'EXCALIDRAW' : 'FLOW'}
+                </span>
+              </div>
               {diagram.description && (
-                <p className="text-muted-foreground text-sm mb-2">{diagram.description}</p>
+                <p className="text-muted-foreground text-sm mb-2 line-clamp-2">{diagram.description}</p>
               )}
               <div className="flex items-center justify-between text-muted-foreground text-xs">
                 <span>{formatRelativeDate(diagram.updated_at)}</span>

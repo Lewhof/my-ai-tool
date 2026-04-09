@@ -7,7 +7,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from('diagrams')
-    .select('id, name, description, created_at, updated_at')
+    .select('id, name, description, type, created_at, updated_at')
     .eq('user_id', userId)
     .order('updated_at', { ascending: false });
 
@@ -19,8 +19,10 @@ export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
-  const { name, description, nodes, edges } = await req.json();
+  const { name, description, nodes, edges, type, excalidraw_scene } = await req.json();
   if (!name?.trim()) return Response.json({ error: 'Name required' }, { status: 400 });
+
+  const engine = type === 'excalidraw' ? 'excalidraw' : 'flow';
 
   const { data, error } = await supabaseAdmin
     .from('diagrams')
@@ -28,8 +30,10 @@ export async function POST(req: Request) {
       user_id: userId,
       name,
       description: description || null,
-      nodes: nodes || [],
-      edges: edges || [],
+      type: engine,
+      nodes: engine === 'flow' ? (nodes || []) : [],
+      edges: engine === 'flow' ? (edges || []) : [],
+      excalidraw_scene: engine === 'excalidraw' ? (excalidraw_scene || { elements: [], appState: {}, files: {} }) : null,
     })
     .select()
     .single();
