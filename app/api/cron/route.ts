@@ -452,33 +452,43 @@ ${context}`,
       let extracted = 0;
 
       for (const userId of uniqueIds) {
-        const token = await getMicrosoftToken(userId);
-        if (!token) continue;
+        // Get ALL Microsoft accounts for this user
+        const { data: msAccounts } = await supabaseAdmin
+          .from('calendar_accounts')
+          .select('id, provider')
+          .eq('user_id', userId)
+          .in('provider', ['microsoft', 'microsoft-work']);
 
-        // Fetch recent emails (last 24h)
+        if (!msAccounts || msAccounts.length === 0) continue;
+
         const since = new Date(now.getTime() - 86400000).toISOString();
-        const res = await fetch(
-          `https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=20&$orderby=receivedDateTime desc&$filter=receivedDateTime ge ${since}&$select=from,toRecipients`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
 
-        if (!res.ok) continue;
-        const data = await res.json();
+        for (const account of msAccounts) {
+          const token = await getMicrosoftToken(userId, account.id);
+          if (!token) continue;
 
-        for (const email of data.value ?? []) {
-          // Extract sender
-          const fromAddr = email.from?.emailAddress;
-          if (fromAddr?.address && !fromAddr.address.includes('noreply') && !fromAddr.address.includes('no-reply')) {
-            const { error: upsertErr } = await supabaseAdmin.from('contacts').upsert({
-              user_id: userId,
-              name: fromAddr.name || fromAddr.address.split('@')[0],
-              email: fromAddr.address.toLowerCase(),
-              source: 'email',
-              last_interaction: email.receivedDateTime || now.toISOString(),
-              interaction_count: 1,
-              updated_at: now.toISOString(),
-            }, { onConflict: 'user_id,email' });
-            if (!upsertErr) extracted++;
+          const res = await fetch(
+            `https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=20&$orderby=receivedDateTime desc&$filter=receivedDateTime ge ${since}&$select=from,toRecipients`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          if (!res.ok) continue;
+          const data = await res.json();
+
+          for (const email of data.value ?? []) {
+            const fromAddr = email.from?.emailAddress;
+            if (fromAddr?.address && !fromAddr.address.includes('noreply') && !fromAddr.address.includes('no-reply')) {
+              const { error: upsertErr } = await supabaseAdmin.from('contacts').upsert({
+                user_id: userId,
+                name: fromAddr.name || fromAddr.address.split('@')[0],
+                email: fromAddr.address.toLowerCase(),
+                source: 'email',
+                last_interaction: email.receivedDateTime || now.toISOString(),
+                interaction_count: 1,
+                updated_at: now.toISOString(),
+              }, { onConflict: 'user_id,email' });
+              if (!upsertErr) extracted++;
+            }
           }
         }
       }

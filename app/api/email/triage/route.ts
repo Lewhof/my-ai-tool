@@ -1,4 +1,5 @@
 import { auth } from '@clerk/nextjs/server';
+import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS } from '@/lib/anthropic';
 import { getMicrosoftToken } from '@/lib/microsoft-token';
 
@@ -6,30 +7,68 @@ export async function POST() {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
-  const token = await getMicrosoftToken(userId);
-  if (!token) return Response.json({ error: 'Not connected' }, { status: 400 });
+  // Get ALL Microsoft accounts (personal + work)
+  const { data: accounts } = await supabaseAdmin
+    .from('calendar_accounts')
+    .select('id, label, alias, provider')
+    .eq('user_id', userId)
+    .in('provider', ['microsoft', 'microsoft-work']);
 
-  // Get latest unread emails
-  const res = await fetch(
-    'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=15&$filter=isRead eq false&$orderby=receivedDateTime desc&$select=id,subject,from,bodyPreview,importance,receivedDateTime',
-    { headers: { Authorization: `Bearer ${token}` } }
+  if (!accounts || accounts.length === 0) {
+    return Response.json({ error: 'Not connected' }, { status: 400 });
+  }
+
+  // Fetch unread emails from all accounts in parallel
+  type RawEmail = {
+    id: string;
+    subject: string;
+    from?: { emailAddress?: { name?: string; address?: string } };
+    bodyPreview?: string;
+    receivedDateTime: string;
+    accountLabel: string;
+  };
+
+  const perAccount = Math.max(8, Math.floor(20 / accounts.length));
+  const results = await Promise.all(
+    accounts.map(async (account): Promise<RawEmail[]> => {
+      try {
+        const token = await getMicrosoftToken(userId, account.id);
+        if (!token) return [];
+
+        const res = await fetch(
+          `https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=${perAccount}&$filter=isRead eq false&$orderby=receivedDateTime desc&$select=id,subject,from,bodyPreview,importance,receivedDateTime`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!res.ok) return [];
+        const data = await res.json();
+        const label = account.alias || account.label || 'Email';
+        return (data.value ?? []).map((e: Record<string, unknown>) => ({
+          ...e,
+          accountLabel: label,
+        })) as RawEmail[];
+      } catch {
+        return [];
+      }
+    })
   );
 
-  if (!res.ok) return Response.json({ error: 'Failed to fetch emails' }, { status: 500 });
+  // Merge, sort by date desc, take top 20
+  const emails = results.flat()
+    .sort((a, b) => new Date(b.receivedDateTime).getTime() - new Date(a.receivedDateTime).getTime())
+    .slice(0, 20);
 
-  const data = await res.json();
-  const emails = data.value ?? [];
+  if (emails.length === 0) {
+    return Response.json({ triaged: [], summary: 'No unread emails.' });
+  }
 
-  if (emails.length === 0) return Response.json({ triaged: [], summary: 'No unread emails.' });
-
-  const emailList = emails.map((e: Record<string, unknown>, i: number) => {
-    const from = (e.from as Record<string, Record<string, string>>)?.emailAddress;
-    return `${i + 1}. From: ${from?.name || from?.address || 'unknown'} | Subject: ${e.subject} | Preview: ${(e.bodyPreview as string)?.slice(0, 100)}`;
+  const emailList = emails.map((e, i) => {
+    const from = e.from?.emailAddress;
+    return `${i + 1}. [${e.accountLabel}] From: ${from?.name || from?.address || 'unknown'} | Subject: ${e.subject} | Preview: ${(e.bodyPreview ?? '').slice(0, 100)}`;
   }).join('\n');
 
   const response = await anthropic.messages.create({
     model: MODELS.fast,
-    max_tokens: 800,
+    max_tokens: 1000,
     messages: [{
       role: 'user',
       content: `Triage these emails into categories. For each email return its index and category.
@@ -59,11 +98,12 @@ Respond with ONLY valid JSON array: [{"index": 1, "category": "IMPORTANT", "summ
     const result = triaged.map((t) => {
       const email = emails[t.index - 1];
       if (!email) return null;
-      const from = (email.from as Record<string, Record<string, string>>)?.emailAddress;
+      const from = email.from?.emailAddress;
       return {
         id: email.id,
         subject: email.subject,
         from: from?.name || from?.address || 'unknown',
+        accountLabel: email.accountLabel,
         category: t.category,
         summary: t.summary,
         date: email.receivedDateTime,
@@ -76,7 +116,7 @@ Respond with ONLY valid JSON array: [{"index": 1, "category": "IMPORTANT", "summ
 
     return Response.json({
       triaged: result,
-      summary: `${emails.length} unread: ${important} important, ${canWait} can wait, ${fyi} FYI`,
+      summary: `${emails.length} unread across ${accounts.length} account${accounts.length !== 1 ? 's' : ''}: ${important} important, ${canWait} can wait, ${fyi} FYI`,
     });
   } catch {
     return Response.json({ error: 'AI triage failed', raw: text }, { status: 500 });

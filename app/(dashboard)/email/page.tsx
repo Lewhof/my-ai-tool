@@ -148,9 +148,11 @@ export default function EmailPage() {
   const loadEmail = async (id: string) => {
     setSelectedId(id);
     setEmailDetail(null);
-    const params = new URLSearchParams({ id });
-    if (activeAccountId) params.set('account_id', activeAccountId);
-    const res = await fetch(`/api/email/${id}`);
+    // Figure out which account this email came from (if in combined view, use the email's accountId)
+    const emailInList = emails.find(e => e.id === id);
+    const accountForFetch = emailInList?.accountId || (isAllInbox ? undefined : activeAccountId);
+    const url = accountForFetch ? `/api/email/${id}?account_id=${accountForFetch}` : `/api/email/${id}`;
+    const res = await fetch(url);
     if (res.ok) setEmailDetail(await res.json());
   };
 

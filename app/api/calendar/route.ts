@@ -151,19 +151,24 @@ export async function GET() {
           }
         }
       } else {
-        // Microsoft Graph API
-        const calRes = await fetch(
-          `https://graph.microsoft.com/v1.0/me/calendarview?startDateTime=${startOfDay}&endDateTime=${endOfWeek}&$orderby=start/dateTime&$top=50&$select=subject,start,end,location,isAllDay,showAs`,
-          {
+        // Microsoft Graph API — calendarview endpoint, paginated until we have everything
+        // $top max is 1000; $orderby not supported on calendarview, so we sort locally
+        let nextLink: string | null =
+          `https://graph.microsoft.com/v1.0/me/calendarview?startDateTime=${startOfDay}&endDateTime=${endOfWeek}&$top=200&$select=subject,start,end,location,isAllDay,showAs`;
+        let accountEventCount = 0;
+
+        // Fetch up to 3 pages (600 events max per account — plenty for a week)
+        for (let page = 0; page < 3 && nextLink; page++) {
+          const calRes: Response = await fetch(nextLink, {
             headers: {
               Authorization: `Bearer ${token}`,
               Prefer: 'outlook.timezone="Africa/Johannesburg"',
             },
-          }
-        );
+          });
 
-        if (calRes.ok) {
+          if (!calRes.ok) break;
           const calData = await calRes.json();
+
           for (const e of calData.value ?? []) {
             const startDt = (e.start?.dateTime || '').replace(/\.0+$/, '');
             const endDt = (e.end?.dateTime || '').replace(/\.0+$/, '');
@@ -179,7 +184,10 @@ export async function GET() {
               accountLabel: account.alias || account.label,
               accountColor: account.color,
             });
+            accountEventCount++;
           }
+
+          nextLink = calData['@odata.nextLink'] || null;
         }
       }
     } catch { /* skip failed account */ }
