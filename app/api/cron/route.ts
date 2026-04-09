@@ -7,6 +7,26 @@ import { sendTelegramMessage, getTelegramChatId } from '@/lib/telegram';
 import { generateNudges } from '@/lib/nudges';
 import { getMicrosoftToken } from '@/lib/microsoft-token';
 
+// Helper: convert raw executor errors into user-friendly explanations
+function humanizeExecutorError(raw: string): string {
+  if (/Unterminated string in JSON|Unexpected (token|end).*JSON|JSON\.parse/i.test(raw)) {
+    return 'The model returned malformed code output. This usually means the generated file was too large or contained unescaped characters.';
+  }
+  if (/Response truncated|max_tokens/i.test(raw)) {
+    return 'The code was too large for a single generation pass.';
+  }
+  if (/rate_limit|429/i.test(raw)) {
+    return 'Rate limited by the AI provider. Try again in a minute.';
+  }
+  if (/insufficient.*credit|balance.*too low|402/i.test(raw)) {
+    return 'Anthropic credits exhausted. Top up at console.anthropic.com.';
+  }
+  if (/No GitHub token|GitHub/i.test(raw)) {
+    return 'GitHub API error while committing the generated files.';
+  }
+  return raw;
+}
+
 // Helper: post a message to a user's Cerebro thread
 async function postToCerebro(userId: string, content: string) {
   let { data: thread } = await supabaseAdmin
@@ -225,9 +245,35 @@ Be specific and actionable.`,
     if (taskToExecute) {
       const task = taskToExecute;
       try {
+        // Use tool-use for structured output — SDK handles all escaping.
+        // This eliminates free-text JSON parse failures on unescaped backticks,
+        // template literals, and newlines inside code strings.
         const codeResponse = await anthropic.messages.create({
           model: MODELS.smart,
-          max_tokens: 4096,
+          max_tokens: 16000, // was 4096 — truncation mid-string caused "Unterminated string in JSON" failures
+          tools: [{
+            name: 'write_files',
+            description: 'Commit a batch of file operations to implement the task. Include every file needed in a single call.',
+            input_schema: {
+              type: 'object' as const,
+              properties: {
+                files: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      path:    { type: 'string', description: 'Repo-relative file path, e.g. app/example/page.tsx' },
+                      action:  { type: 'string', enum: ['create', 'update', 'delete'] },
+                      content: { type: 'string', description: 'Full file content. Ignored for delete actions.' },
+                    },
+                    required: ['path', 'action', 'content'],
+                  },
+                },
+              },
+              required: ['files'],
+            },
+          }],
+          tool_choice: { type: 'tool', name: 'write_files' },
           messages: [{
             role: 'user',
             content: `You are an autonomous code generator for a Next.js 16 + Supabase + Tailwind app.
@@ -236,17 +282,21 @@ Task: ${task.title}
 ${task.description ? `Details: ${task.description}` : ''}
 ${task.result ? `Approved plan: ${task.result}` : ''}
 
-Generate the implementation as a JSON array of file operations:
-[{"path":"app/example/page.tsx","action":"create","content":"..."}]
-
 Rules: TypeScript, Tailwind CSS v4 tokens (bg-card, text-foreground, border-border), import from @/lib/utils.
-Return ONLY valid JSON array.`,
+Call the write_files tool with every file needed to complete the task.`,
           }],
         });
 
-        const text = codeResponse.content[0].type === 'text' ? codeResponse.content[0].text : '';
-        const json = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-        const files: Array<{ path: string; action: string; content: string }> = JSON.parse(json);
+        // Defensive checks — catch both truncation and unexpected model output
+        if (codeResponse.stop_reason === 'max_tokens') {
+          throw new Error('Response truncated — task too large. Try splitting it into smaller steps.');
+        }
+        const toolUse = codeResponse.content.find(b => b.type === 'tool_use');
+        if (!toolUse || toolUse.type !== 'tool_use') {
+          throw new Error('Model returned text instead of calling write_files. Retry or rephrase the task.');
+        }
+        const files = (toolUse.input as { files?: Array<{ path: string; action: string; content: string }> }).files;
+        if (!files?.length) throw new Error('No files generated.');
 
         // Commit via GitHub API
         const owner = process.env.GITHUB_OWNER || 'Lewhof';
@@ -308,10 +358,15 @@ Return ONLY valid JSON array.`,
 
         results.executed = task.title;
       } catch (err) {
-        const errMsg = err instanceof Error ? err.message : 'Failed';
-        await supabaseAdmin.from('task_queue').update({ status: 'failed', result: errMsg }).eq('id', task.id);
-        await postToCerebro(task.user_id, `\u{274C} **Failed: ${task.title}**\n\n${errMsg}`);
-        await sendPushToUser(task.user_id, { title: 'Task failed', body: errMsg.slice(0, 80), tag: 'task-failed', url: '/agent' });
+        const rawMsg = err instanceof Error ? err.message : 'Failed';
+        // Humanize common low-level errors so Cerebro messages are readable.
+        const friendlyMsg = humanizeExecutorError(rawMsg);
+        await supabaseAdmin.from('task_queue').update({ status: 'failed', result: rawMsg }).eq('id', task.id);
+        await postToCerebro(
+          task.user_id,
+          `\u{26A0}\u{FE0F} **Code generation failed: ${task.title}**\n\n${friendlyMsg}\n\nRetry with \`/dev ${task.title}\` or split the task into smaller steps.`
+        );
+        await sendPushToUser(task.user_id, { title: 'Task failed', body: friendlyMsg.slice(0, 80), tag: 'task-failed', url: '/agent' });
         results.executed = 'failed';
       }
     }
