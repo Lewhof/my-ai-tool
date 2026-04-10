@@ -3,9 +3,9 @@ import { after } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { anthropic, cachedSystem, pickModel } from '@/lib/anthropic';
 import { supabaseAdmin } from '@/lib/supabase-server';
-import { AGENT_TOOLS } from '@/lib/agent/tools';
-import { executeTool } from '@/lib/agent/executor';
-import { getLearnedRules, bumpRuleHits } from '@/lib/agent/evolution';
+import { CEREBRO_TOOLS } from '@/lib/cerebro/tools';
+import { executeTool } from '@/lib/cerebro/executor';
+import { getLearnedRules, bumpRuleHits } from '@/lib/cerebro/evolution';
 
 // ── STATIC portion of the Cerebro system prompt ──
 // This is cached via prompt caching (5-min TTL). Never reference
@@ -303,7 +303,7 @@ export async function POST(req: Request) {
       model: pickModel('agent.tools'),
       max_tokens: 4096,
       system: getSystemPrompt(learnedRules),
-      tools: AGENT_TOOLS,
+      tools: CEREBRO_TOOLS,
       messages: currentMessages,
     });
 

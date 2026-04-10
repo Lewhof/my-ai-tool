@@ -18,8 +18,8 @@ const SIDEBAR_GROUPS = [
     label: 'Home',
     items: [
       { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-      { name: 'Cerebro', href: '/agent', icon: Bot, isBrand: true },
-      { name: 'Cerebro Brain', href: '/agent/brain', icon: Sparkles },
+      { name: 'Cerebro', href: '/cerebro', icon: Bot, isBrand: true },
+      { name: 'Cerebro Brain', href: '/cerebro/brain', icon: Sparkles },
       { name: 'Social', href: '/social', icon: Globe },
     ],
   },
@@ -71,8 +71,8 @@ export default function Sidebar() {
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
-    // /agent should not match /agent/brain — treat top-level agent as exact + its plain children only
-    if (href === '/agent') return pathname === '/agent';
+    // /cerebro should not match /cerebro/brain — treat top-level cerebro as exact
+    if (href === '/cerebro') return pathname === '/cerebro';
     return pathname.startsWith(href);
   };
 

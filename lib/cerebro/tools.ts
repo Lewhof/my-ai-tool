@@ -1,7 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 
 // Tool definitions for the Master Agent
-export const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
+export const CEREBRO_TOOLS: Anthropic.Messages.Tool[] = [
   {
     name: 'get_calendar',
     description: 'Get calendar events for today or upcoming days. Returns events from all connected Microsoft Calendar accounts.',

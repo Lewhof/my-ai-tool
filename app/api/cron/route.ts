@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS } from '@/lib/anthropic';
-import { executeTool } from '@/lib/agent/executor';
+import { executeTool } from '@/lib/cerebro/executor';
 import { sendPushToUser } from '@/lib/push';
 import { gatherBriefingData, generateBriefing, formatBriefingForTelegram } from '@/lib/briefing';
 import { sendTelegramMessage, getTelegramChatId } from '@/lib/telegram';
@@ -217,7 +217,7 @@ Be specific and actionable.`,
           title: 'Task plan ready',
           body: `${task.title} \u2014 review in Cerebro`,
           tag: 'task-plan',
-          url: '/agent',
+          url: '/cerebro',
         });
 
         planned++;
@@ -353,7 +353,7 @@ Call the write_files tool with every file needed to complete the task.`,
           title: 'Task completed',
           body: `${task.title} \u2014 deployed`,
           tag: 'task-complete',
-          url: '/agent',
+          url: '/cerebro',
         });
 
         results.executed = task.title;
@@ -366,7 +366,7 @@ Call the write_files tool with every file needed to complete the task.`,
           task.user_id,
           `\u{26A0}\u{FE0F} **Code generation failed: ${task.title}**\n\n${friendlyMsg}\n\nRetry with \`/dev ${task.title}\` or split the task into smaller steps.`
         );
-        await sendPushToUser(task.user_id, { title: 'Task failed', body: friendlyMsg.slice(0, 80), tag: 'task-failed', url: '/agent' });
+        await sendPushToUser(task.user_id, { title: 'Task failed', body: friendlyMsg.slice(0, 80), tag: 'task-failed', url: '/cerebro' });
         results.executed = 'failed';
       }
     }

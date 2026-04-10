@@ -269,7 +269,7 @@ export default function DashboardPage() {
             if (isListening) stopListening();
             if (cerebroInput.trim()) {
               // Navigate to Cerebro with the prompt
-              window.location.href = `/agent?prompt=${encodeURIComponent(cerebroInput)}`;
+              window.location.href = `/cerebro?prompt=${encodeURIComponent(cerebroInput)}`;
             }
           }} className="flex items-center gap-2">
             <div className="flex-1 relative">
@@ -295,7 +295,7 @@ export default function DashboardPage() {
             >
               {isListening ? <MicOff size={16} /> : <Mic size={16} />}
             </button>
-            <Link href="/agent">
+            <Link href="/cerebro">
               <button
                 type="button"
                 className="w-11 h-11 rounded-xl flex items-center justify-center text-white transition-all btn-brand"

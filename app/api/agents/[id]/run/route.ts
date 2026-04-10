@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS } from '@/lib/anthropic';
-import { executeTool } from '@/lib/agent/executor';
+import { executeTool } from '@/lib/cerebro/executor';
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();

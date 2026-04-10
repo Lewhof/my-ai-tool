@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { getMicrosoftToken } from '@/lib/microsoft-token';
-import { recordToolMetric } from '@/lib/agent/evolution';
+import { recordToolMetric } from '@/lib/cerebro/evolution';
 
 export async function executeTool(
   toolName: string,

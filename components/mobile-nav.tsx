@@ -13,14 +13,14 @@ import {
 
 const TABS = [
   { name: 'Home', href: '/', icon: LayoutDashboard },
-  { name: 'Cerebro', href: '/agent', icon: Bot, isBrand: true },
+  { name: 'Cerebro', href: '/cerebro', icon: Bot, isBrand: true },
   { name: 'Tasks', href: '/todos', icon: CheckSquare },
   { name: 'Docs', href: '/documents', icon: FileText },
   { name: 'More', href: '#more', icon: MoreHorizontal },
 ];
 
 const MORE_GRID = [
-  { name: 'Cerebro Brain', href: '/agent/brain', icon: Sparkles },
+  { name: 'Cerebro Brain', href: '/cerebro/brain', icon: Sparkles },
   { name: 'Planner', href: '/planner', icon: CalendarDays },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Email', href: '/email', icon: Mail },

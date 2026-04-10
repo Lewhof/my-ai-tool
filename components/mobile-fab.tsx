@@ -18,7 +18,7 @@ export default function MobileFAB() {
   const router = useRouter();
 
   // Hide on Cerebro page (input bar serves the same purpose)
-  if (pathname === '/agent') return null;
+  if (pathname === '/cerebro') return null;
 
   return (
     <>

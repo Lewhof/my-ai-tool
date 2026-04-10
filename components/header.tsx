@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 
 const pageTitles: Record<string, string> = {
   '/': 'Dashboard',
-  '/agent': 'Cerebro',
+  '/cerebro': 'Cerebro',
   '/chat': 'Chat',
   '/todos': 'Tasks',
   '/email': 'Email',

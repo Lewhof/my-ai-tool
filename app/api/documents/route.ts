@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { after } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS } from '@/lib/anthropic';
-import { fireEvent } from '@/lib/agent/event-triggers';
+import { fireEvent } from '@/lib/cerebro/event-triggers';
 
 export async function GET() {
   const { userId } = await auth();

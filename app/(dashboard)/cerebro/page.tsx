@@ -67,7 +67,7 @@ function AgentPageInner() {
   const initialPromptHandled = useRef(false);
 
   const loadHistory = () => {
-    fetch('/api/agent/history')
+    fetch('/api/cerebro/history')
       .then((r) => r.json())
       .then((data) => {
         if (data.messages?.length) {
@@ -89,7 +89,7 @@ function AgentPageInner() {
       correction = prompt('What should I have done differently? (Optional — leave blank to just flag)');
       if (correction === null) return; // user cancelled
     }
-    const res = await fetch('/api/agent/feedback', {
+    const res = await fetch('/api/cerebro/feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message_id: messageId, rating, correction_text: correction || null }),
@@ -116,7 +116,7 @@ function AgentPageInner() {
     if (promptParam && promptParam.trim()) {
       initialPromptHandled.current = true;
       // Clean the URL so refresh doesn't re-send
-      router.replace('/agent');
+      router.replace('/cerebro');
       // Auto-send the prompt
       sendMessage(promptParam);
     }
@@ -154,7 +154,7 @@ function AgentPageInner() {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('prompt', input.trim() || 'Analyze this image in detail.');
-      const res = await fetch('/api/agent/vision', { method: 'POST', body: formData });
+      const res = await fetch('/api/cerebro/vision', { method: 'POST', body: formData });
       const data = await res.json();
       setMessages((prev) => [...prev, { role: 'assistant', content: data.analysis || data.error || 'Could not analyze image.' }]);
     } catch {
@@ -184,7 +184,7 @@ function AgentPageInner() {
   const saveToHistory = async (userMsg: string, assistantMsg: string) => {
     try {
       // Use a lightweight endpoint to save both messages
-      await fetch('/api/agent/history', {
+      await fetch('/api/cerebro/history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userMessage: userMsg, assistantMessage: assistantMsg }),
@@ -245,7 +245,7 @@ function AgentPageInner() {
       setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
       setLoading(true);
       try {
-        const res = await fetch('/api/agent', {
+        const res = await fetch('/api/cerebro', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: 'show pending', history: [] }),
@@ -276,7 +276,7 @@ function AgentPageInner() {
       setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
       setLoading(true);
       try {
-        const res = await fetch('/api/agent', {
+        const res = await fetch('/api/cerebro', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -298,7 +298,7 @@ function AgentPageInner() {
       setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
       setLoading(true);
       try {
-        const res = await fetch('/api/agent', {
+        const res = await fetch('/api/cerebro', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -332,7 +332,7 @@ function AgentPageInner() {
     setMessages((prev) => [...prev, { role: 'user', content: fullMsg }]);
     setLoading(true);
     try {
-      const res = await fetch('/api/agent', {
+      const res = await fetch('/api/cerebro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: fullMsg, history: messages.slice(-20) }),
@@ -360,7 +360,7 @@ function AgentPageInner() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: `Cerebro Archive \u2014 ${new Date().toLocaleDateString('en-ZA')}`, content, category: 'Reference', tags: ['cerebro', 'archive'] }),
     });
-    await fetch('/api/agent/history', { method: 'DELETE' });
+    await fetch('/api/cerebro/history', { method: 'DELETE' });
     setMessages([]);
     toast('Conversation archived to Knowledge Base');
   };
@@ -379,7 +379,7 @@ function AgentPageInner() {
           <p className="text-[11px] text-muted-foreground">Claude Sonnet &middot; access to all your tools</p>
         </div>
         <div className="flex items-center gap-1">
-          <Link href="/agent/brain"
+          <Link href="/cerebro/brain"
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] text-muted-foreground hover:text-foreground border border-border hover:bg-surface-2 transition-colors"
             title="Cerebro Brain — rules, metrics, corrections">
             <Brain size={12} /> Brain
@@ -392,7 +392,7 @@ function AgentPageInner() {
               </button>
               <button onClick={async () => {
                 if (!confirm('Clear conversation?')) return;
-                await fetch('/api/agent/history', { method: 'DELETE' });
+                await fetch('/api/cerebro/history', { method: 'DELETE' });
                 setMessages([]);
                 toast('Conversation cleared');
               }}

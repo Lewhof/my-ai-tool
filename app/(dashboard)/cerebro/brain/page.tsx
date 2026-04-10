@@ -74,7 +74,7 @@ export default function BrainPage() {
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <Link href="/agent" className="text-muted-foreground hover:text-foreground text-xs flex items-center gap-1 mb-2">
+          <Link href="/cerebro" className="text-muted-foreground hover:text-foreground text-xs flex items-center gap-1 mb-2">
             <ArrowLeft size={12} /> Back to Cerebro
           </Link>
           <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
@@ -131,7 +131,7 @@ function RulesTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/agent/rules');
+      const res = await fetch('/api/cerebro/rules');
       const data = await res.json();
       setRules(data.rules ?? []);
     } catch {
@@ -145,7 +145,7 @@ function RulesTab() {
 
   const addRule = async () => {
     if (!newRule.trim()) return;
-    const res = await fetch('/api/agent/rules', {
+    const res = await fetch('/api/cerebro/rules', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rule: newRule.trim(), category: newCategory, source: 'manual' }),
@@ -161,7 +161,7 @@ function RulesTab() {
   };
 
   const toggleActive = async (r: Rule) => {
-    const res = await fetch('/api/agent/rules', {
+    const res = await fetch('/api/cerebro/rules', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: r.id, active: !r.active }),
@@ -174,7 +174,7 @@ function RulesTab() {
 
   const deleteRule = async (id: string) => {
     if (!confirm('Delete this rule? This cannot be undone.')) return;
-    const res = await fetch(`/api/agent/rules?id=${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/cerebro/rules?id=${id}`, { method: 'DELETE' });
     if (res.ok) {
       toast.success('Rule deleted');
       load();
@@ -302,7 +302,7 @@ function MetricsTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/agent/metrics?days=${days}`);
+      const res = await fetch(`/api/cerebro/metrics?days=${days}`);
       const data = await res.json();
       setMetrics(data);
     } catch {
@@ -418,7 +418,7 @@ function CorrectionsTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const url = showResolved ? '/api/agent/feedback' : '/api/agent/feedback?resolved=false';
+      const url = showResolved ? '/api/cerebro/feedback' : '/api/cerebro/feedback?resolved=false';
       const res = await fetch(url);
       const data = await res.json();
       setItems(data.feedback ?? []);
@@ -432,7 +432,7 @@ function CorrectionsTab() {
   useEffect(() => { load(); }, [load]);
 
   const markResolved = async (id: string) => {
-    const res = await fetch('/api/agent/feedback', {
+    const res = await fetch('/api/cerebro/feedback', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, resolved: true }),
@@ -448,7 +448,7 @@ function CorrectionsTab() {
     // Simple inline distillation: create a rule directly from the correction text.
     const ruleText = item.correction_text?.trim() || 'Avoid the behavior shown in the previous response';
     const category = 'dont';
-    const res = await fetch('/api/agent/rules', {
+    const res = await fetch('/api/cerebro/rules', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rule: ruleText.slice(0, 200), category, source: 'feedback' }),
@@ -559,7 +559,7 @@ function ReflectTab() {
     setCandidates([]);
     setDismissedIdx(new Set());
     try {
-      const res = await fetch('/api/agent/reflect', { method: 'POST' });
+      const res = await fetch('/api/cerebro/reflect', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Reflection failed');
       setCandidates(data.candidates ?? []);
@@ -577,7 +577,7 @@ function ReflectTab() {
   const acceptCandidate = async (idx: number) => {
     const c = candidates[idx];
     setSavingIdx(idx);
-    const res = await fetch('/api/agent/rules', {
+    const res = await fetch('/api/cerebro/rules', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rule: c.rule, category: c.category, source: 'reflection' }),

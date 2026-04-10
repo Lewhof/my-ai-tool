@@ -4,7 +4,7 @@ const OFFLINE_URL = '/offline';
 
 const PRECACHE_URLS = [
   '/',
-  '/agent',
+  '/cerebro',
   '/todos',
   '/documents',
   '/calendar',
