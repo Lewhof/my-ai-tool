@@ -303,4 +303,67 @@ export const CEREBRO_TOOLS: Anthropic.Messages.Tool[] = [
       required: ['rule'],
     },
   },
+  {
+    name: 'get_todo_stats',
+    description: 'Get aggregate statistics on the user\'s tasks — counts by status, priority, overdue items, and completion rate. Use when the user asks "how many tasks", "task summary", "my backlog", "productivity stats", etc.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'generate_chart',
+    description: 'Generate an SVG chart from data. Supports bar, pie, and line charts. Returns raw SVG markup. Use when the user asks for a visual breakdown, chart, or graph of data.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        type: { type: 'string', enum: ['bar', 'pie', 'line'], description: 'Chart type' },
+        title: { type: 'string', description: 'Chart title' },
+        labels: { type: 'array', items: { type: 'string' }, description: 'Category labels (x-axis or pie slices)' },
+        values: { type: 'array', items: { type: 'number' }, description: 'Numeric values corresponding to each label' },
+        colors: { type: 'array', items: { type: 'string' }, description: 'Optional hex colors for each segment. Auto-generated if omitted.' },
+      },
+      required: ['type', 'title', 'labels', 'values'],
+    },
+  },
+  {
+    name: 'generate_prd',
+    description: 'Generate a structured Product Requirements Document (PRD) in markdown. Saves to Knowledge Base. Use when the user asks for a PRD, spec, requirements doc, or feature brief.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title: { type: 'string', description: 'Product/feature name' },
+        overview: { type: 'string', description: 'High-level description of what this feature/product does and why' },
+        requirements: { type: 'array', items: { type: 'string' }, description: 'List of functional requirements' },
+        non_functional: { type: 'array', items: { type: 'string' }, description: 'Non-functional requirements (perf, security, etc.)' },
+        milestones: { type: 'array', items: { type: 'string' }, description: 'Key milestones or phases' },
+      },
+      required: ['title', 'overview', 'requirements'],
+    },
+  },
+  {
+    name: 'generate_presentation',
+    description: 'Generate a structured slide deck outline in markdown. Saves to Knowledge Base. Use when the user asks for a presentation, pitch deck, slide deck, or talk outline.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title: { type: 'string', description: 'Presentation title' },
+        audience: { type: 'string', description: 'Target audience (investors, team, clients, etc.)' },
+        slides: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              heading: { type: 'string', description: 'Slide heading' },
+              bullets: { type: 'array', items: { type: 'string' }, description: 'Key bullet points' },
+            },
+            required: ['heading', 'bullets'],
+          },
+          description: 'Array of slides with heading + bullets',
+        },
+      },
+      required: ['title', 'slides'],
+    },
+  },
 ];

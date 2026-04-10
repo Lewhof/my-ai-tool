@@ -176,6 +176,8 @@ function AgentPageInner() {
     if (msg.startsWith('/credits')) return 'Show me my AI usage and credits';
     if (msg.startsWith('/todos')) return 'Show me my pending tasks';
     if (msg.startsWith('/email')) return 'Show me my recent unread emails';
+    if (msg.startsWith('/scope ')) return `SSA (Scope, Spec, Advise) for: "${msg.slice(7)}"\n\nDo deep research. Search the web for best practices. Then create a comprehensive document with:\n## Scope\nWhat this entails. Define boundaries.\n## Specification\n- Technical architecture\n- Data models / DB changes\n- API endpoints\n- UI/UX components\n## Advisory\n- Recommended approach\n- Risks and mitigations\n- Complexity (S/M/L)\nSave the result to the Knowledge Base when done.`;
+    if (msg.startsWith('/plan ')) return `Create a detailed implementation plan for: "${msg.slice(6)}"\n\nInclude:\n1. Files to create/modify (with paths)\n2. Step-by-step implementation order\n3. Key technical decisions\n4. Dependencies needed\n5. Testing approach\n\nDo NOT execute anything. Just plan. Save to Knowledge Base when done.`;
     return msg;
   };
 
@@ -270,48 +272,9 @@ function AgentPageInner() {
       return true;
     }
 
-    // /scope — deep research + spec document
-    if (rawMsg.startsWith('/scope ')) {
-      const topic = rawMsg.slice(7).trim();
-      setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
-      setLoading(true);
-      try {
-        const res = await fetch('/api/cerebro', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: `SSA (Scope, Spec, Advise) for: "${topic}"\n\nDo deep research. Search the web for best practices and existing solutions. Then create a comprehensive document with:\n\n## Scope\nWhat this feature/project entails. Define boundaries.\n\n## Specification\n- Technical architecture\n- Data models / DB changes\n- API endpoints needed\n- UI/UX components\n- Dependencies and integrations\n\n## Advisory\n- Recommended approach\n- Risks and mitigations\n- Estimated complexity (S/M/L)\n- Priority recommendation\n- Suggested sprint\n\nBe thorough. This document will guide implementation. Save the result to the Knowledge Base when done.`,
-            history: messages.slice(-10),
-          }),
-        });
-        const data = await res.json();
-        setMessages(prev => [...prev, { role: 'assistant', content: data.response || 'Could not generate scope.' }]);
-      } catch {
-        setMessages(prev => [...prev, { role: 'assistant', content: 'Error generating scope.' }]);
-      } finally { setLoading(false); }
-      return true;
-    }
-
-    // /plan — generate plan only, save to KB
-    if (rawMsg.startsWith('/plan ')) {
-      const topic = rawMsg.slice(6).trim();
-      setMessages(prev => [...prev, { role: 'user', content: rawMsg }]);
-      setLoading(true);
-      try {
-        const res = await fetch('/api/cerebro', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: `Create a detailed implementation plan for: "${topic}"\n\nInclude:\n1. Files to create/modify (with paths)\n2. Step-by-step implementation order\n3. Key technical decisions\n4. Dependencies needed\n5. Testing approach\n\nDo NOT execute anything. Just plan. Save to Knowledge Base when done.`,
-            history: messages.slice(-10),
-          }),
-        });
-        const data = await res.json();
-        setMessages(prev => [...prev, { role: 'assistant', content: data.response || 'Could not generate plan.' }]);
-      } catch {
-        setMessages(prev => [...prev, { role: 'assistant', content: 'Error generating plan.' }]);
-      } finally { setLoading(false); }
-      return true;
+    // /scope and /plan — route through sendMessage which handles SSE streaming
+    if (rawMsg.startsWith('/scope ') || rawMsg.startsWith('/plan ')) {
+      return false; // fall through to sendMessage → processSlashCommand
     }
 
     return false;
@@ -331,6 +294,8 @@ function AgentPageInner() {
     setReplyTo(null);
     setMessages((prev) => [...prev, { role: 'user', content: fullMsg }]);
     setLoading(true);
+    // Add placeholder assistant message, then stream into it
+    setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
     try {
       const res = await fetch('/api/cerebro', {
         method: 'POST',
@@ -339,17 +304,62 @@ function AgentPageInner() {
       });
       if (!res.ok) {
         const err = await res.text().catch(() => 'Agent error');
-        setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${err}` }]);
+        setMessages((prev) => { const u = [...prev]; u[u.length - 1] = { role: 'assistant', content: `Error: ${err}` }; return u; });
         return;
       }
-      const data = await res.json();
-      setMessages((prev) => [...prev, {
-        id: data.assistant_message_id,
-        role: 'assistant',
-        content: data.response || 'No response.',
-      }]);
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        // Shortcut command response (show pending, approve, etc.)
+        const data = await res.json();
+        setMessages((prev) => { const u = [...prev]; u[u.length - 1] = { id: data.assistant_message_id, role: 'assistant', content: data.response || 'No response.' }; return u; });
+      } else {
+        // SSE stream
+        const reader = res.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            try {
+              const event = JSON.parse(line.slice(6));
+              if (event.type === 'text') {
+                setMessages((prev) => {
+                  const u = [...prev];
+                  const last = u[u.length - 1];
+                  u[u.length - 1] = { ...last, content: last.content + event.content };
+                  return u;
+                });
+              } else if (event.type === 'tool_call') {
+                setMessages((prev) => {
+                  const u = [...prev];
+                  const last = u[u.length - 1];
+                  const status = last.content ? last.content + `\n\n_Using ${event.name}..._` : `_Using ${event.name}..._`;
+                  u[u.length - 1] = { ...last, content: status };
+                  return u;
+                });
+              } else if (event.type === 'done') {
+                setMessages((prev) => {
+                  const u = [...prev];
+                  const last = u[u.length - 1];
+                  // Strip tool status lines from final content, attach message ID
+                  const cleaned = last.content.replace(/\n*_Using \w+\.\.\._\n*/g, '').trim();
+                  u[u.length - 1] = { ...last, id: event.assistant_message_id, content: cleaned || 'Done.' };
+                  return u;
+                });
+              } else if (event.type === 'error') {
+                setMessages((prev) => { const u = [...prev]; u[u.length - 1] = { role: 'assistant', content: `Error: ${event.message}` }; return u; });
+              }
+            } catch { /* skip malformed SSE line */ }
+          }
+        }
+      }
     } catch (err) {
-      setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${err instanceof Error ? err.message : 'Network error'}` }]);
+      setMessages((prev) => { const u = [...prev]; u[u.length - 1] = { role: 'assistant', content: `Error: ${err instanceof Error ? err.message : 'Network error'}` }; return u; });
     } finally { setLoading(false); inputRef.current?.focus(); }
   };
 

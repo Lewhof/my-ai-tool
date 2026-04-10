@@ -1,5 +1,4 @@
 import { auth } from '@clerk/nextjs/server';
-import { after } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { anthropic, cachedSystem, pickModel } from '@/lib/anthropic';
 import { supabaseAdmin } from '@/lib/supabase-server';
@@ -66,7 +65,7 @@ CRITICAL — TASK DEDUPLICATION:
  * The static portion is cached (90% discount on reads).
  * The dynamic portion (current time + learned rules) is added fresh each request.
  */
-function getSystemPrompt(learnedRules: string): Anthropic.Messages.TextBlockParam[] {
+async function getSystemPrompt(userId: string, learnedRules: string): Promise<Anthropic.Messages.TextBlockParam[]> {
   const now = new Date();
   const sast = new Date(now.getTime() + 2 * 60 * 60 * 1000); // UTC+2
   const dateStr = sast.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -78,7 +77,25 @@ function getSystemPrompt(learnedRules: string): Anthropic.Messages.TextBlockPara
 - ALWAYS use this date/time when referring to "today", "now", "this week", etc.
 - When creating calendar events or tasks with dates, use this as reference`;
 
-  const dynamic = learnedRules ? `${timeBlock}\n\n${learnedRules}` : timeBlock;
+  // State snapshot — lightweight counts so Cerebro knows what the user has
+  let snapshot = '';
+  try {
+    const [todosRes, whiteboardRes] = await Promise.all([
+      supabaseAdmin.from('todos').select('status', { count: 'exact', head: false }).eq('user_id', userId),
+      supabaseAdmin.from('whiteboard').select('title, status').eq('user_id', userId).order('priority', { ascending: true }).limit(5),
+    ]);
+
+    const todos = todosRes.data ?? [];
+    const pending = todos.filter(t => t.status !== 'done').length;
+    const done = todos.filter(t => t.status === 'done').length;
+    const wb = (whiteboardRes.data ?? []).filter(w => w.status !== 'done').slice(0, 3);
+
+    snapshot = `\n\nSTATE SNAPSHOT (auto-injected):
+- Tasks: ${pending} pending, ${done} done (${todos.length} total)` +
+      (wb.length ? `\n- Top whiteboard items: ${wb.map(w => `${w.title} [${w.status}]`).join(', ')}` : '');
+  } catch { /* snapshot is optional — never block the prompt */ }
+
+  const dynamic = [timeBlock, snapshot, learnedRules].filter(Boolean).join('\n\n');
   return cachedSystem(CEREBRO_STATIC_PROMPT, dynamic);
 }
 
@@ -289,127 +306,155 @@ export async function POST(req: Request) {
 
   // Load learned rules once per turn and inject into the system prompt.
   const learnedRules = await getLearnedRules(userId);
+  const systemPrompt = await getSystemPrompt(userId, learnedRules);
 
-  // Agentic loop — keep calling tools until the model stops
-  let finalResponse = '';
-  let iterations = 0;
-  const maxIterations = 10;
-  let currentMessages = [...messages];
+  // SSE stream — text chunks arrive in real-time, tool iterations happen server-side
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const emit = (event: Record<string, unknown>) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+      };
 
-  while (iterations < maxIterations) {
-    iterations++;
+      let finalResponse = '';
+      let iterations = 0;
+      const maxIterations = 10;
+      let currentMessages = [...messages];
 
-    const response = await anthropic.messages.create({
-      model: pickModel('agent.tools'),
-      max_tokens: 4096,
-      system: getSystemPrompt(learnedRules),
-      tools: CEREBRO_TOOLS,
-      messages: currentMessages,
-    });
+      try {
+        while (iterations < maxIterations) {
+          iterations++;
 
-    // Check if the model wants to use tools
-    const toolUseBlocks = response.content.filter(
-      (block): block is Anthropic.Messages.ToolUseBlock => block.type === 'tool_use'
-    );
-    const textBlocks = response.content.filter(
-      (block): block is Anthropic.Messages.TextBlock => block.type === 'text'
-    );
+          const response = await anthropic.messages.create({
+            model: pickModel('agent.tools'),
+            max_tokens: 4096,
+            system: systemPrompt,
+            tools: CEREBRO_TOOLS,
+            messages: currentMessages,
+          });
 
-    if (toolUseBlocks.length === 0) {
-      // No tool calls — we're done
-      finalResponse = textBlocks.map((b) => b.text).join('\n');
-      break;
-    }
+          const toolUseBlocks = response.content.filter(
+            (block): block is Anthropic.Messages.ToolUseBlock => block.type === 'tool_use'
+          );
+          const textBlocks = response.content.filter(
+            (block): block is Anthropic.Messages.TextBlock => block.type === 'text'
+          );
 
-    // Execute all tool calls
-    const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
+          if (toolUseBlocks.length === 0) {
+            // Final text response — stream it
+            const text = textBlocks.map((b) => b.text).join('\n');
+            finalResponse = text;
+            emit({ type: 'text', content: text });
+            break;
+          }
 
-    for (const toolUse of toolUseBlocks) {
-      const result = await executeTool(
-        toolUse.name,
-        toolUse.input as Record<string, unknown>,
-        userId
-      );
-      toolResults.push({
-        type: 'tool_result',
-        tool_use_id: toolUse.id,
-        content: result,
-      });
-    }
+          // Tool iteration — emit progress, execute tools, continue
+          for (const toolUse of toolUseBlocks) {
+            emit({ type: 'tool_call', name: toolUse.name });
+          }
 
-    // Add assistant response and tool results to messages
-    currentMessages = [
-      ...currentMessages,
-      { role: 'assistant', content: response.content },
-      { role: 'user', content: toolResults },
-    ];
+          const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
+          for (const toolUse of toolUseBlocks) {
+            const result = await executeTool(
+              toolUse.name,
+              toolUse.input as Record<string, unknown>,
+              userId
+            );
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: toolUse.id,
+              content: result,
+            });
+          }
 
-    // If stop_reason is 'end_turn', grab text and finish
-    if (response.stop_reason === 'end_turn') {
-      finalResponse = textBlocks.map((b) => b.text).join('\n');
-      break;
-    }
-  }
+          currentMessages = [
+            ...currentMessages,
+            { role: 'assistant', content: response.content },
+            { role: 'user', content: toolResults },
+          ];
 
-  // Save conversation synchronously so we can return the assistant_message_id
-  // (the feedback UI needs it to attach thumbs/corrections). Wrapped in try/catch
-  // so a history failure never breaks the response.
-  let assistantMessageId: string | null = null;
-  try {
-    let { data: thread } = await supabaseAdmin
-      .from('chat_threads')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('agent_thread', true)
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .single();
+          // Emit any intermediate text from tool iterations
+          if (textBlocks.length > 0) {
+            const interimText = textBlocks.map((b) => b.text).join('\n');
+            if (interimText.trim()) {
+              emit({ type: 'text', content: interimText + '\n\n' });
+              finalResponse += interimText + '\n\n';
+            }
+          }
 
-    if (!thread) {
-      const { data: created } = await supabaseAdmin
-        .from('chat_threads')
-        .insert({ user_id: userId, title: 'Cerebro History', model: 'claude-sonnet', agent_thread: true })
-        .select('id')
-        .single();
-      thread = created;
-    }
+          if (response.stop_reason === 'end_turn') {
+            break;
+          }
+        }
 
-    if (thread) {
-      await supabaseAdmin.from('chat_messages').insert({
-        thread_id: thread.id,
-        role: 'user',
-        content: message,
-      });
+        // Save history + emit done event
+        let assistantMessageId: string | null = null;
+        try {
+          let { data: thread } = await supabaseAdmin
+            .from('chat_threads')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('agent_thread', true)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .single();
 
-      if (finalResponse) {
-        const { data: assistantRow } = await supabaseAdmin
-          .from('chat_messages')
-          .insert({
-            thread_id: thread.id,
-            role: 'assistant',
-            content: finalResponse,
-            model: 'claude-sonnet',
-          })
-          .select('id')
-          .single();
-        assistantMessageId = assistantRow?.id ?? null;
+          if (!thread) {
+            const { data: created } = await supabaseAdmin
+              .from('chat_threads')
+              .insert({ user_id: userId, title: 'Cerebro History', model: 'claude-sonnet', agent_thread: true })
+              .select('id')
+              .single();
+            thread = created;
+          }
+
+          if (thread) {
+            await supabaseAdmin.from('chat_messages').insert({
+              thread_id: thread.id,
+              role: 'user',
+              content: message,
+            });
+
+            if (finalResponse.trim()) {
+              const { data: assistantRow } = await supabaseAdmin
+                .from('chat_messages')
+                .insert({
+                  thread_id: thread.id,
+                  role: 'assistant',
+                  content: finalResponse.trim(),
+                  model: 'claude-sonnet',
+                })
+                .select('id')
+                .single();
+              assistantMessageId = assistantRow?.id ?? null;
+            }
+
+            await supabaseAdmin
+              .from('chat_threads')
+              .update({ updated_at: new Date().toISOString() })
+              .eq('id', thread.id);
+          }
+        } catch { /* silent */ }
+
+        emit({ type: 'done', iterations, assistant_message_id: assistantMessageId });
+
+        // Fire-and-forget: bump hit counters
+        if (finalResponse.trim()) {
+          void bumpRuleHits(userId, finalResponse);
+        }
+      } catch (err) {
+        emit({ type: 'error', message: err instanceof Error ? err.message : 'Unknown error' });
+      } finally {
+        controller.close();
       }
+    },
+  });
 
-      await supabaseAdmin
-        .from('chat_threads')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', thread.id);
-    }
-  } catch { /* silent — don't break the response if history save fails */ }
-
-  // Fire-and-forget: bump hit counters on rules whose text matches the response.
-  if (finalResponse) {
-    after(async () => { await bumpRuleHits(userId, finalResponse); });
-  }
-
-  return Response.json({
-    response: finalResponse,
-    iterations,
-    assistant_message_id: assistantMessageId,
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-store',
+      'Connection': 'keep-alive',
+    },
   });
 }
