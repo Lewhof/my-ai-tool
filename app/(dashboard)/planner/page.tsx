@@ -248,6 +248,68 @@ export default function PlannerPage() {
           </div>
         ) : (
           <div className="flex h-full">
+            {/* Summary panel (left side) */}
+            <div className="w-64 shrink-0 border-r border-border p-4 hidden lg:block overflow-auto">
+              <h3 className="text-foreground font-semibold text-sm mb-3">Day Summary</h3>
+
+              <div className="space-y-3">
+                {/* Stats */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-card rounded-lg p-2.5 border border-border">
+                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Meetings</p>
+                    <p className="text-foreground text-lg font-bold">{plan.blocks.filter(b => b.type === 'calendar').length}</p>
+                  </div>
+                  <div className="bg-card rounded-lg p-2.5 border border-border">
+                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Tasks</p>
+                    <p className="text-foreground text-lg font-bold">{plan.blocks.filter(b => b.type === 'task').length}</p>
+                  </div>
+                  <div className="bg-card rounded-lg p-2.5 border border-border">
+                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Focus</p>
+                    <p className="text-foreground text-lg font-bold">{plan.blocks.filter(b => b.type === 'focus').length}</p>
+                  </div>
+                  <div className="bg-card rounded-lg p-2.5 border border-border">
+                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Total</p>
+                    <p className="text-foreground text-lg font-bold">{Math.round(plan.blocks.reduce((s, b) => s + b.duration, 0) / 60)}h</p>
+                  </div>
+                </div>
+
+                {/* Block list (compact) */}
+                <div>
+                  <h4 className="text-muted-foreground text-[10px] uppercase tracking-wider mb-2">Schedule</h4>
+                  <div className="space-y-1">
+                    {plan.blocks.map((block) => {
+                      const config = TYPE_CONFIG[block.type] || TYPE_CONFIG.task;
+                      const Icon = config.icon;
+                      return (
+                        <div key={block.id} className="flex items-center gap-2 py-1">
+                          <Icon size={10} className={config.color} />
+                          <span className="text-muted-foreground text-[10px] w-10 shrink-0">{block.time}</span>
+                          <span className="text-foreground text-[11px] truncate flex-1">{block.title}</span>
+                          <span className="text-muted-foreground/60 text-[10px] shrink-0">{block.duration}m</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Legend */}
+                <div className="pt-3 border-t border-border">
+                  <h4 className="text-muted-foreground text-[10px] uppercase tracking-wider mb-2">Legend</h4>
+                  <div className="space-y-1.5">
+                    {Object.entries(TYPE_CONFIG).map(([key, config]) => {
+                      const Icon = config.icon;
+                      return (
+                        <div key={key} className="flex items-center gap-2">
+                          <Icon size={10} className={config.color} />
+                          <span className="text-muted-foreground text-[11px] capitalize">{key}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Timeline gutter */}
             <div className="w-16 shrink-0 border-r border-border relative">
               {HOURS.map((hour) => (
@@ -359,67 +421,6 @@ export default function PlannerPage() {
               })}
             </div>
 
-            {/* Summary panel */}
-            <div className="w-64 shrink-0 border-l border-border p-4 hidden lg:block overflow-auto">
-              <h3 className="text-foreground font-semibold text-sm mb-3">Day Summary</h3>
-
-              <div className="space-y-3">
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-card rounded-lg p-2.5 border border-border">
-                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Meetings</p>
-                    <p className="text-foreground text-lg font-bold">{plan.blocks.filter(b => b.type === 'calendar').length}</p>
-                  </div>
-                  <div className="bg-card rounded-lg p-2.5 border border-border">
-                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Tasks</p>
-                    <p className="text-foreground text-lg font-bold">{plan.blocks.filter(b => b.type === 'task').length}</p>
-                  </div>
-                  <div className="bg-card rounded-lg p-2.5 border border-border">
-                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Focus</p>
-                    <p className="text-foreground text-lg font-bold">{plan.blocks.filter(b => b.type === 'focus').length}</p>
-                  </div>
-                  <div className="bg-card rounded-lg p-2.5 border border-border">
-                    <p className="text-muted-foreground text-[10px] uppercase tracking-wider">Total</p>
-                    <p className="text-foreground text-lg font-bold">{Math.round(plan.blocks.reduce((s, b) => s + b.duration, 0) / 60)}h</p>
-                  </div>
-                </div>
-
-                {/* Block list (compact) */}
-                <div>
-                  <h4 className="text-muted-foreground text-[10px] uppercase tracking-wider mb-2">Schedule</h4>
-                  <div className="space-y-1">
-                    {plan.blocks.map((block) => {
-                      const config = TYPE_CONFIG[block.type] || TYPE_CONFIG.task;
-                      const Icon = config.icon;
-                      return (
-                        <div key={block.id} className="flex items-center gap-2 py-1">
-                          <Icon size={10} className={config.color} />
-                          <span className="text-muted-foreground text-[10px] w-10 shrink-0">{block.time}</span>
-                          <span className="text-foreground text-[11px] truncate flex-1">{block.title}</span>
-                          <span className="text-muted-foreground/60 text-[10px] shrink-0">{block.duration}m</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Legend */}
-                <div className="pt-3 border-t border-border">
-                  <h4 className="text-muted-foreground text-[10px] uppercase tracking-wider mb-2">Legend</h4>
-                  <div className="space-y-1.5">
-                    {Object.entries(TYPE_CONFIG).map(([key, config]) => {
-                      const Icon = config.icon;
-                      return (
-                        <div key={key} className="flex items-center gap-2">
-                          <Icon size={10} className={config.color} />
-                          <span className="text-muted-foreground text-[11px] capitalize">{key}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         )}
       </div>
