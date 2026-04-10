@@ -13,6 +13,8 @@ interface BriefingData {
     dueToday: number;
     whiteboardItems: number;
     staleItems: number;
+    calendarEvents: number;
+    unreadEmails: number;
   };
 }
 
