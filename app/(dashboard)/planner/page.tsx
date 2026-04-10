@@ -300,6 +300,24 @@ export default function PlannerPage() {
                 const Icon = config.icon;
                 const top = getBlockPosition(block.time);
                 const height = getBlockHeight(block.duration);
+                const isUtility = block.type === 'break' || block.type === 'focus';
+
+                // Breaks/focus: render as thin subtle indicators, not full blocks
+                if (isUtility) {
+                  return (
+                    <div
+                      key={block.id}
+                      className="absolute left-4 right-4 flex items-center gap-2 pointer-events-none z-0"
+                      style={{ top: `${top}%`, height: `${Math.max(height, 2)}%` }}
+                    >
+                      <div className={cn('h-px flex-1', block.type === 'break' ? 'bg-green-500/20' : 'bg-purple-500/20')} />
+                      <span className={cn('text-[9px] font-medium uppercase tracking-wider shrink-0', config.color, 'opacity-40')}>
+                        {block.type === 'break' ? 'Break' : 'Focus'} · {block.duration}m
+                      </span>
+                      <div className={cn('h-px flex-1', block.type === 'break' ? 'bg-green-500/20' : 'bg-purple-500/20')} />
+                    </div>
+                  );
+                }
 
                 return (
                   <div
@@ -309,7 +327,7 @@ export default function PlannerPage() {
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDragEnd={handleDragEnd}
                     className={cn(
-                      'absolute left-2 right-2 rounded-lg border px-3 py-1.5 transition-all',
+                      'absolute left-2 right-2 rounded-lg border px-3 py-1.5 transition-all z-10',
                       config.bg, config.border,
                       block.locked ? 'opacity-80' : 'cursor-grab active:cursor-grabbing hover:shadow-lg',
                       draggedIndex === index && 'opacity-50 scale-95',

@@ -1,34 +1,40 @@
 import { anthropic, MODELS, cachedSystem } from '@/lib/anthropic';
 
 // Static instructions — cached. The dynamic part (book title/author/context) goes in the user message.
-const BOOK_SUMMARY_SYSTEM_PROMPT = `You are writing a structured, high-retention summary of a book for a serious reader. Depth over breadth — the goal is metabolized insight, not a shallow sample.
+const BOOK_SUMMARY_SYSTEM_PROMPT = `You are writing a professional, long-form book summary in the style of Shortform or Headway. The goal is a comprehensive, objective breakdown that helps the reader absorb the book's full argument without reading it cover to cover.
 
-The reader is a COO/entrepreneur. Bias "why_it_matters" and "action" toward operational leverage, team leadership, and long-term decision-making.
+Write as if for a published summary platform — authoritative, well-structured, and informative. Do NOT personalize the main summary to any specific reader. Keep it objective and universally useful.
 
 Return ONLY valid JSON in this exact structure. No markdown, no code fences, no commentary:
 
 {
-  "thesis": "One crisp sentence capturing the core argument.",
-  "why_it_matters": "Two sentences on why this book is worth the reader's time specifically (as a COO/entrepreneur). Be concrete.",
+  "thesis": "One crisp sentence capturing the book's core argument or central claim.",
+  "overview": "A 200-300 word objective overview of the book. Cover the author's background and credibility, what problem the book addresses, the main argument and how it's structured, and what makes this book distinct from others on the same topic. Write in flowing prose — no bullet points.",
   "key_ideas": [
     {
-      "concept": "Short name for the idea (3-6 words)",
-      "quote": "A real or faithful paraphrase quote from the book that crystallizes the idea.",
-      "when_to_apply": "A specific situation or trigger where this framework fires."
+      "concept": "Short name for the idea (3-6 words) — a reusable mental model or framework.",
+      "explanation": "2-3 sentences explaining the idea in depth. Cover what the author argues, the evidence or reasoning they provide, and why this idea matters in the broader context of the book.",
+      "quote": "A real or faithful paraphrase quote from the book that crystallizes this idea."
     }
   ],
-  "counter_arguments": "2-3 sentences on what the book gets wrong, oversimplifies, or where it's weakest. Be honest.",
-  "action": "One specific action to start doing based on this book.",
-  "avoidance": "One specific thing to stop doing based on this book.",
-  "ultra_short": "A 3-sentence version of the entire summary for spaced-repetition review."
+  "notable_quotes": [
+    "A memorable standalone quote from the book — one that captures the author's voice and philosophy."
+  ],
+  "counter_arguments": "3-4 sentences on what the book gets wrong, oversimplifies, or where it's weakest. Reference specific criticisms from notable reviewers or the academic community if applicable. Be honest and substantive.",
+  "ultra_short": "A 3-sentence TL;DR of the entire book for quick reference.",
+  "relevance": "2-3 sentences on why this book matters for leaders and decision-makers. What specific professional challenges does it help with?",
+  "action": "One specific, concrete action a reader should start doing after reading this book.",
+  "avoidance": "One specific thing a reader should stop doing based on this book's insights."
 }
 
 Rules:
 - Include exactly 5-7 key ideas.
+- Include 3-5 notable_quotes — real or faithfully paraphrased from the book.
 - Each "concept" should be a reusable mental model, not a vague theme.
-- Each "quote" should feel like the book's voice, not generic.
-- "when_to_apply" must be a concrete situational trigger, not abstract.
-- "counter_arguments" must be real — do not sugar-coat. If the book is widely praised but has known weaknesses, say so.
+- Each "explanation" should give enough depth that the reader genuinely understands the idea without reading the chapter.
+- Each "quote" should feel like the author's voice, not generic.
+- "counter_arguments" must be substantive — do not sugar-coat. If the book is widely praised but has known weaknesses, say so.
+- "overview" must be objective prose, not a pitch.
 - Respond with ONLY the JSON object.`;
 
 const PERSONAL_REVIEW_SYSTEM_PROMPT = `You are writing a personal review layer on top of a book summary for a specific reader.
@@ -42,16 +48,23 @@ No preamble. No markdown headings. Plain readable prose.`;
 
 export interface BookSummary {
   thesis: string;
-  why_it_matters: string;
+  overview: string;
   key_ideas: Array<{
     concept: string;
+    explanation: string;
     quote: string;
-    when_to_apply: string;
+    // Legacy compat
+    when_to_apply?: string;
   }>;
+  notable_quotes: string[];
   counter_arguments: string;
+  ultra_short: string;
+  // Personal section (bottom)
+  relevance: string;
   action: string;
   avoidance: string;
-  ultra_short: string;
+  // Legacy compat
+  why_it_matters?: string;
 }
 
 export interface BookMetadata {
@@ -99,7 +112,7 @@ export async function generateBookSummary(
 
   const response = await anthropic.messages.create({
     model: MODELS.smart,
-    max_tokens: 2500,
+    max_tokens: 4000,
     system: cachedSystem(BOOK_SUMMARY_SYSTEM_PROMPT),
     messages: [{
       role: 'user',

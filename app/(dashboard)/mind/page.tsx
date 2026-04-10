@@ -36,12 +36,15 @@ interface Book {
 
 interface BookSummary {
   thesis: string;
-  why_it_matters: string;
-  key_ideas: Array<{ concept: string; quote: string; when_to_apply: string }>;
+  overview?: string;
+  key_ideas: Array<{ concept: string; explanation?: string; quote: string; when_to_apply?: string }>;
+  notable_quotes?: string[];
   counter_arguments: string;
+  ultra_short: string;
+  relevance?: string;
   action: string;
   avoidance: string;
-  ultra_short: string;
+  why_it_matters?: string;
 }
 
 interface Highlight {
@@ -797,6 +800,52 @@ function BookDetail({ book, onBack, onStatusChange, onDelete }: {
 }) {
   const summary = book.summary;
   const [savedIdx, setSavedIdx] = useState<Set<number>>(new Set());
+  const [isReading, setIsReading] = useState(false);
+
+  const buildSummaryText = (): string => {
+    if (!summary) return '';
+    const parts: string[] = [];
+    parts.push(`Core Thesis. ${summary.thesis}`);
+    if (summary.overview) {
+      parts.push(`Book Overview. ${summary.overview}`);
+    } else if (summary.why_it_matters) {
+      parts.push(`Overview. ${summary.why_it_matters}`);
+    }
+    if (summary.key_ideas?.length) {
+      parts.push('Key Ideas.');
+      summary.key_ideas.forEach((idea, i) => {
+        parts.push(`Idea ${i + 1}: ${idea.concept}. ${idea.explanation || idea.when_to_apply || ''} Quote: ${idea.quote}.`);
+      });
+    }
+    if (summary.notable_quotes?.length) {
+      parts.push('Notable Quotes.');
+      summary.notable_quotes.forEach(q => parts.push(q));
+    }
+    parts.push(`Criticisms and Counterpoints. ${summary.counter_arguments}`);
+    parts.push(`TL;DR. ${summary.ultra_short}`);
+    return parts.join('\n\n');
+  };
+
+  const toggleReadAloud = () => {
+    if (isReading) {
+      window.speechSynthesis.cancel();
+      setIsReading(false);
+      return;
+    }
+    const text = buildSummaryText();
+    if (!text) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    utterance.lang = 'en-ZA';
+    utterance.onend = () => setIsReading(false);
+    utterance.onerror = () => setIsReading(false);
+    window.speechSynthesis.speak(utterance);
+    setIsReading(true);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => () => { window.speechSynthesis.cancel(); }, []);
 
   const saveKeyIdeaAsHighlight = async (idx: number, idea: { concept: string; quote: string }) => {
     const tag = idea.concept.toLowerCase().replace(/\s+/g, '-').slice(0, 40);
@@ -853,9 +902,32 @@ function BookDetail({ book, onBack, onStatusChange, onDelete }: {
                   {s === 'want-to-read' ? 'Want to Read' : s.charAt(0).toUpperCase() + s.slice(1)}
                 </button>
               ))}
+              {summary && (
+                <button
+                  onClick={toggleReadAloud}
+                  className={cn(
+                    'ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors',
+                    isReading
+                      ? 'border-primary/50 text-primary bg-primary/10'
+                      : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
+                  )}
+                >
+                  {isReading ? (
+                    <>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                      Stop
+                    </>
+                  ) : (
+                    <>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                      Read aloud
+                    </>
+                  )}
+                </button>
+              )}
               <button
                 onClick={() => onDelete(book.id)}
-                className="ml-auto p-1.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
+                className={cn(summary ? '' : 'ml-auto', 'p-1.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors')}
               >
                 <Trash2 size={14} />
               </button>
@@ -866,41 +938,48 @@ function BookDetail({ book, onBack, onStatusChange, onDelete }: {
 
       {summary ? (
         <>
-          {/* Thesis */}
+          {/* ── OBJECTIVE SUMMARY ── */}
+
+          {/* Core Thesis */}
           <div className="bg-card border border-border rounded-xl p-5">
-            <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Thesis</h3>
-            <p className="text-foreground text-sm leading-relaxed">{summary.thesis}</p>
+            <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Core Thesis</h3>
+            <p className="text-foreground text-base font-medium leading-relaxed">{summary.thesis}</p>
           </div>
 
-          {/* Why it matters (personalized) */}
-          <div className="bg-card border border-border rounded-xl p-5">
-            <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
-              <Sparkles size={10} /> Why it matters for you
-            </h3>
-            <p className="text-foreground text-sm leading-relaxed">{summary.why_it_matters}</p>
-          </div>
-
-          {/* Personal review */}
-          {book.personal_review && (
-            <div className="bg-card border border-primary/30 rounded-xl p-5" style={{ background: 'var(--color-surface-2)' }}>
-              <h3 className="text-[10px] text-primary uppercase tracking-wider mb-2 flex items-center gap-1">
-                <Sparkles size={10} /> AI Personal Review
-              </h3>
-              <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">{book.personal_review}</p>
+          {/* Book Overview */}
+          {summary.overview ? (
+            <div className="bg-card border border-border rounded-xl p-5">
+              <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">Book Overview</h3>
+              <p className="text-foreground/90 text-sm leading-[1.8] whitespace-pre-wrap">{summary.overview}</p>
+            </div>
+          ) : summary.why_it_matters && (
+            <div className="bg-card border border-border rounded-xl p-5">
+              <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Overview</h3>
+              <p className="text-foreground/90 text-sm leading-relaxed">{summary.why_it_matters}</p>
             </div>
           )}
 
-          {/* Key ideas */}
+          {/* Key Ideas */}
           <div className="bg-card border border-border rounded-xl p-5">
-            <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">Key Ideas</h3>
-            <div className="space-y-4">
+            <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider mb-4">Key Ideas</h3>
+            <div className="space-y-5">
               {summary.key_ideas.map((idea, i) => {
                 const saved = savedIdx.has(i);
                 return (
                   <div key={i} className="border-l-2 border-primary/40 pl-4 group">
-                    <p className="text-foreground text-sm font-semibold">{idea.concept}</p>
-                    <div className="flex items-start gap-2 mt-1">
-                      <p className="text-foreground/80 text-xs italic flex-1">&ldquo;{idea.quote}&rdquo;</p>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-[10px] text-primary/60 font-bold">{i + 1}</span>
+                      <p className="text-foreground text-sm font-semibold">{idea.concept}</p>
+                    </div>
+                    {/* Explanation (new) or when_to_apply (legacy) */}
+                    {idea.explanation && (
+                      <p className="text-foreground/80 text-[13px] leading-[1.7] mb-2">{idea.explanation}</p>
+                    )}
+                    {!idea.explanation && idea.when_to_apply && (
+                      <p className="text-muted-foreground text-[12px] mb-2">When to apply: {idea.when_to_apply}</p>
+                    )}
+                    <div className="flex items-start gap-2">
+                      <p className="text-foreground/60 text-xs italic flex-1 border-l border-border/50 pl-3">&ldquo;{idea.quote}&rdquo;</p>
                       <button
                         onClick={() => saveKeyIdeaAsHighlight(i, idea)}
                         disabled={saved}
@@ -915,35 +994,72 @@ function BookDetail({ book, onBack, onStatusChange, onDelete }: {
                         {saved ? <CheckCircle2 size={12} /> : <Save size={12} />}
                       </button>
                     </div>
-                    <p className="text-muted-foreground text-[11px] mt-1">When to apply: {idea.when_to_apply}</p>
                   </div>
                 );
               })}
             </div>
           </div>
 
-          {/* Counter-arguments */}
+          {/* Notable Quotes */}
+          {summary.notable_quotes && summary.notable_quotes.length > 0 && (
+            <div className="bg-card border border-border rounded-xl p-5">
+              <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">Notable Quotes</h3>
+              <div className="space-y-3">
+                {summary.notable_quotes.map((q, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <Quote size={12} className="text-primary/30 shrink-0 mt-0.5" />
+                    <p className="text-foreground/70 text-sm italic leading-relaxed">{q}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Criticisms & Counterpoints */}
           <div className="bg-card border border-border rounded-xl p-5">
-            <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Counter-Arguments</h3>
-            <p className="text-foreground text-sm leading-relaxed">{summary.counter_arguments}</p>
+            <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Criticisms &amp; Counterpoints</h3>
+            <p className="text-foreground/80 text-sm leading-[1.7]">{summary.counter_arguments}</p>
           </div>
 
-          {/* Action + Avoidance */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="bg-card border border-green-500/30 rounded-xl p-5" style={{ background: 'var(--color-surface-2)' }}>
-              <h3 className="text-[10px] text-green-400 uppercase tracking-wider mb-2">One thing to START</h3>
-              <p className="text-foreground text-sm">{summary.action}</p>
-            </div>
-            <div className="bg-card border border-red-500/30 rounded-xl p-5" style={{ background: 'var(--color-surface-2)' }}>
-              <h3 className="text-[10px] text-red-400 uppercase tracking-wider mb-2">One thing to STOP</h3>
-              <p className="text-foreground text-sm">{summary.avoidance}</p>
-            </div>
-          </div>
-
-          {/* Ultra-short */}
+          {/* TL;DR */}
           <div className="bg-card border border-dashed border-border rounded-xl p-5">
-            <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">3-sentence version</h3>
-            <p className="text-foreground/80 text-sm italic">{summary.ultra_short}</p>
+            <h3 className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">TL;DR</h3>
+            <p className="text-foreground/70 text-sm italic leading-relaxed">{summary.ultra_short}</p>
+          </div>
+
+          {/* ── PERSONAL RELEVANCE (bottom) ── */}
+          <div className="border-t border-border pt-4 mt-2">
+            <h3 className="text-[10px] text-primary/70 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Sparkles size={10} /> Personal Application
+            </h3>
+
+            {/* Relevance */}
+            {(summary.relevance || summary.why_it_matters) && (
+              <div className="bg-card border border-primary/20 rounded-xl p-5 mb-3" style={{ background: 'var(--color-surface-2)' }}>
+                <h4 className="text-[10px] text-primary/50 uppercase tracking-wider mb-2">Why this matters for you</h4>
+                <p className="text-foreground/80 text-sm leading-relaxed">{summary.relevance || summary.why_it_matters}</p>
+              </div>
+            )}
+
+            {/* AI Personal Review */}
+            {book.personal_review && (
+              <div className="bg-card border border-primary/20 rounded-xl p-5 mb-3" style={{ background: 'var(--color-surface-2)' }}>
+                <h4 className="text-[10px] text-primary/50 uppercase tracking-wider mb-2">AI Review for You</h4>
+                <p className="text-foreground/80 text-sm leading-relaxed whitespace-pre-wrap">{book.personal_review}</p>
+              </div>
+            )}
+
+            {/* Action + Avoidance */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-card border border-green-500/20 rounded-xl p-4" style={{ background: 'var(--color-surface-2)' }}>
+                <h4 className="text-[10px] text-green-400/80 uppercase tracking-wider mb-1.5">Start doing</h4>
+                <p className="text-foreground/80 text-sm">{summary.action}</p>
+              </div>
+              <div className="bg-card border border-red-500/20 rounded-xl p-4" style={{ background: 'var(--color-surface-2)' }}>
+                <h4 className="text-[10px] text-red-400/80 uppercase tracking-wider mb-1.5">Stop doing</h4>
+                <p className="text-foreground/80 text-sm">{summary.avoidance}</p>
+              </div>
+            </div>
           </div>
         </>
       ) : (

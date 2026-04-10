@@ -137,11 +137,12 @@ Rules:
 1. NEVER overlap with LOCKED calendar events
 2. Place overdue and urgent tasks in the FIRST available gaps
 3. Tasks due today come before backlog items
-4. Add a "Focus Block" if there's a gap of 2+ hours with no meetings
-5. Add a 15-min break every 2 hours of work
+4. Only add a "Focus Block" if there is a gap of 3+ hours with NO meetings AND no tasks to fill it — maximum 1 per day
+5. Only add a "Break" if the schedule has 3+ consecutive hours of back-to-back work with no gaps — maximum 2 per day, 15 min each
 6. Schedule between 07:00 and 19:00 only
 7. Estimate 30-60 min per task based on complexity (default 45 min)
-8. Fill the day — schedule as many tasks as fit
+8. PRIORITIZE scheduling tasks over adding breaks/focus blocks — fill gaps with tasks first
+9. Do NOT place a break or focus block between two calendar events that are less than 30 min apart
 
 Return ONLY a JSON array of blocks. Each block must have ALL these fields:
 {"time":"HH:MM","endTime":"HH:MM","title":"task title","type":"task","taskIndex":1,"duration":45}
