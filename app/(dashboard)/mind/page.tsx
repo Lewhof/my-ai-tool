@@ -1079,6 +1079,7 @@ function QuotesTab() {
   const [loading, setLoading] = useState(true);
   const [sourceFilter, setSourceFilter] = useState<'all' | 'book' | 'manual' | 'article' | 'web_clip'>('all');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [showTags, setShowTags] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
 
@@ -1284,31 +1285,52 @@ function QuotesTab() {
         <span className="text-muted-foreground text-[11px] ml-auto">{filtered.length} of {quotes.length}</span>
       </div>
 
-      {/* Tag chips */}
+      {/* Tag filter toggle */}
       {allTags.length > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <Tag size={11} className="text-muted-foreground/60" />
+        <div>
           <button
-            onClick={() => setTagFilter(null)}
+            onClick={() => setShowTags(!showTags)}
             className={cn(
-              'text-[10px] px-2 py-0.5 rounded-full border transition-colors',
-              !tagFilter ? 'bg-primary/10 text-primary border-primary/30' : 'text-muted-foreground border-border hover:text-foreground'
+              'flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full border transition-colors',
+              tagFilter ? 'bg-primary/10 text-primary border-primary/30' : 'text-muted-foreground border-border hover:text-foreground'
             )}
           >
-            All tags
+            <Tag size={10} />
+            {tagFilter ? `#${tagFilter}` : `${allTags.length} tags`}
+            {tagFilter && (
+              <span
+                onClick={(e) => { e.stopPropagation(); setTagFilter(null); }}
+                className="ml-0.5 hover:text-foreground"
+              >
+                ×
+              </span>
+            )}
           </button>
-          {allTags.slice(0, 20).map(t => (
-            <button
-              key={t}
-              onClick={() => setTagFilter(tagFilter === t ? null : t)}
-              className={cn(
-                'text-[10px] px-2 py-0.5 rounded-full border transition-colors',
-                tagFilter === t ? 'bg-primary/10 text-primary border-primary/30' : 'text-muted-foreground border-border hover:text-foreground'
-              )}
-            >
-              #{t}
-            </button>
-          ))}
+          {showTags && (
+            <div className="flex items-center gap-1.5 flex-wrap mt-2 p-2 rounded-lg border border-border bg-card/50">
+              <button
+                onClick={() => { setTagFilter(null); setShowTags(false); }}
+                className={cn(
+                  'text-[10px] px-2 py-0.5 rounded-full border transition-colors',
+                  !tagFilter ? 'bg-primary/10 text-primary border-primary/30' : 'text-muted-foreground border-border hover:text-foreground'
+                )}
+              >
+                All
+              </button>
+              {allTags.slice(0, 20).map(t => (
+                <button
+                  key={t}
+                  onClick={() => { setTagFilter(tagFilter === t ? null : t); setShowTags(false); }}
+                  className={cn(
+                    'text-[10px] px-2 py-0.5 rounded-full border transition-colors',
+                    tagFilter === t ? 'bg-primary/10 text-primary border-primary/30' : 'text-muted-foreground border-border hover:text-foreground'
+                  )}
+                >
+                  #{t}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

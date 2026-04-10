@@ -48,12 +48,27 @@ export async function POST(req: Request) {
     userContext = [notepad, goals].filter(Boolean).join('\n\n');
   } catch { /* skip */ }
 
-  // 3. Generate AI summary (Sonnet — the quality pass)
+  // 3. Generate AI summary (Sonnet — the quality pass) with retry on 529/overloaded
   let summary;
-  try {
-    summary = await generateBookSummary(title, author, userContext);
-  } catch (err) {
-    return Response.json({ error: err instanceof Error ? err.message : 'Summary generation failed' }, { status: 500 });
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      summary = await generateBookSummary(title, author, userContext);
+      break;
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const isOverloaded = errMsg.includes('overloaded') || errMsg.includes('529') || errMsg.includes('Overloaded');
+      if (isOverloaded && attempt < MAX_RETRIES) {
+        // Exponential backoff: 3s, 6s
+        await new Promise(r => setTimeout(r, attempt * 3000));
+        continue;
+      }
+      const status = isOverloaded ? 503 : 500;
+      const message = isOverloaded
+        ? 'AI is temporarily overloaded. Please try again in a minute.'
+        : errMsg;
+      return Response.json({ error: message }, { status });
+    }
   }
 
   // 4. Generate personal review layer

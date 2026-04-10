@@ -71,7 +71,7 @@ async function getValidToken(account: { id: string; access_token: string; refres
   return refreshToken(account.id, account.refresh_token, account.provider);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
@@ -86,9 +86,17 @@ export async function GET() {
     return Response.json({ connected: false, accounts: [], events: [] });
   }
 
+  // Accept date range from query params — default to 30 days ahead
+  const url = new URL(request.url);
   const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const endOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7).toISOString();
+  const startParam = url.searchParams.get('start');
+  const endParam = url.searchParams.get('end');
+  const startOfDay = startParam
+    ? new Date(startParam).toISOString()
+    : new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const endOfWeek = endParam
+    ? new Date(endParam).toISOString()
+    : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30).toISOString();
 
   const allEvents: Array<{
     id: string;

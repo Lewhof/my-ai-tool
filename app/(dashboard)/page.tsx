@@ -350,59 +350,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Row 3: AI Briefing + Credits */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 rounded-2xl border border-border overflow-hidden animate-fade-up animate-fade-up-delay-2"
-          style={{ background: 'var(--color-surface-1)' }}>
-          <BriefingWidget />
-        </div>
-
-        {/* AI Credits */}
-        <div className="rounded-2xl border border-border overflow-hidden animate-fade-up animate-fade-up-delay-2"
-          style={{ background: 'var(--color-surface-1)' }}>
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
-            <div className="flex items-center gap-2">
-              <TrendingUp size={15} style={{ color: 'oklch(0.60 0.20 255)' }} />
-              <h3 className="text-[13px] font-semibold text-foreground">AI Usage</h3>
-            </div>
-            <span className="text-[10px] text-muted-foreground">30 days</span>
-          </div>
-          <div className="p-4 space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: 'Spend', value: credits?.ai?.totalCost !== undefined ? formatCost(credits.ai.totalCost) : null },
-                { label: 'Requests', value: credits?.ai?.totalRequests?.toString() ?? null },
-                { label: 'Tokens', value: credits?.ai?.totalTokens !== undefined ? formatTokens(credits.ai.totalTokens) : null },
-                { label: 'Avg/Req', value: credits?.ai?.totalRequests ? formatCost(credits.ai.totalCost / credits.ai.totalRequests) : null },
-              ].map((stat) => (
-                <div key={stat.label} className="rounded-xl p-3 border border-border" style={{ background: 'var(--color-surface-2)' }}>
-                  <p className="text-[10px] text-muted-foreground mb-1">{stat.label}</p>
-                  {stat.value !== null ? (
-                    <p className="text-[15px] font-bold text-foreground font-mono">{stat.value}</p>
-                  ) : (
-                    <div className="skeleton h-5 w-16 mt-0.5" />
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="space-y-1.5">
-              {[
-                { name: 'Anthropic', ok: !credits?.ai?.error },
-                { name: 'Supabase', ok: true },
-                { name: 'Vercel', ok: !credits?.vercel?.error },
-                { name: 'Clerk', ok: true },
-              ].map((s) => (
-                <div key={s.name} className="flex items-center justify-between">
-                  <span className="text-[11px] text-muted-foreground">{s.name}</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className={cn('w-1.5 h-1.5 rounded-full', s.ok ? 'status-dot-green' : 'status-dot-red')} />
-                    <span className="text-[10px] text-muted-foreground">{s.ok ? 'Active' : 'Error'}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+      {/* Row 3: AI Briefing (full width) */}
+      <div className="rounded-2xl border border-border overflow-hidden animate-fade-up animate-fade-up-delay-2"
+        style={{ background: 'var(--color-surface-1)' }}>
+        <BriefingWidget />
       </div>
 
       {/* Row 3.5: Nudges + Mind */}
@@ -521,6 +472,50 @@ export default function DashboardPage() {
         <div className="rounded-2xl border border-border overflow-hidden"
           style={{ background: 'var(--color-surface-1)' }}>
           <HealthWidget />
+        </div>
+      </div>
+
+      {/* Row 7: AI Usage */}
+      <div className="rounded-2xl border border-border overflow-hidden animate-fade-up animate-fade-up-delay-5"
+        style={{ background: 'var(--color-surface-1)' }}>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+          <div className="flex items-center gap-2">
+            <TrendingUp size={15} style={{ color: 'oklch(0.60 0.20 255)' }} />
+            <h3 className="text-[13px] font-semibold text-foreground">AI Usage</h3>
+          </div>
+          <span className="text-[10px] text-muted-foreground">30 days</span>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { label: 'Spend', value: credits?.ai?.totalCost !== undefined ? formatCost(credits.ai.totalCost) : null },
+              { label: 'Requests', value: credits?.ai?.totalRequests?.toString() ?? null },
+              { label: 'Tokens', value: credits?.ai?.totalTokens !== undefined ? formatTokens(credits.ai.totalTokens) : null },
+              { label: 'Avg/Req', value: credits?.ai?.totalRequests ? formatCost(credits.ai.totalCost / credits.ai.totalRequests) : null },
+            ].map((stat) => (
+              <div key={stat.label} className="rounded-xl p-3 border border-border" style={{ background: 'var(--color-surface-2)' }}>
+                <p className="text-[10px] text-muted-foreground mb-1">{stat.label}</p>
+                {stat.value !== null ? (
+                  <p className="text-[15px] font-bold text-foreground font-mono">{stat.value}</p>
+                ) : (
+                  <div className="skeleton h-5 w-16 mt-0.5" />
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-1 mt-3">
+            {[
+              { name: 'Anthropic', ok: !credits?.ai?.error },
+              { name: 'Supabase', ok: true },
+              { name: 'Vercel', ok: !credits?.vercel?.error },
+              { name: 'Clerk', ok: true },
+            ].map((s) => (
+              <div key={s.name} className="flex items-center gap-1.5">
+                <span className={cn('w-1.5 h-1.5 rounded-full', s.ok ? 'status-dot-green' : 'status-dot-red')} />
+                <span className="text-[11px] text-muted-foreground">{s.name}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

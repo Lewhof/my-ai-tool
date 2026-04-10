@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Sparkles, RefreshCw, AlertTriangle, CheckSquare, ClipboardList, Loader2 } from 'lucide-react';
+import { Sparkles, RefreshCw, AlertTriangle, CheckSquare, ClipboardList, Loader2, Calendar } from 'lucide-react';
 
 interface BriefingData {
   briefing: string;
@@ -76,6 +76,12 @@ export default function BriefingWidget() {
                 <div className="flex items-center gap-1.5 text-xs">
                   <CheckSquare size={12} className="text-yellow-400" />
                   <span className="text-yellow-400">{data.stats.dueToday} due today</span>
+                </div>
+              )}
+              {data.stats.calendarEvents > 0 && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  <Calendar size={12} className="text-primary" />
+                  <span className="text-muted-foreground">{data.stats.calendarEvents} events</span>
                 </div>
               )}
               <div className="flex items-center gap-1.5 text-xs">

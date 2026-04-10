@@ -290,12 +290,33 @@ export default function CalendarPage() {
   const [newLocation, setNewLocation] = useState('');
 
   const fetchEvents = useCallback(async () => {
-    const res = await fetch('/api/calendar');
+    // Calculate the visible date range based on current view
+    const d = new Date(currentDate);
+    let start: Date;
+    let end: Date;
+    if (view === 'day') {
+      start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      end = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+    } else if (view === 'week') {
+      const weekStart = new Date(d);
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+      start = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
+      end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+    } else {
+      // month view — fetch entire month plus buffer
+      start = new Date(d.getFullYear(), d.getMonth(), 1);
+      end = new Date(d.getFullYear(), d.getMonth() + 1, 7);
+    }
+    const params = new URLSearchParams({
+      start: start.toISOString(),
+      end: end.toISOString(),
+    });
+    const res = await fetch(`/api/calendar?${params}`);
     const data = await res.json();
     setConnected(data.connected);
     setAccounts(data.accounts ?? []);
     setEvents(data.events ?? []);
-  }, []);
+  }, [currentDate, view]);
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
