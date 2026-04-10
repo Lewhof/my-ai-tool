@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   Brain, Sun, Moon, BookOpen, Flame, Sparkles, Plus, Loader2, X, Trash2,
   Quote, Check, Search, CheckCircle2, BookMarked, Settings, Save, Tag,
-  Copy, MessageSquareQuote, Pencil,
+  Copy, MessageSquareQuote, Pencil, Newspaper, ExternalLink, Clock, RefreshCw, Bookmark,
 } from 'lucide-react';
 
 interface DailyContent {
@@ -71,7 +71,7 @@ interface VirtueLog {
   note: string | null;
 }
 
-type Tab = 'today' | 'library' | 'quotes' | 'virtues';
+type Tab = 'today' | 'library' | 'quotes' | 'virtues' | 'news';
 
 interface SearchSource {
   n: number;
@@ -90,7 +90,14 @@ interface SearchResult {
 }
 
 export default function MindLibraryPage() {
-  const [tab, setTab] = useState<Tab>('today');
+  const [tab, setTab] = useState<Tab>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const t = params.get('tab');
+      if (t && ['today', 'library', 'quotes', 'virtues', 'news'].includes(t)) return t as Tab;
+    }
+    return 'today';
+  });
 
   // Library search state (persistent across tabs)
   const [searchQuery, setSearchQuery] = useState('');
@@ -200,6 +207,7 @@ export default function MindLibraryPage() {
             { id: 'library' as const, label: 'Library', icon: BookOpen },
             { id: 'quotes' as const, label: 'Quotes', icon: MessageSquareQuote },
             { id: 'virtues' as const, label: 'Virtues', icon: Flame },
+            { id: 'news' as const, label: 'News', icon: Newspaper },
           ]).map(t => {
             const Icon = t.icon;
             return (
@@ -225,6 +233,7 @@ export default function MindLibraryPage() {
         {tab === 'library' && <LibraryTab />}
         {tab === 'quotes' && <QuotesTab />}
         {tab === 'virtues' && <VirtuesTab />}
+        {tab === 'news' && <NewsTab />}
       </div>
 
       {/* Search overlay */}
@@ -1587,6 +1596,187 @@ function VirtuesTab() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// NEWS TAB
+// ═══════════════════════════════════════════════
+
+interface NewsArticle {
+  id: string;
+  title: string;
+  source: string;
+  url: string;
+  publishedAt: string;
+  description: string;
+}
+
+type NewsCategory = 'top' | 'business' | 'tech' | 'world';
+
+function NewsTab() {
+  const [articles, setArticles] = useState<NewsArticle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [category, setCategory] = useState<NewsCategory>('top');
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const fetchNews = useCallback(async (cat: NewsCategory, isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
+    try {
+      const res = await fetch(`/api/news?category=${cat}&limit=30`);
+      if (res.ok) {
+        const data = await res.json();
+        setArticles(data.articles ?? []);
+      }
+    } catch {
+      toast.error('Failed to load news');
+    }
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
+
+  useEffect(() => { fetchNews(category); }, [category, fetchNews]);
+
+  const saveAsHighlight = async (article: NewsArticle) => {
+    setSaving(article.id);
+    try {
+      await fetch('/api/highlights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: `${article.title}\n\n${article.description}\n\nSource: ${article.source}\nURL: ${article.url}`,
+          source_type: 'article',
+          source_title: article.source,
+          tags: ['news', category],
+        }),
+      });
+      toast.success('Saved to highlights');
+    } catch {
+      toast.error('Failed to save');
+    }
+    setSaving(null);
+  };
+
+  function timeAgo(dateStr: string): string {
+    try {
+      const diff = Date.now() - new Date(dateStr).getTime();
+      const mins = Math.floor(diff / 60000);
+      if (mins < 60) return `${mins}m ago`;
+      const hours = Math.floor(mins / 60);
+      if (hours < 24) return `${hours}h ago`;
+      return `${Math.floor(hours / 24)}d ago`;
+    } catch {
+      return '';
+    }
+  }
+
+  const categories: Array<{ id: NewsCategory; label: string }> = [
+    { id: 'top', label: 'Top Stories' },
+    { id: 'business', label: 'Business' },
+    { id: 'tech', label: 'Technology' },
+    { id: 'world', label: 'World' },
+  ];
+
+  return (
+    <div className="p-6">
+      {/* Category filters + refresh */}
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+        <div className="flex items-center gap-1.5 p-0.5 rounded-lg border border-border">
+          {categories.map(c => (
+            <button
+              key={c.id}
+              onClick={() => setCategory(c.id)}
+              className={cn(
+                'px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors',
+                category === c.id ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => fetchNews(category, true)}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+        >
+          {refreshing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          Refresh
+        </button>
+      </div>
+
+      {/* Articles */}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <Loader2 size={20} className="animate-spin text-primary" />
+          <p className="text-muted-foreground text-sm">Loading news...</p>
+        </div>
+      ) : articles.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <Newspaper size={32} className="text-muted-foreground/40" />
+          <p className="text-muted-foreground text-sm">No news available</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {articles.map((article) => (
+            <div
+              key={article.id}
+              className="group flex items-start gap-4 p-4 rounded-xl border border-border hover:border-border/60 transition-all"
+              style={{ background: 'var(--color-surface-1)' }}
+            >
+              <div className="flex-1 min-w-0">
+                <a
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-foreground font-medium text-sm leading-snug hover:text-primary transition-colors line-clamp-2"
+                >
+                  {article.title}
+                </a>
+                {article.description && (
+                  <p className="text-muted-foreground/70 text-xs mt-1.5 line-clamp-2 leading-relaxed">
+                    {article.description}
+                  </p>
+                )}
+                <div className="flex items-center gap-3 mt-2">
+                  {article.source && (
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      {article.source}
+                    </span>
+                  )}
+                  {article.publishedAt && (
+                    <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/50">
+                      <Clock size={8} />
+                      {timeAgo(article.publishedAt)}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={() => saveAsHighlight(article)}
+                  disabled={saving === article.id}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                  title="Save to highlights"
+                >
+                  {saving === article.id ? <Loader2 size={14} className="animate-spin" /> : <Bookmark size={14} />}
+                </button>
+                <a
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                  title="Open article"
+                >
+                  <ExternalLink size={14} />
+                </a>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -20,6 +20,7 @@ import HealthWidget from '@/components/dashboard/health-widget';
 import HabitTracker from '@/components/habit-tracker';
 import NudgesWidget from '@/components/dashboard/nudges-widget';
 import MindWidget from '@/components/dashboard/mind-widget';
+import NewsWidget from '@/components/dashboard/news-widget';
 
 interface DashboardData {
   recentChats: Array<{ id: string; title: string; updated_at: string }>;
@@ -408,6 +409,11 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fade-up animate-fade-up-delay-3">
         <NudgesWidget />
         <MindWidget />
+      </div>
+
+      {/* Row 3.6: News */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <NewsWidget />
       </div>
 
       {/* Row 4: Tasks + Recent Chats */}
