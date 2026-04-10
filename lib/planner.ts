@@ -204,9 +204,107 @@ Return ONLY the JSON array. No prose, no markdown, no code fences.`,
       duration: b.duration || 45,
     }));
 
+  // Enforce no overlaps — AI sometimes ignores the instruction
+  const resolvedTasks = resolveOverlaps(calendarBlocks, taskBlocks);
+
   // Merge and sort by time
-  const allBlocks = [...calendarBlocks, ...taskBlocks].sort((a, b) => a.time.localeCompare(b.time));
+  const allBlocks = [...calendarBlocks, ...resolvedTasks].sort((a, b) => a.time.localeCompare(b.time));
   return allBlocks;
+}
+
+/**
+ * Post-AI overlap resolver.
+ * Validates AI-generated blocks against locked calendar events and each other.
+ * Shifts blocks forward to the next available gap; drops if no room.
+ */
+function resolveOverlaps(calendarBlocks: PlanBlock[], aiBlocks: PlanBlock[]): PlanBlock[] {
+  const toMin = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    return h * 60 + m;
+  };
+  const toHHMM = (min: number) =>
+    `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+
+  const DAY_START = 7 * 60;   // 07:00
+  const DAY_END   = 19 * 60;  // 19:00
+
+  // Build occupied intervals from calendar blocks
+  const occupied: Array<{ start: number; end: number }> = calendarBlocks.map(b => ({
+    start: toMin(b.time),
+    end: toMin(b.endTime),
+  }));
+
+  const resolved: PlanBlock[] = [];
+
+  for (const block of aiBlocks) {
+    let start = toMin(block.time);
+    const dur = block.duration;
+    let end = start + dur;
+
+    // Clamp start to day bounds
+    if (start < DAY_START) { start = DAY_START; end = start + dur; }
+
+    // Won't fit in the day at all
+    if (end > DAY_END) {
+      // Try squeezing into a gap instead of giving up
+      const gap = findNextGap(occupied, DAY_START, DAY_END, dur);
+      if (!gap) continue;
+      start = gap;
+      end = start + dur;
+    }
+
+    // Shift forward past any overlapping occupied interval
+    let shifted = true;
+    let attempts = 0;
+    while (shifted && attempts < 40) {
+      shifted = false;
+      for (const o of occupied) {
+        if (start < o.end && end > o.start) {
+          start = o.end;
+          end = start + dur;
+          shifted = true;
+          break;
+        }
+      }
+      attempts++;
+    }
+
+    // Final bounds + overlap check
+    if (end > DAY_END || start < DAY_START) continue;
+    if (occupied.some(o => start < o.end && end > o.start)) continue;
+
+    // Accept the block
+    occupied.push({ start, end });
+    resolved.push({
+      ...block,
+      time: toHHMM(start),
+      endTime: toHHMM(end),
+    });
+  }
+
+  return resolved;
+}
+
+/**
+ * Find the earliest gap of at least `minDuration` minutes between occupied intervals.
+ */
+function findNextGap(
+  occupied: Array<{ start: number; end: number }>,
+  dayStart: number,
+  dayEnd: number,
+  minDuration: number,
+): number | null {
+  const sorted = [...occupied].sort((a, b) => a.start - b.start);
+  let cursor = dayStart;
+
+  for (const slot of sorted) {
+    if (slot.start - cursor >= minDuration) return cursor;
+    cursor = Math.max(cursor, slot.end);
+  }
+
+  // Check gap after last occupied slot
+  if (dayEnd - cursor >= minDuration) return cursor;
+  return null;
 }
 
 function addMinutes(hhmm: string, minutes: number): string {
