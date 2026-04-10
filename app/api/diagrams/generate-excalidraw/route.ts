@@ -95,9 +95,12 @@ export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
+  type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
+  const ALLOWED_TYPES: ImageMediaType[] = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+
   let prompt = '';
   let imageBase64: string | null = null;
-  let imageMimeType: string = 'image/png';
+  let imageMimeType: ImageMediaType = 'image/png';
 
   const contentType = req.headers.get('content-type') ?? '';
   if (contentType.includes('multipart/form-data')) {
@@ -107,7 +110,9 @@ export async function POST(req: Request) {
     if (file) {
       const buffer = Buffer.from(await file.arrayBuffer());
       imageBase64 = buffer.toString('base64');
-      imageMimeType = file.type || 'image/png';
+      imageMimeType = ALLOWED_TYPES.includes(file.type as ImageMediaType)
+        ? (file.type as ImageMediaType)
+        : 'image/png';
     }
   } else {
     const body = await req.json();
@@ -120,7 +125,10 @@ export async function POST(req: Request) {
 
   try {
     // Build user content: image (if provided) + text prompt
-    const userContent: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } } | { type: 'text'; text: string }> = [];
+    const userContent: Array<
+      | { type: 'image'; source: { type: 'base64'; media_type: ImageMediaType; data: string } }
+      | { type: 'text'; text: string }
+    > = [];
     if (imageBase64) {
       userContent.push({
         type: 'image',
