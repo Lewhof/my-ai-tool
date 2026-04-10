@@ -94,15 +94,19 @@ export default function DiagramsPage() {
       const name = (generatePrompt || 'Image diagram').slice(0, 50);
 
       if (generateEngine === 'excalidraw') {
-        // Excalidraw generation doesn't support image input yet — prompt only.
+        let genRes: Response;
         if (imageFile) {
-          throw new Error('Image input is not supported for Excalidraw yet. Use a text prompt.');
+          const formData = new FormData();
+          formData.append('image', imageFile);
+          formData.append('prompt', generatePrompt || 'Convert this into a diagram');
+          genRes = await fetch('/api/diagrams/generate-excalidraw', { method: 'POST', body: formData });
+        } else {
+          genRes = await fetch('/api/diagrams/generate-excalidraw', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: generatePrompt }),
+          });
         }
-        const genRes = await fetch('/api/diagrams/generate-excalidraw', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: generatePrompt }),
-        });
         if (!genRes.ok) {
           const errData = await genRes.json().catch(() => ({}));
           throw new Error(errData.error || `Generation failed (${genRes.status})`);

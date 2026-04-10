@@ -28,84 +28,119 @@ DARK THEME PALETTE (on #1e1e2e background):
 
 Use roundness { type: 3 } for rounded rectangles.`;
 
+const EXCALIDRAW_TOOL = {
+  name: 'create_excalidraw_scene',
+  description: 'Emit an Excalidraw scene as an array of elements.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      elements: {
+        type: 'array',
+        description: 'Array of Excalidraw elements (rectangle, ellipse, diamond, arrow, text).',
+        items: {
+          type: 'object',
+          properties: {
+            type: { type: 'string', enum: ['rectangle', 'ellipse', 'diamond', 'arrow', 'text'] },
+            id: { type: 'string' },
+            x: { type: 'number' },
+            y: { type: 'number' },
+            width: { type: 'number' },
+            height: { type: 'number' },
+            backgroundColor: { type: 'string' },
+            strokeColor: { type: 'string' },
+            fillStyle: { type: 'string' },
+            strokeWidth: { type: 'number' },
+            roundness: {
+              type: 'object',
+              properties: { type: { type: 'number' } },
+            },
+            label: {
+              type: 'object',
+              properties: {
+                text: { type: 'string' },
+                fontSize: { type: 'number' },
+              },
+            },
+            text: { type: 'string' },
+            fontSize: { type: 'number' },
+            points: {
+              type: 'array',
+              items: { type: 'array', items: { type: 'number' } },
+            },
+            endArrowhead: { type: 'string' },
+            startBinding: {
+              type: 'object',
+              properties: {
+                elementId: { type: 'string' },
+                fixedPoint: { type: 'array', items: { type: 'number' } },
+              },
+            },
+            endBinding: {
+              type: 'object',
+              properties: {
+                elementId: { type: 'string' },
+                fixedPoint: { type: 'array', items: { type: 'number' } },
+              },
+            },
+          },
+          required: ['type', 'id', 'x', 'y', 'width', 'height'],
+        },
+      },
+    },
+    required: ['elements'],
+  },
+} as const;
+
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
-  const { prompt } = await req.json();
-  if (!prompt?.trim()) {
-    return Response.json({ error: 'Prompt required' }, { status: 400 });
+  let prompt = '';
+  let imageBase64: string | null = null;
+  let imageMimeType: string = 'image/png';
+
+  const contentType = req.headers.get('content-type') ?? '';
+  if (contentType.includes('multipart/form-data')) {
+    const formData = await req.formData();
+    prompt = (formData.get('prompt') as string) ?? '';
+    const file = formData.get('image') as File | null;
+    if (file) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      imageBase64 = buffer.toString('base64');
+      imageMimeType = file.type || 'image/png';
+    }
+  } else {
+    const body = await req.json();
+    prompt = body.prompt ?? '';
+  }
+
+  if (!prompt?.trim() && !imageBase64) {
+    return Response.json({ error: 'Prompt or image required' }, { status: 400 });
   }
 
   try {
+    // Build user content: image (if provided) + text prompt
+    const userContent: Array<{ type: 'image'; source: { type: 'base64'; media_type: string; data: string } } | { type: 'text'; text: string }> = [];
+    if (imageBase64) {
+      userContent.push({
+        type: 'image',
+        source: { type: 'base64', media_type: imageMimeType, data: imageBase64 },
+      });
+    }
+    userContent.push({
+      type: 'text',
+      text: prompt?.trim()
+        ? (imageBase64 ? `Convert this image/document into an Excalidraw diagram. Additional instructions: ${prompt}` : prompt)
+        : 'Convert this image/document into a clean Excalidraw diagram. Identify the key components, relationships, and structure shown.',
+    });
+
     const response = await anthropic.messages.create({
       model: MODELS.smart,
       max_tokens: 8000,
       system: SYSTEM,
-      tools: [{
-        name: 'create_excalidraw_scene',
-        description: 'Emit an Excalidraw scene as an array of elements.',
-        input_schema: {
-          type: 'object' as const,
-          properties: {
-            elements: {
-              type: 'array',
-              description: 'Array of Excalidraw elements (rectangle, ellipse, diamond, arrow, text).',
-              items: {
-                type: 'object',
-                properties: {
-                  type: { type: 'string', enum: ['rectangle', 'ellipse', 'diamond', 'arrow', 'text'] },
-                  id: { type: 'string' },
-                  x: { type: 'number' },
-                  y: { type: 'number' },
-                  width: { type: 'number' },
-                  height: { type: 'number' },
-                  backgroundColor: { type: 'string' },
-                  strokeColor: { type: 'string' },
-                  fillStyle: { type: 'string' },
-                  strokeWidth: { type: 'number' },
-                  roundness: {
-                    type: 'object',
-                    properties: { type: { type: 'number' } },
-                  },
-                  label: {
-                    type: 'object',
-                    properties: {
-                      text: { type: 'string' },
-                      fontSize: { type: 'number' },
-                    },
-                  },
-                  text: { type: 'string' },
-                  fontSize: { type: 'number' },
-                  points: {
-                    type: 'array',
-                    items: { type: 'array', items: { type: 'number' } },
-                  },
-                  endArrowhead: { type: 'string' },
-                  startBinding: {
-                    type: 'object',
-                    properties: {
-                      elementId: { type: 'string' },
-                      fixedPoint: { type: 'array', items: { type: 'number' } },
-                    },
-                  },
-                  endBinding: {
-                    type: 'object',
-                    properties: {
-                      elementId: { type: 'string' },
-                      fixedPoint: { type: 'array', items: { type: 'number' } },
-                    },
-                  },
-                },
-                required: ['type', 'id', 'x', 'y', 'width', 'height'],
-              },
-            },
-          },
-          required: ['elements'],
-        },
-      }],
+      tools: [EXCALIDRAW_TOOL],
       tool_choice: { type: 'tool', name: 'create_excalidraw_scene' },
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content: userContent }],
     });
 
     if (response.stop_reason === 'max_tokens') {
