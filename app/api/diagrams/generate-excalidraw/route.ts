@@ -89,7 +89,7 @@ const EXCALIDRAW_TOOL = {
     },
     required: ['elements'],
   },
-} as const;
+};
 
 export async function POST(req: Request) {
   const { userId } = await auth();
