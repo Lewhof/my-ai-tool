@@ -43,8 +43,12 @@ const PRIORITY_DOTS: Record<string, string> = {
   low: 'bg-muted-foreground',
 };
 
-// Hours for timeline (7am - 7pm)
-const HOURS = Array.from({ length: 13 }, (_, i) => i + 7);
+// Hours for timeline (7am - 8pm = 13 hours)
+const TIMELINE_START = 7;
+const TIMELINE_HOURS = 13;
+const HOUR_HEIGHT = 60; // px per hour
+const TIMELINE_HEIGHT = TIMELINE_HOURS * HOUR_HEIGHT; // 780px
+const HOURS = Array.from({ length: TIMELINE_HOURS + 1 }, (_, i) => i + TIMELINE_START);
 
 export default function PlannerPage() {
   const [plan, setPlan] = useState<DailyPlan | null>(null);
@@ -158,21 +162,21 @@ export default function PlannerPage() {
     return dt.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' });
   };
 
-  // Calculate position on timeline
-  const getBlockPosition = (time: string) => {
+  // Calculate position on timeline (pixel-based for precise rendering)
+  const getBlockTop = (time: string): number => {
     const [h, m] = time.split(':').map(Number);
-    return ((h - 7) * 60 + m) / (13 * 60) * 100; // 7am-7pm = 13 hours
+    return ((h - TIMELINE_START) * 60 + m) / 60 * HOUR_HEIGHT;
   };
 
-  const getBlockHeight = (duration: number) => {
-    return (duration / (13 * 60)) * 100;
+  const getBlockPxHeight = (duration: number): number => {
+    return (duration / 60) * HOUR_HEIGHT;
   };
 
   // Current time indicator
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const currentPosition = ((currentMinutes - 7 * 60) / (13 * 60)) * 100;
-  const showCurrentTime = isToday && currentPosition >= 0 && currentPosition <= 100;
+  const currentPositionPx = ((currentMinutes - TIMELINE_START * 60) / 60) * HOUR_HEIGHT;
+  const showCurrentTime = isToday && currentPositionPx >= 0 && currentPositionPx <= TIMELINE_HEIGHT;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -311,12 +315,12 @@ export default function PlannerPage() {
             </div>
 
             {/* Timeline gutter */}
-            <div className="w-16 shrink-0 border-r border-border relative">
+            <div className="w-16 shrink-0 border-r border-border relative" style={{ height: `${TIMELINE_HEIGHT}px` }}>
               {HOURS.map((hour) => (
                 <div
                   key={hour}
                   className="absolute w-full text-right pr-2"
-                  style={{ top: `${((hour - 7) / 13) * 100}%` }}
+                  style={{ top: `${(hour - TIMELINE_START) * HOUR_HEIGHT}px` }}
                 >
                   <span className="text-[10px] text-muted-foreground/60 -translate-y-1/2 inline-block">
                     {hour.toString().padStart(2, '0')}:00
@@ -327,7 +331,7 @@ export default function PlannerPage() {
               {showCurrentTime && (
                 <div
                   className="absolute left-0 right-0 z-10"
-                  style={{ top: `${currentPosition}%` }}
+                  style={{ top: `${currentPositionPx}px` }}
                 >
                   <div className="flex items-center">
                     <div className="w-2 h-2 rounded-full bg-red-500 -ml-1" />
@@ -338,13 +342,13 @@ export default function PlannerPage() {
             </div>
 
             {/* Timeline content */}
-            <div className="flex-1 relative" style={{ minHeight: '780px' }}>
+            <div className="flex-1 relative" style={{ height: `${TIMELINE_HEIGHT}px` }}>
               {/* Hour gridlines */}
               {HOURS.map((hour) => (
                 <div
                   key={hour}
                   className="absolute left-0 right-0 border-t border-border/30"
-                  style={{ top: `${((hour - 7) / 13) * 100}%` }}
+                  style={{ top: `${(hour - TIMELINE_START) * HOUR_HEIGHT}px` }}
                 />
               ))}
 
@@ -352,7 +356,7 @@ export default function PlannerPage() {
               {showCurrentTime && (
                 <div
                   className="absolute left-0 right-0 z-10 h-px bg-red-500/40"
-                  style={{ top: `${currentPosition}%` }}
+                  style={{ top: `${currentPositionPx}px` }}
                 />
               )}
 
@@ -360,9 +364,10 @@ export default function PlannerPage() {
               {plan.blocks.map((block, index) => {
                 const config = TYPE_CONFIG[block.type] || TYPE_CONFIG.task;
                 const Icon = config.icon;
-                const top = getBlockPosition(block.time);
-                const height = getBlockHeight(block.duration);
+                const topPx = getBlockTop(block.time);
+                const heightPx = getBlockPxHeight(block.duration);
                 const isUtility = block.type === 'break' || block.type === 'focus';
+                const isCompact = heightPx < 40;
 
                 // Breaks/focus: render as thin subtle indicators, not full blocks
                 if (isUtility) {
@@ -370,7 +375,7 @@ export default function PlannerPage() {
                     <div
                       key={block.id}
                       className="absolute left-4 right-4 flex items-center gap-2 pointer-events-none z-0"
-                      style={{ top: `${top}%`, height: `${Math.max(height, 2)}%` }}
+                      style={{ top: `${topPx}px`, height: `${Math.max(heightPx, 14)}px` }}
                     >
                       <div className={cn('h-px flex-1', block.type === 'break' ? 'bg-green-500/20' : 'bg-purple-500/20')} />
                       <span className={cn('text-[9px] font-medium uppercase tracking-wider shrink-0', config.color, 'opacity-40')}>
@@ -389,27 +394,36 @@ export default function PlannerPage() {
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDragEnd={handleDragEnd}
                     className={cn(
-                      'absolute left-2 right-2 rounded-lg border px-3 py-1.5 transition-all z-10',
+                      'absolute left-2 right-2 rounded-lg border overflow-hidden transition-all z-10',
                       config.bg, config.border,
                       block.locked ? 'opacity-80' : 'cursor-grab active:cursor-grabbing hover:shadow-lg',
                       draggedIndex === index && 'opacity-50 scale-95',
                     )}
                     style={{
-                      top: `${top}%`,
-                      minHeight: `${Math.max(height, 3)}%`,
+                      top: `${topPx}px`,
+                      height: `${Math.max(heightPx - 2, 20)}px`,
                     }}
                   >
-                    <div className="flex items-center gap-2 h-full">
+                    <div className={cn('flex items-center gap-2 h-full', isCompact ? 'px-2' : 'px-3 py-1')}>
                       {!block.locked && !plan.locked && (
-                        <GripVertical size={12} className="text-muted-foreground/40 shrink-0" />
+                        <GripVertical size={isCompact ? 10 : 12} className="text-muted-foreground/40 shrink-0" />
                       )}
-                      <Icon size={12} className={cn(config.color, 'shrink-0')} />
+                      <Icon size={isCompact ? 10 : 12} className={cn(config.color, 'shrink-0')} />
                       {block.priority && (
                         <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', PRIORITY_DOTS[block.priority])} />
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-foreground text-xs font-medium truncate">{block.title}</p>
-                        <p className="text-muted-foreground/60 text-[10px]">{block.time} - {block.endTime} ({block.duration}m)</p>
+                        {isCompact ? (
+                          <p className="text-foreground text-[11px] font-medium truncate">
+                            {block.title}
+                            <span className="text-muted-foreground/50 ml-1.5">{block.time}</span>
+                          </p>
+                        ) : (
+                          <>
+                            <p className="text-foreground text-xs font-medium truncate">{block.title}</p>
+                            <p className="text-muted-foreground/60 text-[10px]">{block.time} - {block.endTime} ({block.duration}m)</p>
+                          </>
+                        )}
                       </div>
                       {block.locked && <Lock size={10} className="text-muted-foreground/40 shrink-0" />}
                       {block.type === 'task' && block.priority === 'urgent' && (
