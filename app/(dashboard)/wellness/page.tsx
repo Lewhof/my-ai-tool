@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Activity, Heart, Moon, Zap, Footprints, Dumbbell, Plus, TrendingUp, Sparkles, Trash2 } from 'lucide-react';
+import { Activity, Heart, Moon, Zap, Footprints, Dumbbell, Plus, TrendingUp, Sparkles, Trash2, Timer, Flame, Target, Calendar } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 type TrendPoint = { date: string; value: number };
@@ -77,7 +78,270 @@ function generateDemoData() {
   return metrics;
 }
 
+type WellnessTab = 'biometrics' | 'training';
+
+// ═══════════════════════════════════════════════
+// TRAINING TAB (Placeholder)
+// ═══════════════════════════════════════════════
+function TrainingTab() {
+  const [activities, setActivities] = useState<Array<{
+    id: string;
+    date: string;
+    type: string;
+    name: string;
+    duration_min: number;
+    notes: string;
+    intensity: 'low' | 'medium' | 'high';
+  }>>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newType, setNewType] = useState('gym');
+  const [newName, setNewName] = useState('');
+  const [newDuration, setNewDuration] = useState('');
+  const [newIntensity, setNewIntensity] = useState<'low' | 'medium' | 'high'>('medium');
+  const [newNotes, setNewNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const TRAINING_TYPES = [
+    { id: 'gym', label: 'Gym / Weights', icon: Dumbbell },
+    { id: 'cardio', label: 'Cardio / Run', icon: Footprints },
+    { id: 'hiit', label: 'HIIT', icon: Flame },
+    { id: 'martial_arts', label: 'Martial Arts / MMA', icon: Target },
+    { id: 'sport', label: 'Sport', icon: Activity },
+    { id: 'recovery', label: 'Recovery / Stretch', icon: Heart },
+    { id: 'other', label: 'Other', icon: Timer },
+  ];
+
+  useEffect(() => {
+    fetch('/api/wellness/training')
+      .then(r => r.ok ? r.json() : { activities: [] })
+      .then(d => setActivities(d.activities ?? []))
+      .catch(() => {});
+  }, []);
+
+  const addActivity = async () => {
+    if (!newName.trim() || !newDuration) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/wellness/training', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: newType,
+          name: newName,
+          duration_min: parseInt(newDuration),
+          intensity: newIntensity,
+          notes: newNotes,
+          date: new Date().toISOString().slice(0, 10),
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setActivities(prev => [data.activity, ...prev]);
+        setNewName(''); setNewDuration(''); setNewNotes('');
+        setShowAdd(false);
+        toast.success('Activity logged');
+      }
+    } catch {
+      toast.error('Failed to log activity');
+    }
+    setSaving(false);
+  };
+
+  // Stats for the week
+  const thisWeek = activities.filter(a => {
+    const d = new Date(a.date);
+    const now = new Date();
+    const weekAgo = new Date(now);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    return d >= weekAgo;
+  });
+  const totalMinutes = thisWeek.reduce((s, a) => s + (a.duration_min || 0), 0);
+
+  return (
+    <div className="space-y-6">
+      {/* Weekly summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Calendar size={14} className="text-primary" />
+            <span className="text-muted-foreground text-xs">This week</span>
+          </div>
+          <p className="text-foreground text-2xl font-bold">{thisWeek.length}</p>
+          <p className="text-muted-foreground text-[10px]">sessions</p>
+        </div>
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Timer size={14} className="text-blue-400" />
+            <span className="text-muted-foreground text-xs">Duration</span>
+          </div>
+          <p className="text-foreground text-2xl font-bold">{Math.round(totalMinutes / 60 * 10) / 10}h</p>
+          <p className="text-muted-foreground text-[10px]">{totalMinutes} min total</p>
+        </div>
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Flame size={14} className="text-orange-400" />
+            <span className="text-muted-foreground text-xs">Intensity</span>
+          </div>
+          <p className="text-foreground text-2xl font-bold">
+            {thisWeek.length > 0 ? (thisWeek.filter(a => a.intensity === 'high').length > thisWeek.length / 2 ? 'High' : 'Medium') : '—'}
+          </p>
+          <p className="text-muted-foreground text-[10px]">avg this week</p>
+        </div>
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp size={14} className="text-green-400" />
+            <span className="text-muted-foreground text-xs">Streak</span>
+          </div>
+          <p className="text-foreground text-2xl font-bold">—</p>
+          <p className="text-muted-foreground text-[10px]">coming soon</p>
+        </div>
+      </div>
+
+      {/* Log button + form */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-foreground font-semibold text-sm">Training Log</h3>
+        <button
+          onClick={() => setShowAdd(!showAdd)}
+          className="flex items-center gap-1.5 bg-primary text-foreground px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-primary/90 transition-colors"
+        >
+          <Plus size={12} /> Log session
+        </button>
+      </div>
+
+      {showAdd && (
+        <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {TRAINING_TYPES.map(t => {
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setNewType(t.id)}
+                  className={cn(
+                    'flex items-center gap-2 p-2.5 rounded-lg border text-[12px] font-medium transition-colors',
+                    newType === t.id
+                      ? 'border-primary/50 bg-primary/10 text-primary'
+                      : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
+                  )}
+                >
+                  <Icon size={14} />
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap gap-2 items-end">
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-muted-foreground text-[11px] block mb-1">Activity name</label>
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="e.g. Push day, 5km run, BJJ class"
+                className="w-full bg-secondary border border-border rounded-lg px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/40"
+              />
+            </div>
+            <div className="w-24">
+              <label className="text-muted-foreground text-[11px] block mb-1">Duration (min)</label>
+              <input
+                type="number"
+                value={newDuration}
+                onChange={(e) => setNewDuration(e.target.value)}
+                placeholder="60"
+                className="w-full bg-secondary border border-border rounded-lg px-3 py-1.5 text-sm text-foreground"
+              />
+            </div>
+            <div>
+              <label className="text-muted-foreground text-[11px] block mb-1">Intensity</label>
+              <div className="flex gap-1">
+                {(['low', 'medium', 'high'] as const).map(i => (
+                  <button
+                    key={i}
+                    onClick={() => setNewIntensity(i)}
+                    className={cn(
+                      'px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors capitalize',
+                      newIntensity === i
+                        ? i === 'high' ? 'border-red-500/50 bg-red-500/10 text-red-400'
+                          : i === 'medium' ? 'border-yellow-500/50 bg-yellow-500/10 text-yellow-400'
+                          : 'border-green-500/50 bg-green-500/10 text-green-400'
+                        : 'border-border text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    {i}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="text-muted-foreground text-[11px] block mb-1">Notes (optional)</label>
+            <input
+              value={newNotes}
+              onChange={(e) => setNewNotes(e.target.value)}
+              placeholder="PR, felt great, etc."
+              className="w-full bg-secondary border border-border rounded-lg px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/40"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowAdd(false)} className="text-muted-foreground text-xs px-3 py-1.5">Cancel</button>
+            <button
+              onClick={addActivity}
+              disabled={saving || !newName.trim() || !newDuration}
+              className="bg-primary text-foreground px-4 py-1.5 rounded-lg text-xs font-medium disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Log activity'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Activity list */}
+      {activities.length === 0 ? (
+        <div className="bg-card border border-border rounded-xl p-12 text-center space-y-3">
+          <Dumbbell size={36} className="mx-auto text-muted-foreground/40" />
+          <div>
+            <p className="text-foreground font-semibold">No training sessions logged</p>
+            <p className="text-muted-foreground text-sm mt-1">Log your first workout to start tracking your training.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="divide-y divide-border">
+            {activities.slice(0, 20).map((a) => {
+              const typeInfo = TRAINING_TYPES.find(t => t.id === a.type) || TRAINING_TYPES[6];
+              const Icon = typeInfo.icon;
+              return (
+                <div key={a.id} className="flex items-center gap-3 px-5 py-3.5">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/10 shrink-0">
+                    <Icon size={16} className="text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-foreground text-sm font-medium truncate">{a.name}</p>
+                    <p className="text-muted-foreground text-[11px]">
+                      {new Date(a.date).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })}
+                      {a.duration_min ? ` · ${a.duration_min}min` : ''}
+                      {a.notes ? ` · ${a.notes}` : ''}
+                    </p>
+                  </div>
+                  <span className={cn(
+                    'text-[10px] font-medium px-2 py-0.5 rounded-full capitalize',
+                    a.intensity === 'high' ? 'bg-red-500/15 text-red-400'
+                      : a.intensity === 'medium' ? 'bg-yellow-500/15 text-yellow-400'
+                      : 'bg-green-500/15 text-green-400'
+                  )}>
+                    {a.intensity}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function WellnessPage() {
+  const [tab, setTab] = useState<WellnessTab>('biometrics');
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -159,24 +423,54 @@ export default function WellnessPage() {
           <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Activity size={22} className="text-primary" /> Wellness
           </h2>
-          <p className="text-muted-foreground text-sm mt-1">Biometrics, sleep, workouts — from Garmin, Apple Health or manual entry</p>
+          <p className="text-muted-foreground text-sm mt-1">Biometrics, training & recovery tracking</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setShowAdd((v) => !v)} className="bg-primary text-foreground px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors">
-            <Plus size={12} /> Log manual
-          </button>
-          {!hasDemoData ? (
-            <button onClick={seedDemo} className="text-muted-foreground hover:text-foreground text-xs px-3 py-1.5 border border-border rounded-lg flex items-center gap-2 transition-colors">
-              <Sparkles size={12} /> Seed demo data
+        {tab === 'biometrics' && (
+          <div className="flex gap-2">
+            <button onClick={() => setShowAdd((v) => !v)} className="bg-primary text-foreground px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors">
+              <Plus size={12} /> Log manual
             </button>
-          ) : (
-            <button onClick={clearDemo} className="text-muted-foreground hover:text-red-400 text-xs px-3 py-1.5 border border-border rounded-lg flex items-center gap-2 transition-colors">
-              <Trash2 size={12} /> Clear demo
-            </button>
-          )}
-        </div>
+            {!hasDemoData ? (
+              <button onClick={seedDemo} className="text-muted-foreground hover:text-foreground text-xs px-3 py-1.5 border border-border rounded-lg flex items-center gap-2 transition-colors">
+                <Sparkles size={12} /> Seed demo data
+              </button>
+            ) : (
+              <button onClick={clearDemo} className="text-muted-foreground hover:text-red-400 text-xs px-3 py-1.5 border border-border rounded-lg flex items-center gap-2 transition-colors">
+                <Trash2 size={12} /> Clear demo
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-1 bg-card border border-border rounded-xl p-1 w-fit">
+        {([
+          { id: 'biometrics' as const, label: 'Biometrics', icon: Heart },
+          { id: 'training' as const, label: 'Training', icon: Dumbbell },
+        ]).map(t => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                tab === t.id
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Icon size={14} />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === 'training' && <TrainingTab />}
+
+      {tab === 'biometrics' && <>
       {/* Manual add form */}
       {showAdd && (
         <div className="bg-card border border-border rounded-lg p-4 space-y-3">
@@ -348,6 +642,7 @@ export default function WellnessPage() {
           </div>
         </div>
       </div>
+      </>}
     </div>
   );
 }
