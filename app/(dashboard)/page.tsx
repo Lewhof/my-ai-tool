@@ -21,6 +21,7 @@ import HabitTracker from '@/components/habit-tracker';
 import NudgesWidget from '@/components/dashboard/nudges-widget';
 import MindWidget from '@/components/dashboard/mind-widget';
 import NewsWidget from '@/components/dashboard/news-widget';
+import UfcWidget from '@/components/dashboard/ufc-widget';
 
 interface DashboardData {
   recentChats: Array<{ id: string; title: string; updated_at: string }>;
@@ -518,6 +519,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Row 8: UFC Events */}
+      <UfcWidget />
     </div>
   );
 }
