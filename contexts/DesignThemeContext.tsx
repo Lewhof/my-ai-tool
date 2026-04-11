@@ -14,6 +14,17 @@ export const ACCENT_OPTIONS = [
   { id: 'copper',  label: 'Copper',        hex: '#CD7F32', oklch: 'oklch(0.62 0.12 55)',  glow: 'oklch(0.62 0.12 55 / 0.30)' },
 ] as const;
 
+export const BACKGROUND_OPTIONS = [
+  { id: 'warm-dusk',   label: 'Warm Dusk',    hex: '#2A2520', hue: 55,  chroma: 0.010, base: 0.18 },
+  { id: 'cool-slate',  label: 'Cool Slate',   hex: '#1E2228', hue: 240, chroma: 0.012, base: 0.18 },
+  { id: 'deep-ocean',  label: 'Deep Ocean',   hex: '#1A2230', hue: 230, chroma: 0.018, base: 0.17 },
+  { id: 'midnight',    label: 'Midnight',     hex: '#1A1A1E', hue: 280, chroma: 0.006, base: 0.16 },
+  { id: 'volcanic',    label: 'Volcanic',     hex: '#2A1F1A', hue: 30,  chroma: 0.014, base: 0.18 },
+  { id: 'forest',      label: 'Forest',       hex: '#1A2520', hue: 155, chroma: 0.012, base: 0.17 },
+  { id: 'graphite',    label: 'Graphite',     hex: '#222222', hue: 0,   chroma: 0.000, base: 0.17 },
+  { id: 'amoled',      label: 'AMOLED Black', hex: '#000000', hue: 0,   chroma: 0.000, base: 0.05 },
+] as const;
+
 export const FONT_OPTIONS = [
   { id: 'figtree',   label: 'Figtree',            family: "'Figtree', sans-serif",            googleParam: 'Figtree:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400' },
   { id: 'jakarta',   label: 'Plus Jakarta Sans',  family: "'Plus Jakarta Sans', sans-serif",  googleParam: 'Plus+Jakarta+Sans:wght@400;500;600;700' },
@@ -28,15 +39,19 @@ export const FONT_OPTIONS = [
 interface DesignThemeContextType {
   accent: string;
   font: string;
+  background: string;
   setAccent: (id: string) => void;
   setFont: (id: string) => void;
+  setBackground: (id: string) => void;
 }
 
 const DesignThemeContext = createContext<DesignThemeContextType>({
   accent: 'orange',
   font: 'figtree',
+  background: 'warm-dusk',
   setAccent: () => {},
   setFont: () => {},
+  setBackground: () => {},
 });
 
 function applyAccent(id: string) {
@@ -67,17 +82,63 @@ function applyFont(id: string) {
   }
 }
 
+function applyBackground(id: string) {
+  const option = BACKGROUND_OPTIONS.find(o => o.id === id) || BACKGROUND_OPTIONS[0];
+  const { hue: h, chroma: c, base: l } = option;
+  const root = document.documentElement;
+
+  const oklch = (light: number, chr: number) => `oklch(${light.toFixed(3)} ${chr.toFixed(3)} ${h})`;
+
+  root.style.setProperty('--background', oklch(l, c));
+  root.style.setProperty('--foreground', oklch(0.94, Math.min(c, 0.010)));
+  root.style.setProperty('--card', oklch(l + 0.04, c + 0.002));
+  root.style.setProperty('--card-foreground', oklch(0.94, Math.min(c, 0.010)));
+  root.style.setProperty('--popover', oklch(l + 0.07, c + 0.003));
+  root.style.setProperty('--popover-foreground', oklch(0.94, Math.min(c, 0.010)));
+
+  root.style.setProperty('--surface-1', oklch(l + 0.04, c + 0.002));
+  root.style.setProperty('--surface-2', oklch(l + 0.09, c + 0.004));
+  root.style.setProperty('--surface-3', oklch(l + 0.14, c + 0.006));
+
+  root.style.setProperty('--secondary', oklch(l + 0.09, c + 0.004));
+  root.style.setProperty('--secondary-foreground', oklch(0.78, Math.min(c, 0.010)));
+  root.style.setProperty('--muted', oklch(l + 0.09, c + 0.004));
+  root.style.setProperty('--muted-foreground', oklch(0.62, Math.min(c, 0.012)));
+  root.style.setProperty('--accent', oklch(l + 0.09, c + 0.004));
+  root.style.setProperty('--accent-foreground', oklch(0.94, Math.min(c, 0.010)));
+
+  root.style.setProperty('--border', oklch(l + 0.14, c + 0.005));
+  root.style.setProperty('--input', oklch(l + 0.14, c + 0.005));
+
+  // Sidebar
+  root.style.setProperty('--sidebar-background', oklch(l - 0.02, c));
+  root.style.setProperty('--sidebar-foreground', oklch(0.94, Math.min(c, 0.010)));
+  root.style.setProperty('--sidebar-border', oklch(l + 0.10, c + 0.004));
+  root.style.setProperty('--sidebar-accent', oklch(l + 0.09, c + 0.004));
+  root.style.setProperty('--sidebar-accent-foreground', oklch(0.94, Math.min(c, 0.010)));
+
+  // Color aliases
+  root.style.setProperty('--color-background', `var(--background)`);
+  root.style.setProperty('--color-surface-1', `var(--surface-1)`);
+  root.style.setProperty('--color-surface-2', `var(--surface-2)`);
+  root.style.setProperty('--color-surface-3', `var(--surface-3)`);
+}
+
 export function DesignThemeProvider({ children }: { children: React.ReactNode }) {
   const [accent, setAccentState] = useState('orange');
   const [font, setFontState] = useState('figtree');
+  const [background, setBackgroundState] = useState('warm-dusk');
 
   useEffect(() => {
     const savedAccent = localStorage.getItem('design-accent') || 'orange';
     const savedFont = localStorage.getItem('design-font') || 'figtree';
+    const savedBg = localStorage.getItem('design-background') || 'warm-dusk';
     setAccentState(savedAccent);
     setFontState(savedFont);
+    setBackgroundState(savedBg);
     applyAccent(savedAccent);
     applyFont(savedFont);
+    if (savedBg !== 'warm-dusk') applyBackground(savedBg);
   }, []);
 
   const setAccent = (id: string) => {
@@ -92,8 +153,14 @@ export function DesignThemeProvider({ children }: { children: React.ReactNode })
     applyFont(id);
   };
 
+  const setBackground = (id: string) => {
+    setBackgroundState(id);
+    localStorage.setItem('design-background', id);
+    applyBackground(id);
+  };
+
   return (
-    <DesignThemeContext.Provider value={{ accent, font, setAccent, setFont }}>
+    <DesignThemeContext.Provider value={{ accent, font, background, setAccent, setFont, setBackground }}>
       {children}
     </DesignThemeContext.Provider>
   );
