@@ -111,7 +111,8 @@ function applyBackground(id: string) {
   root.style.setProperty('--input', oklch(l + 0.14, c + 0.005));
 
   // Sidebar
-  root.style.setProperty('--sidebar-background', oklch(l - 0.02, c));
+  root.style.setProperty('--sidebar', oklch(Math.max(l - 0.02, 0.03), c));
+  root.style.setProperty('--sidebar-background', oklch(Math.max(l - 0.02, 0.03), c));
   root.style.setProperty('--sidebar-foreground', oklch(0.94, Math.min(c, 0.010)));
   root.style.setProperty('--sidebar-border', oklch(l + 0.10, c + 0.004));
   root.style.setProperty('--sidebar-accent', oklch(l + 0.09, c + 0.004));
