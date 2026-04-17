@@ -992,8 +992,8 @@ export default function FinancePage() {
             </div>
 
             {/* Transaction table */}
-            <div className="flex-1 overflow-y-auto">
-              <table className="w-full text-xs">
+            <div className="flex-1 overflow-auto">
+              <table className="w-full min-w-[600px] text-xs">
                 <thead className="sticky top-0 bg-background border-b border-border">
                   <tr>
                     <th className="px-3 py-2 w-8"></th>

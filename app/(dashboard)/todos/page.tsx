@@ -583,8 +583,8 @@ export default function TodosPage() {
       {/* Add Form */}
       {showAdd && (
         <div className="bg-card border border-border rounded-lg p-5 space-y-4 shrink-0">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="col-span-full">
               <label className="text-foreground text-sm block mb-1">Title</label>
               <input
                 value={newTitle}
@@ -595,7 +595,7 @@ export default function TodosPage() {
                 autoFocus
               />
             </div>
-            <div className="col-span-2">
+            <div className="col-span-full">
               <label className="text-foreground text-sm block mb-1">Description</label>
               <textarea
                 value={newDesc}

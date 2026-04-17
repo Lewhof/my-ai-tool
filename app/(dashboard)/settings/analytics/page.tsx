@@ -304,7 +304,7 @@ export default function AnalyticsSettingsPage() {
                   ) : (
                     <div className="space-y-4">
                       {/* Visitor metrics */}
-                      <div className="grid grid-cols-4 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div>
                           <p className="text-muted-foreground text-xs mb-1">Visitors today</p>
                           <p className="text-foreground text-xl font-bold">{(s.visitors?.today ?? 0).toLocaleString()}</p>

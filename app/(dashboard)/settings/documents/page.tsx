@@ -119,7 +119,7 @@ export default function DocumentSettingsPage() {
         {/* Add folder form */}
         {showAdd && (
           <div className="px-5 py-4 border-b border-border space-y-3 bg-background/50">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-foreground text-xs block mb-1">Folder name</label>
                 <input

@@ -142,7 +142,7 @@ export default function AgentsPage() {
       {/* Create form */}
       {showCreate && (
         <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-foreground text-sm block mb-1">Agent Name</label>
               <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Morning Briefing" className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
