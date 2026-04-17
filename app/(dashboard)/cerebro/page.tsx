@@ -109,19 +109,18 @@ function AgentPageInner() {
     return () => clearInterval(poll);
   }, []);
 
-  // Handle inbound ?prompt= from Dashboard Cerebro widget — auto-send once
+  // Handle inbound ?prompt= from Dashboard Cerebro widget — auto-send once on mount
   useEffect(() => {
     if (initialPromptHandled.current) return;
     const promptParam = searchParams.get('prompt');
     if (promptParam && promptParam.trim()) {
       initialPromptHandled.current = true;
-      // Clean the URL so refresh doesn't re-send
-      router.replace('/cerebro');
-      // Auto-send the prompt
       sendMessage(promptParam);
+      // Defer URL cleanup so sendMessage's state updates commit first
+      setTimeout(() => router.replace('/cerebro'), 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });

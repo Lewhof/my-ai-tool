@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Bot, MessageSquare, FileText, Zap, CheckSquare,
   ChevronRight, TrendingUp, Cpu, Database,
@@ -189,6 +190,7 @@ const QUICK_ACTIONS = [
 ];
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [credits, setCredits] = useState<CreditsData | null>(null);
   const [cerebroInput, setCerebroInput] = useState('');
@@ -270,8 +272,7 @@ export default function DashboardPage() {
             e.preventDefault();
             if (isListening) stopListening();
             if (cerebroInput.trim()) {
-              // Navigate to Cerebro with the prompt
-              window.location.href = `/cerebro?prompt=${encodeURIComponent(cerebroInput)}`;
+              router.push(`/cerebro?prompt=${encodeURIComponent(cerebroInput)}`);
             }
           }} className="flex items-center gap-2">
             <div className="flex-1 relative">
