@@ -8,6 +8,7 @@ import GlobalSearch from '@/components/global-search';
 import MobileFAB from '@/components/mobile-fab';
 import PushPrompt from '@/components/push-prompt';
 import OfflineBanner from '@/components/offline-banner';
+import PWAInstallPrompt from '@/components/pwa-install-prompt';
 
 export default function DashboardLayout({
   children,
@@ -41,6 +42,9 @@ export default function DashboardLayout({
 
       {/* Push notification prompt */}
       <PushPrompt />
+
+      {/* PWA install prompt — shows when browser fires beforeinstallprompt */}
+      <PWAInstallPrompt />
 
       {/* Global search (Cmd+K) */}
       <GlobalSearch />
