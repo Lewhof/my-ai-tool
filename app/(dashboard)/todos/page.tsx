@@ -14,9 +14,18 @@ interface Todo {
   due_date: string | null;
   bucket: string;
   tags: string[];
+  recurrence: string | null;
   created_at: string;
   updated_at: string;
 }
+
+const RECURRENCE_OPTIONS = [
+  { value: '', label: 'One-time' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Biweekly' },
+  { value: 'monthly', label: 'Monthly' },
+];
 
 const STATUS_COLUMNS = [
   { key: 'todo', label: 'To Do', color: 'border-blue-500', bg: 'bg-blue-500/10', text: 'text-blue-400' },
@@ -404,8 +413,22 @@ export default function TodosPage() {
           <tr>
             <td colSpan={7} className="px-5 py-3 bg-background/50">
               {todo.description && (
-                <p className="text-foreground text-sm whitespace-pre-wrap">{todo.description}</p>
+                <p className="text-foreground text-sm whitespace-pre-wrap mb-3">{todo.description}</p>
               )}
+              <div className="flex items-center gap-2 mb-3">
+                <label className="text-muted-foreground text-xs">Repeat:</label>
+                <select
+                  value={todo.recurrence ?? ''}
+                  onChange={(e) => { e.stopPropagation(); updateTodo(todo.id, { recurrence: e.target.value || null }); }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="bg-transparent text-foreground text-xs border border-border rounded px-2 py-1 focus:outline-none"
+                >
+                  {RECURRENCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                {todo.recurrence && (
+                  <span className="text-[11px] text-muted-foreground">Next instance auto-creates on completion.</span>
+                )}
+              </div>
               <EntityLinks entityType="todo" entityId={todo.id} />
             </td>
           </tr>
@@ -643,10 +666,7 @@ export default function TodosPage() {
                 onChange={(e) => setNewRecurrence(e.target.value)}
                 className="w-full bg-secondary text-foreground border border-border rounded-lg px-4 py-2"
               >
-                <option value="">One-time</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
+                {RECURRENCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div className="flex items-end">
