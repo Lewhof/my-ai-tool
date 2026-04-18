@@ -8,16 +8,18 @@ Combined scoping from Architect Advisory + Master Agent research + session work.
 
 ---
 
-## Phase 1: Intelligence Layer (NEXT)
+## Phase 1: Intelligence Layer ✅ SHIPPED (as Cerebro)
+
+The Master Agent shipped in production as **Cerebro** (`/cerebro`). Core architecture refactored 2026-04-17 into director modules (research/operations/creative/wellness) — `lib/cerebro/directors/*`. Single Claude call preserved.
 
 | Feature | Priority | Status |
 |---------|----------|--------|
-| Master Agent page — single prompt, all tools | HIGH | Scoped |
-| Chat inline actions (Create task, Add to whiteboard, Save as note) | HIGH | Not started |
-| Dashboard AI Briefing widget (daily summary) | HIGH | Not started |
+| Master Agent page — single prompt, all tools | HIGH | ✅ Shipped (29 tools live) |
+| Chat inline actions (Create task, Add to whiteboard, Save as note) | HIGH | ✅ Shipped (in components/chat/message-list.tsx) |
+| Dashboard AI Briefing widget (daily summary) | HIGH | ⏳ Partial (state snapshot in Cerebro prompt; no standalone widget) |
 | Whiteboard AI auto-prioritization + staleness alerts | MEDIUM | Not started |
-| Slash commands in chat (/task, /note, /whiteboard) | MEDIUM | Not started |
-| Suggested prompts on empty chat | LOW | Not started |
+| Slash commands in chat (/task, /note, /whiteboard) | MEDIUM | ✅ Shipped (18 slash commands on /cerebro) |
+| Suggested prompts on empty chat | LOW | ✅ Shipped |
 
 ## Phase 2: Microsoft Email + Scheduling
 
