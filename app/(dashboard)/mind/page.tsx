@@ -8,6 +8,7 @@ import {
   Quote, Check, Search, CheckCircle2, BookMarked, Settings, Save, Tag,
   Copy, MessageSquareQuote, Pencil, Newspaper, ExternalLink, Clock, RefreshCw, Bookmark,
 } from 'lucide-react';
+import BookAudioPlayer from '@/components/book-audio-player';
 
 interface DailyContent {
   date: string;
@@ -800,7 +801,6 @@ function BookDetail({ book, onBack, onStatusChange, onDelete }: {
 }) {
   const summary = book.summary;
   const [savedIdx, setSavedIdx] = useState<Set<number>>(new Set());
-  const [isReading, setIsReading] = useState(false);
 
   const buildSummaryText = (): string => {
     if (!summary) return '';
@@ -825,27 +825,6 @@ function BookDetail({ book, onBack, onStatusChange, onDelete }: {
     parts.push(`TL;DR. ${summary.ultra_short}`);
     return parts.join('\n\n');
   };
-
-  const toggleReadAloud = () => {
-    if (isReading) {
-      window.speechSynthesis.cancel();
-      setIsReading(false);
-      return;
-    }
-    const text = buildSummaryText();
-    if (!text) return;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.95;
-    utterance.pitch = 1;
-    utterance.lang = 'en-ZA';
-    utterance.onend = () => setIsReading(false);
-    utterance.onerror = () => setIsReading(false);
-    window.speechSynthesis.speak(utterance);
-    setIsReading(true);
-  };
-
-  // Cleanup on unmount
-  useEffect(() => () => { window.speechSynthesis.cancel(); }, []);
 
   const saveKeyIdeaAsHighlight = async (idx: number, idea: { concept: string; quote: string }) => {
     const tag = idea.concept.toLowerCase().replace(/\s+/g, '-').slice(0, 40);
@@ -902,29 +881,7 @@ function BookDetail({ book, onBack, onStatusChange, onDelete }: {
                   {s === 'want-to-read' ? 'Want to Read' : s.charAt(0).toUpperCase() + s.slice(1)}
                 </button>
               ))}
-              {summary && (
-                <button
-                  onClick={toggleReadAloud}
-                  className={cn(
-                    'ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors',
-                    isReading
-                      ? 'border-primary/50 text-primary bg-primary/10'
-                      : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
-                  )}
-                >
-                  {isReading ? (
-                    <>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
-                      Stop
-                    </>
-                  ) : (
-                    <>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-                      Read aloud
-                    </>
-                  )}
-                </button>
-              )}
+              {summary && <BookAudioPlayer text={buildSummaryText()} storageKey={book.id} />}
               <button
                 onClick={() => onDelete(book.id)}
                 className={cn(summary ? '' : 'ml-auto', 'p-1.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors')}
