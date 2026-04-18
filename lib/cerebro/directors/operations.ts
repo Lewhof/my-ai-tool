@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { getMicrosoftToken } from '@/lib/microsoft-token';
+import { runEmailTriage } from '@/lib/email-triage';
 
 export const OPERATIONS_TOOLS = [
   'get_calendar',
@@ -365,7 +366,31 @@ export async function handle(
       }
 
       case 'triage_emails': {
-        return 'Email triage requires the AI triage endpoint. Go to the Email page and click "AI Triage" for a categorized view of your unread emails.';
+        const result = await runEmailTriage(userId);
+        switch (result.kind) {
+          case 'not_connected':
+            return 'No Microsoft account connected. Go to Settings > Connections.';
+          case 'no_unread':
+            return 'No unread emails to triage.';
+          case 'ai_failed':
+            return 'Triage failed: the AI response was not parseable. Try again in a moment.';
+          case 'ok': {
+            const byCategory: Record<'IMPORTANT' | 'CAN_WAIT' | 'FYI', typeof result.triaged> = {
+              IMPORTANT: [], CAN_WAIT: [], FYI: [],
+            };
+            for (const t of result.triaged) byCategory[t.category].push(t);
+
+            const fmt = (label: string, items: typeof result.triaged) =>
+              items.length
+                ? `\n\n**${label}** (${items.length})\n${items.map(e => `- [${e.accountLabel}] ${e.from} — ${e.subject}\n  ${e.summary}`).join('\n')}`
+                : '';
+
+            return `Email triage — ${result.summary}` +
+              fmt('🔴 Important', byCategory.IMPORTANT) +
+              fmt('🟡 Can wait', byCategory.CAN_WAIT) +
+              fmt('⚪ FYI', byCategory.FYI);
+          }
+        }
       }
 
       case 'get_credits': {
