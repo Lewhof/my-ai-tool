@@ -1,7 +1,7 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { supabaseAdmin } from '@/lib/supabase-server';
 
-export type TTSProvider = 'azure' | 'openai' | 'elevenlabs' | 'gemini' | 'none';
+export type TTSProvider = 'edge' | 'azure' | 'openai' | 'elevenlabs' | 'gemini' | 'none';
 
 export interface TTSResult {
   url: string;
@@ -14,9 +14,12 @@ function providerChain(): TTSProvider[] {
   const chain: TTSProvider[] = [];
   // ElevenLabs first — if configured, user picked it for premium quality
   if (process.env.ELEVENLABS_API_KEY) chain.push('elevenlabs');
-  // Azure second — 500k chars/month free, Audible-tier neural voices (incl. en-ZA)
+  // Azure second — 500k chars/month free, Audible-tier neural voices
   if (process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION) chain.push('azure');
-  // Gemini third — also free via existing key, preview quality
+  // Edge — same underlying voices as Azure, no API key needed (uses Edge browser's endpoint)
+  // Enabled by default; set DISABLE_EDGE_TTS=1 to opt out.
+  if (!process.env.DISABLE_EDGE_TTS) chain.push('edge');
+  // Gemini — also free via existing key, preview quality
   if (process.env.GEMINI_API_KEY) chain.push('gemini');
   // OpenAI last — paid, no free quota
   if (process.env.OPENAI_API_KEY) chain.push('openai');
@@ -49,7 +52,8 @@ export function listVoices(provider: TTSProvider): Array<{ id: string; label: st
       { id: 'AZnzlk1XvdvUeBnXmlld', label: 'Domi (female, confident)' },
     ];
   }
-  if (provider === 'azure') {
+  if (provider === 'azure' || provider === 'edge') {
+    // Same underlying voices; Edge hits the browser endpoint without an API key
     return [
       { id: 'en-US-AndrewNeural', label: 'Andrew (US, male, natural)' },
       { id: 'en-US-AvaNeural', label: 'Ava (US, female, expressive)' },
@@ -105,6 +109,116 @@ async function synthesizeElevenLabs(text: string, voiceId: string): Promise<Buff
   return Buffer.from(await res.arrayBuffer());
 }
 
+// ── Microsoft Edge TTS ──────────────────────────────────────────────
+// Uses the same WebSocket endpoint Edge browser's Read Aloud feature hits.
+// No API key; free forever; identical voices to Azure Neural.
+// Microsoft added Sec-MS-GEC header validation in 2024 — must compute it.
+const EDGE_TRUSTED_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
+
+function generateSecMsGec(): string {
+  // Convert current Unix time to Windows file time ticks (100ns intervals since 1601).
+  // Round down to the nearest 5-minute interval (3e9 ticks) to match Edge's behavior.
+  const unixSeconds = Math.floor(Date.now() / 1000);
+  const ticks = (unixSeconds + 11_644_473_600) * 10_000_000;
+  const rounded = Math.floor(ticks / 3_000_000_000) * 3_000_000_000;
+  return createHash('sha256').update(`${rounded}${EDGE_TRUSTED_TOKEN}`).digest('hex').toUpperCase();
+}
+
+function generateEdgeId(): string {
+  return randomBytes(16).toString('hex').toUpperCase();
+}
+
+async function synthesizeEdge(text: string, voice: string): Promise<Buffer> {
+  const { default: WebSocket } = await import('ws');
+  const connectionId = generateEdgeId();
+  const secMsGec = generateSecMsGec();
+  const url =
+    `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1` +
+    `?TrustedClientToken=${EDGE_TRUSTED_TOKEN}` +
+    `&Sec-MS-GEC=${secMsGec}` +
+    `&Sec-MS-GEC-Version=1-130.0.2849.68` +
+    `&ConnectionId=${connectionId}`;
+
+  return new Promise<Buffer>((resolve, reject) => {
+    const ws = new WebSocket(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ' +
+          'Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0',
+        Origin: 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
+      },
+    });
+
+    const chunks: Buffer[] = [];
+    const timer = setTimeout(() => {
+      try { ws.close(); } catch { /* ignore */ }
+      reject(new Error('Edge TTS timeout'));
+    }, 60_000);
+
+    ws.on('open', () => {
+      const now = new Date().toISOString().slice(0, -1) + 'Z';
+      const config = {
+        context: {
+          synthesis: {
+            audio: {
+              metadataoptions: {
+                sentenceBoundaryEnabled: 'false',
+                wordBoundaryEnabled: 'false',
+              },
+              outputFormat: 'audio-24khz-48kbitrate-mono-mp3',
+            },
+          },
+        },
+      };
+      ws.send(
+        `X-Timestamp:${now}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n${JSON.stringify(config)}`
+      );
+
+      const escape = (s: string) =>
+        s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const lang = voice.slice(0, 5);
+      const ssml =
+        `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'>` +
+        `<voice name='${voice}'>${escape(text)}</voice></speak>`;
+      const requestId = generateEdgeId();
+      ws.send(
+        `X-RequestId:${requestId}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${now}\r\nPath:ssml\r\n\r\n${ssml}`
+      );
+    });
+
+    ws.on('message', (data: Buffer, isBinary: boolean) => {
+      if (isBinary) {
+        // Binary frame: first 2 bytes = uint16 BE header length, then header, then audio
+        if (data.length < 2) return;
+        const headerLen = data.readUInt16BE(0);
+        if (data.length > 2 + headerLen) {
+          chunks.push(data.subarray(2 + headerLen));
+        }
+      } else {
+        const msg = data.toString('utf-8');
+        if (msg.includes('Path:turn.end')) {
+          clearTimeout(timer);
+          try { ws.close(); } catch { /* ignore */ }
+          if (chunks.length === 0) return reject(new Error('Edge TTS returned no audio'));
+          resolve(Buffer.concat(chunks));
+        }
+      }
+    });
+
+    ws.on('error', (err: Error) => {
+      clearTimeout(timer);
+      reject(new Error(`Edge TTS: ${err.message}`));
+    });
+
+    ws.on('close', (code: number) => {
+      clearTimeout(timer);
+      if (chunks.length === 0 && code !== 1000) {
+        reject(new Error(`Edge TTS closed unexpectedly (code ${code})`));
+      }
+    });
+  });
+}
+
 async function synthesizeAzure(text: string, voice: string): Promise<Buffer> {
   const key = process.env.AZURE_SPEECH_KEY!;
   const region = process.env.AZURE_SPEECH_REGION!;
@@ -148,6 +262,7 @@ async function synthesizeGemini(text: string, _voice: string): Promise<Buffer> {
 }
 
 async function synthesize(provider: TTSProvider, text: string, voice: string): Promise<Buffer> {
+  if (provider === 'edge') return synthesizeEdge(text, voice);
   if (provider === 'azure') return synthesizeAzure(text, voice);
   if (provider === 'openai') return synthesizeOpenAI(text, voice);
   if (provider === 'elevenlabs') return synthesizeElevenLabs(text, voice);
