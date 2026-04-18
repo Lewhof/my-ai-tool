@@ -51,14 +51,16 @@ export function listVoices(provider: TTSProvider): Array<{ id: string; label: st
   }
   if (provider === 'azure') {
     return [
-      { id: 'en-ZA-LeahNeural', label: 'Leah (South African, female)' },
-      { id: 'en-ZA-LukeNeural', label: 'Luke (South African, male)' },
+      { id: 'en-US-AndrewNeural', label: 'Andrew (US, male, natural)' },
+      { id: 'en-US-AvaNeural', label: 'Ava (US, female, expressive)' },
+      { id: 'en-US-BrianNeural', label: 'Brian (US, male, warm)' },
+      { id: 'en-US-EmmaNeural', label: 'Emma (US, female, clear)' },
+      { id: 'en-US-JennyNeural', label: 'Jenny (US, female, warm)' },
+      { id: 'en-US-GuyNeural', label: 'Guy (US, male, neutral)' },
       { id: 'en-GB-RyanNeural', label: 'Ryan (British, male)' },
       { id: 'en-GB-SoniaNeural', label: 'Sonia (British, female)' },
-      { id: 'en-US-JennyNeural', label: 'Jenny (US, female, warm)' },
-      { id: 'en-US-GuyNeural', label: 'Guy (US, male)' },
-      { id: 'en-US-AriaNeural', label: 'Aria (US, female, expressive)' },
-      { id: 'en-US-DavisNeural', label: 'Davis (US, male, calm)' },
+      { id: 'en-GB-LibbyNeural', label: 'Libby (British, female, soft)' },
+      { id: 'en-GB-ThomasNeural', label: 'Thomas (British, male)' },
     ];
   }
   if (provider === 'gemini') {
