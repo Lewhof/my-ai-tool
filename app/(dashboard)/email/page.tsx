@@ -5,7 +5,7 @@ import { cn, formatRelativeDate } from '@/lib/utils';
 import {
   Mail, Inbox, Send, FileText, Archive, Sparkles, Loader2,
   Paperclip, AlertTriangle, Clock, Info, ExternalLink, ChevronDown,
-  PenLine, Copy, X as XIcon,
+  PenLine, Copy, X as XIcon, CheckSquare, Layout,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -74,6 +74,7 @@ export default function EmailPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draftReply, setDraftReply] = useState<{ subject: string; body: string; to: string; toName: string } | null>(null);
   const [drafting, setDrafting] = useState(false);
+  const [converting, setConverting] = useState<'task' | 'whiteboard' | null>(null);
   const [emailDetail, setEmailDetail] = useState<EmailDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [triaging, setTriaging] = useState(false);
@@ -425,8 +426,8 @@ export default function EmailPage() {
               {activeAccount && (
                 <p className="text-muted-foreground/40 text-[10px] mt-0.5">to: {activeAccount.alias || activeAccount.label} ({activeAccount.email})</p>
               )}
-              {/* Draft Reply button */}
-              <div className="flex items-center gap-2 mt-2">
+              {/* Action buttons */}
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <button
                   onClick={async () => {
                     setDrafting(true);
@@ -451,6 +452,56 @@ export default function EmailPage() {
                 >
                   {drafting ? <Loader2 size={12} className="animate-spin" /> : <PenLine size={12} />}
                   Draft Reply
+                </button>
+                <button
+                  onClick={async () => {
+                    if (converting) return;
+                    setConverting('task');
+                    try {
+                      const res = await fetch(`/api/email/${selectedId}/convert`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ target: 'task' }),
+                      });
+                      if (res.ok) {
+                        const data = await res.json();
+                        toast.success(`Task created: "${data.title}"`);
+                      } else {
+                        toast.error('Could not create task');
+                      }
+                    } catch { toast.error('Task failed'); }
+                    setConverting(null);
+                  }}
+                  disabled={!!converting}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                >
+                  {converting === 'task' ? <Loader2 size={12} className="animate-spin" /> : <CheckSquare size={12} />}
+                  Add to Tasks
+                </button>
+                <button
+                  onClick={async () => {
+                    if (converting) return;
+                    setConverting('whiteboard');
+                    try {
+                      const res = await fetch(`/api/email/${selectedId}/convert`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ target: 'whiteboard' }),
+                      });
+                      if (res.ok) {
+                        const data = await res.json();
+                        toast.success(`Whiteboard item added: "${data.title}"`);
+                      } else {
+                        toast.error('Could not add to whiteboard');
+                      }
+                    } catch { toast.error('Whiteboard failed'); }
+                    setConverting(null);
+                  }}
+                  disabled={!!converting}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-purple-500/10 text-purple-400 border border-purple-500/30 hover:bg-purple-500/20 transition-colors disabled:opacity-50"
+                >
+                  {converting === 'whiteboard' ? <Loader2 size={12} className="animate-spin" /> : <Layout size={12} />}
+                  Add to Whiteboard
                 </button>
               </div>
             </div>
