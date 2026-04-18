@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Activity, Heart, Moon, Zap, Footprints, Dumbbell, Plus, TrendingUp, Sparkles, Trash2, Timer, Flame, Target, Calendar } from 'lucide-react';
+import { Activity, Heart, Moon, Zap, Footprints, Dumbbell, Plus, TrendingUp, Sparkles, Trash2, Timer, Flame, Target, Calendar, Beef } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import NutritionTab from '@/components/wellness/nutrition-tab';
 
 type TrendPoint = { date: string; value: number };
 type TodayEntry = { value: number | null; unit: string | null; date: string; source: string };
@@ -78,7 +79,7 @@ function generateDemoData() {
   return metrics;
 }
 
-type WellnessTab = 'biometrics' | 'training';
+type WellnessTab = 'biometrics' | 'training' | 'nutrition';
 
 // ═══════════════════════════════════════════════
 // TRAINING TAB (Placeholder)
@@ -448,6 +449,7 @@ export default function WellnessPage() {
         {([
           { id: 'biometrics' as const, label: 'Biometrics', icon: Heart },
           { id: 'training' as const, label: 'Training', icon: Dumbbell },
+          { id: 'nutrition' as const, label: 'Nutrition', icon: Beef },
         ]).map(t => {
           const Icon = t.icon;
           return (
@@ -469,6 +471,8 @@ export default function WellnessPage() {
       </div>
 
       {tab === 'training' && <TrainingTab />}
+
+      {tab === 'nutrition' && <NutritionTab />}
 
       {tab === 'biometrics' && <>
       {/* Manual add form */}
