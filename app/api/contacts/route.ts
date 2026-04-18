@@ -48,7 +48,7 @@ export async function PATCH(req: Request) {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
-  const { id, name, company, tags, notes } = await req.json();
+  const { id, name, company, tags, notes, bump_interaction } = await req.json();
   if (!id) return Response.json({ error: 'id required' }, { status: 400 });
 
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -56,6 +56,7 @@ export async function PATCH(req: Request) {
   if (company !== undefined) updates.company = company;
   if (tags !== undefined) updates.tags = tags;
   if (notes !== undefined) updates.notes = notes;
+  if (bump_interaction) updates.last_interaction = new Date().toISOString();
 
   await supabaseAdmin.from('contacts').update(updates).eq('id', id).eq('user_id', userId);
   return Response.json({ ok: true });
