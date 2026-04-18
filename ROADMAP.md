@@ -8,17 +8,18 @@ Combined scoping from Architect Advisory + Master Agent research + session work.
 
 ---
 
-## Phase 1: Intelligence Layer ✅ SHIPPED (as Cerebro)
+## Phase 1: Intelligence Layer ✅ 100% SHIPPED
 
-The Master Agent shipped in production as **Cerebro** (`/cerebro`). Core architecture refactored 2026-04-17 into director modules (research/operations/creative/wellness) — `lib/cerebro/directors/*`. Single Claude call preserved.
+All items live in production. Audited 2026-04-18.
 
 | Feature | Priority | Status |
 |---------|----------|--------|
-| Master Agent page — single prompt, all tools | HIGH | ✅ Shipped (29 tools live) |
-| Chat inline actions (Create task, Add to whiteboard, Save as note) | HIGH | ✅ Shipped (in components/chat/message-list.tsx) |
-| Dashboard AI Briefing widget (daily summary) | HIGH | ⏳ Partial (state snapshot in Cerebro prompt; no standalone widget) |
-| Whiteboard AI auto-prioritization + staleness alerts | MEDIUM | Not started |
-| Slash commands in chat (/task, /note, /whiteboard) | MEDIUM | ✅ Shipped (18 slash commands on /cerebro) |
+| Master Agent page — single prompt, all tools | HIGH | ✅ Shipped as Cerebro (29 tools, director architecture in `lib/cerebro/directors/*`) |
+| Chat inline actions (Create task, Add to whiteboard, Save as note) | HIGH | ✅ Shipped (`components/chat/message-list.tsx`) |
+| Dashboard AI Briefing widget (daily summary) | HIGH | ✅ Shipped (`components/dashboard/briefing-widget.tsx` + `lib/briefing.ts`; cron every 5 min, push + Telegram delivery) |
+| Whiteboard AI auto-prioritization | MEDIUM | ✅ Shipped (`api/whiteboard/prioritize`) |
+| Staleness alerts | MEDIUM | ✅ Shipped (stale_whiteboard nudge, 14-day rule, cron-generated, NudgesWidget) |
+| Slash commands in chat (/task, /note, /whiteboard) | MEDIUM | ✅ Shipped (18 commands on /cerebro) |
 | Suggested prompts on empty chat | LOW | ✅ Shipped |
 
 ## Phase 2: Microsoft Email + Scheduling
