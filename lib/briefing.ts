@@ -4,12 +4,13 @@ import { getMicrosoftToken } from '@/lib/microsoft-token';
 
 // Static system prompt — cached via prompt caching (5-min TTL, 10% read cost).
 // Hit daily by briefing cron + manual refreshes → break-even on cache after 1 hit.
-const BRIEFING_SYSTEM_PROMPT = `You are a personal AI chief of staff. Generate a sharp morning briefing (max 200 words, markdown). Structure:
+const BRIEFING_SYSTEM_PROMPT = `You are a personal AI chief of staff. Generate a sharp morning briefing (max 250 words, markdown). Structure:
 1. One-line weather + date summary
 2. Calendar overview (highlight conflicts or back-to-back meetings)
 3. Priority tasks — flag overdue items with warning
-4. One actionable AI insight (connect dots between calendar, tasks, and deadlines)
-5. Top 3 focus areas for the day
+4. Top unread emails — if top unread emails are provided, include a "## 📧 Top unread" section with a one-line actionable gist per email (sender — what they want, in 10 words or less). Skip this section if none.
+5. One actionable AI insight (connect dots between calendar, tasks, emails, and deadlines)
+6. Top 3 focus areas for the day
 
 Be direct, concise, and actionable. No fluff.`;
 
@@ -23,6 +24,7 @@ export interface BriefingData {
   staleItems: Array<{ title: string }>;
   unreadEmails: number;
   unreadByAccount: Array<{ label: string; email: string; count: number }>;
+  topUnreadEmails: Array<{ label: string; from: string; subject: string; preview: string; date: string }>;
   notepadContext: string;
 }
 
@@ -104,6 +106,7 @@ export async function gatherBriefingData(userId: string): Promise<BriefingData> 
     staleItems,
     unreadEmails: emailData.total,
     unreadByAccount: emailData.breakdown,
+    topUnreadEmails: emailData.top,
     notepadContext: notepadRes.data?.content?.slice(0, 500) || '',
   };
 }
@@ -123,11 +126,15 @@ export async function generateBriefing(userId: string, data: BriefingData): Prom
     ? data.unreadByAccount.map(a => `  ${a.label} (${a.email}): ${a.count}`).join('\n')
     : `  Total: ${data.unreadEmails}`;
 
+  const topEmailsBlock = data.topUnreadEmails.length > 0
+    ? `\nTop unread emails (most recent):\n${data.topUnreadEmails.map(e => `  - [${e.label}] From ${e.from}: "${e.subject}" — ${e.preview}`).join('\n')}`
+    : '';
+
   const context = `
 Today: ${dateStr}
 Weather: ${data.weather || 'Unknown'}
 Unread emails (${data.unreadEmails} total across all accounts):
-${emailBreakdown}
+${emailBreakdown}${topEmailsBlock}
 
 Calendar (${data.calendarEvents.length} events today):
 ${data.calendarEvents.length > 0
@@ -351,34 +358,65 @@ async function fetchAllCalendarEvents(userId: string): Promise<Array<{ subject: 
 /**
  * Fetch unread email counts from ALL connected Microsoft accounts.
  */
-async function fetchAllUnreadEmailCounts(userId: string): Promise<{ total: number; breakdown: Array<{ label: string; email: string; count: number }> }> {
+async function fetchAllUnreadEmailCounts(userId: string): Promise<{
+  total: number;
+  breakdown: Array<{ label: string; email: string; count: number }>;
+  top: Array<{ label: string; from: string; subject: string; preview: string; date: string }>;
+}> {
   try {
     const accounts = await getAllMicrosoftAccounts(userId);
-    if (accounts.length === 0) return { total: 0, breakdown: [] };
+    if (accounts.length === 0) return { total: 0, breakdown: [], top: [] };
 
-    const counts = await Promise.all(
-      accounts.map(async (account) => {
+    type PerAccount = {
+      label: string;
+      email: string;
+      count: number;
+      emails: Array<{ label: string; from: string; subject: string; preview: string; date: string }>;
+    };
+
+    const results = await Promise.all(
+      accounts.map(async (account): Promise<PerAccount> => {
+        const label = account.alias || account.label || 'Email';
+        const empty: PerAccount = { label, email: account.email, count: 0, emails: [] };
         try {
           const token = await getMicrosoftToken(userId, account.id);
-          if (!token) return { label: account.alias || account.label || 'Email', email: account.email, count: 0 };
+          if (!token) return empty;
 
           const res = await fetch(
-            'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$filter=isRead eq false&$count=true&$top=1',
-            { headers: { Authorization: `Bearer ${token}`, Prefer: 'odata.maxpagesize=1' } }
+            'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$filter=isRead eq false&$count=true&$top=5&$orderby=receivedDateTime desc&$select=subject,from,bodyPreview,receivedDateTime',
+            { headers: { Authorization: `Bearer ${token}`, Prefer: 'odata.maxpagesize=5' } }
           );
-          if (!res.ok) return { label: account.alias || account.label || 'Email', email: account.email, count: 0 };
+          if (!res.ok) return empty;
           const data = await res.json();
           const count = data['@odata.count'] ?? data.value?.length ?? 0;
-          return { label: account.alias || account.label || 'Email', email: account.email, count };
+          type GraphEmail = {
+            subject?: string;
+            bodyPreview?: string;
+            receivedDateTime?: string;
+            from?: { emailAddress?: { name?: string; address?: string } };
+          };
+          const emails = ((data.value ?? []) as GraphEmail[]).map((e) => ({
+            label,
+            from: e.from?.emailAddress?.name || e.from?.emailAddress?.address || 'unknown',
+            subject: (e.subject ?? '(no subject)').slice(0, 120),
+            preview: (e.bodyPreview ?? '').slice(0, 160),
+            date: e.receivedDateTime ?? '',
+          }));
+          return { label, email: account.email, count, emails };
         } catch {
-          return { label: account.alias || account.label || 'Email', email: account.email, count: 0 };
+          return empty;
         }
       })
     );
 
-    const total = counts.reduce((sum, c) => sum + c.count, 0);
-    return { total, breakdown: counts };
+    const total = results.reduce((sum, r) => sum + r.count, 0);
+    const breakdown = results.map(r => ({ label: r.label, email: r.email, count: r.count }));
+    const top = results.flatMap(r => r.emails)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 3);
+
+    return { total, breakdown, top };
   } catch {
-    return { total: 0, breakdown: [] };
+    return { total: 0, breakdown: [], top: [] };
   }
 }
