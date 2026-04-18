@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { supabaseAdmin } from '@/lib/supabase-server';
 
-export type TTSProvider = 'openai' | 'elevenlabs' | 'gemini' | 'none';
+export type TTSProvider = 'azure' | 'openai' | 'elevenlabs' | 'gemini' | 'none';
 
 export interface TTSResult {
   url: string;
@@ -14,7 +14,9 @@ function providerChain(): TTSProvider[] {
   const chain: TTSProvider[] = [];
   // ElevenLabs first — if configured, user picked it for premium quality
   if (process.env.ELEVENLABS_API_KEY) chain.push('elevenlabs');
-  // Gemini second — has a free tier, so prefer over paid providers
+  // Azure second — 500k chars/month free, Audible-tier neural voices (incl. en-ZA)
+  if (process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION) chain.push('azure');
+  // Gemini third — also free via existing key, preview quality
   if (process.env.GEMINI_API_KEY) chain.push('gemini');
   // OpenAI last — paid, no free quota
   if (process.env.OPENAI_API_KEY) chain.push('openai');
@@ -45,6 +47,18 @@ export function listVoices(provider: TTSProvider): Array<{ id: string; label: st
       { id: '21m00Tcm4TlvDq8ikWAM', label: 'Rachel (female, narrator)' },
       { id: 'TxGEqnHWrfWFTfGW9XjX', label: 'Josh (male, warm)' },
       { id: 'AZnzlk1XvdvUeBnXmlld', label: 'Domi (female, confident)' },
+    ];
+  }
+  if (provider === 'azure') {
+    return [
+      { id: 'en-ZA-LeahNeural', label: 'Leah (South African, female)' },
+      { id: 'en-ZA-LukeNeural', label: 'Luke (South African, male)' },
+      { id: 'en-GB-RyanNeural', label: 'Ryan (British, male)' },
+      { id: 'en-GB-SoniaNeural', label: 'Sonia (British, female)' },
+      { id: 'en-US-JennyNeural', label: 'Jenny (US, female, warm)' },
+      { id: 'en-US-GuyNeural', label: 'Guy (US, male)' },
+      { id: 'en-US-AriaNeural', label: 'Aria (US, female, expressive)' },
+      { id: 'en-US-DavisNeural', label: 'Davis (US, male, calm)' },
     ];
   }
   if (provider === 'gemini') {
@@ -89,6 +103,28 @@ async function synthesizeElevenLabs(text: string, voiceId: string): Promise<Buff
   return Buffer.from(await res.arrayBuffer());
 }
 
+async function synthesizeAzure(text: string, voice: string): Promise<Buffer> {
+  const key = process.env.AZURE_SPEECH_KEY!;
+  const region = process.env.AZURE_SPEECH_REGION!;
+  // SSML wrapper — allows prosody tweaks later
+  const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+  const lang = voice.slice(0, 5); // e.g. "en-ZA"
+  const ssml = `<speak version='1.0' xml:lang='${lang}'><voice name='${voice}'>${escape(text)}</voice></speak>`;
+
+  const res = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+    method: 'POST',
+    headers: {
+      'Ocp-Apim-Subscription-Key': key,
+      'Content-Type': 'application/ssml+xml',
+      'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
+      'User-Agent': 'lewhof-ai-tts',
+    },
+    body: ssml,
+  });
+  if (!res.ok) throw new Error(`Azure TTS failed: ${res.status} ${await res.text().catch(() => '')}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
 async function synthesizeGemini(text: string, _voice: string): Promise<Buffer> {
   const apiKey = process.env.GEMINI_API_KEY;
   const res = await fetch(
@@ -110,6 +146,7 @@ async function synthesizeGemini(text: string, _voice: string): Promise<Buffer> {
 }
 
 async function synthesize(provider: TTSProvider, text: string, voice: string): Promise<Buffer> {
+  if (provider === 'azure') return synthesizeAzure(text, voice);
   if (provider === 'openai') return synthesizeOpenAI(text, voice);
   if (provider === 'elevenlabs') return synthesizeElevenLabs(text, voice);
   if (provider === 'gemini') return synthesizeGemini(text, voice);
@@ -123,7 +160,7 @@ export async function generateTTS(
 ): Promise<TTSResult> {
   const chain = providerChain();
   if (chain.length === 0) {
-    throw new Error('No TTS provider configured. Set GEMINI_API_KEY, ELEVENLABS_API_KEY, or OPENAI_API_KEY.');
+    throw new Error('No TTS provider configured. Set AZURE_SPEECH_KEY+AZURE_SPEECH_REGION, GEMINI_API_KEY, ELEVENLABS_API_KEY, or OPENAI_API_KEY.');
   }
 
   const primary = chain[0];

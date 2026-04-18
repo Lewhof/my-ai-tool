@@ -85,8 +85,14 @@ export default function CalendarWidget() {
     );
   }
 
-  // Group events by date
-  const grouped = events.reduce<Record<string, CalendarEvent[]>>((acc, event) => {
+  // Cap the widget to the next 8 events so it stays glanceable — the full
+  // list is one click away on /calendar.
+  const MAX = 8;
+  const visibleEvents = events.slice(0, MAX);
+  const remaining = Math.max(0, events.length - MAX);
+
+  // Group visible events by date
+  const grouped = visibleEvents.reduce<Record<string, CalendarEvent[]>>((acc, event) => {
     const dateLabel = formatEventDate(event.start);
     if (!acc[dateLabel]) acc[dateLabel] = [];
     acc[dateLabel].push(event);
@@ -116,35 +122,45 @@ export default function CalendarWidget() {
             <p className="text-muted-foreground text-sm">No upcoming events</p>
           </div>
         ) : (
-          Object.entries(grouped).map(([dateLabel, dayEvents]) => (
-            <div key={dateLabel}>
-              <div className="px-5 py-1.5 bg-background/50">
-                <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">{dateLabel}</p>
-              </div>
-              {dayEvents.map((event) => (
-                <div key={event.id} className="px-5 py-2.5 border-b border-border hover:bg-secondary/30 transition-colors">
-                  <div className="flex items-start gap-2.5">
-                    <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${statusColor(event.showAs)}`} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-foreground text-sm font-medium truncate">{event.subject}</p>
-                      <div className="flex items-center gap-3 mt-0.5">
-                        <span className="text-muted-foreground text-xs flex items-center gap-1">
-                          <Clock size={10} />
-                          {formatEventTime(event.start, event.end, event.isAllDay)}
-                        </span>
-                        {event.location && (
-                          <span className="text-muted-foreground text-xs flex items-center gap-1 truncate">
-                            <MapPin size={10} />
-                            {event.location}
+          <>
+            {Object.entries(grouped).map(([dateLabel, dayEvents]) => (
+              <div key={dateLabel}>
+                <div className="px-5 py-1.5 bg-background/50">
+                  <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">{dateLabel}</p>
+                </div>
+                {dayEvents.map((event) => (
+                  <div key={event.id} className="px-5 py-2.5 border-b border-border hover:bg-secondary/30 transition-colors">
+                    <div className="flex items-start gap-2.5">
+                      <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${statusColor(event.showAs)}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-foreground text-sm font-medium truncate">{event.subject}</p>
+                        <div className="flex items-center gap-3 mt-0.5">
+                          <span className="text-muted-foreground text-xs flex items-center gap-1">
+                            <Clock size={10} />
+                            {formatEventTime(event.start, event.end, event.isAllDay)}
                           </span>
-                        )}
+                          {event.location && (
+                            <span className="text-muted-foreground text-xs flex items-center gap-1 truncate">
+                              <MapPin size={10} />
+                              {event.location}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ))
+                ))}
+              </div>
+            ))}
+            {remaining > 0 && (
+              <a
+                href="/calendar"
+                className="block px-5 py-2.5 text-center text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors text-xs font-medium"
+              >
+                +{remaining} more {remaining === 1 ? 'event' : 'events'} in /calendar →
+              </a>
+            )}
+          </>
         )}
       </div>
     </div>
