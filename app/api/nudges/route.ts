@@ -17,7 +17,10 @@ export async function GET() {
     .order('created_at', { ascending: false })
     .limit(10);
 
-  return Response.json({ nudges: data ?? [] });
+  return Response.json(
+    { nudges: data ?? [] },
+    { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' } }
+  );
 }
 
 // PATCH: Dismiss or snooze a nudge

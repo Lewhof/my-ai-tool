@@ -34,7 +34,7 @@ export async function GET() {
           calendarEvents: data.calendarEvents.length,
           unreadEmails: data.unreadEmails,
         },
-      });
+      }, { headers: { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=600' } });
     }
   } catch { /* no cache, generate fresh */ }
 
@@ -45,5 +45,5 @@ export async function GET() {
   return Response.json({
     briefing: result.briefing,
     stats: result.stats,
-  });
+  }, { headers: { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=600' } });
 }

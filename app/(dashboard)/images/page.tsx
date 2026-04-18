@@ -348,7 +348,7 @@ export default function ImageLabPage() {
                 {/* Image */}
                 {result.image ? (
                   <div className="relative">
-                    <img src={result.image} alt={prompt} className="w-full max-h-[600px] object-contain bg-background" />
+                    <img src={result.image} alt={prompt} loading="lazy" decoding="async" className="w-full max-h-[600px] object-contain bg-background" />
                     <div className="absolute top-3 right-3 flex gap-1">
                       <button
                         onClick={() => downloadImage(result.image, prompt.slice(0, 30) || 'image')}
@@ -403,6 +403,8 @@ export default function ImageLabPage() {
                         <img
                           src={item.url}
                           alt={item.prompt}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-32 object-cover cursor-pointer"
                           onClick={() => setResult({ image: item.url!, provider: item.provider || 'unknown', attempts: [] })}
                         />

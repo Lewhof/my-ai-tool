@@ -299,5 +299,7 @@ export async function GET() {
     results.anthropicBalance = { configured: false, error: String(e) };
   }
 
-  return Response.json(results);
+  return Response.json(results, {
+    headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=300' },
+  });
 }

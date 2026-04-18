@@ -9,6 +9,7 @@ import MobileFAB from '@/components/mobile-fab';
 import PushPrompt from '@/components/push-prompt';
 import OfflineBanner from '@/components/offline-banner';
 import PWAInstallPrompt from '@/components/pwa-install-prompt';
+import SWRProvider from '@/components/swr-provider';
 
 export default function DashboardLayout({
   children,
@@ -16,6 +17,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
+    <SWRProvider>
     <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Desktop sidebar — hidden on mobile */}
       <Sidebar />
@@ -49,5 +51,6 @@ export default function DashboardLayout({
       {/* Global search (Cmd+K) */}
       <GlobalSearch />
     </div>
+    </SWRProvider>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import Link from 'next/link';
 import { Brain, Flame, Loader2, ChevronRight } from 'lucide-react';
 
@@ -11,16 +11,7 @@ interface DailyContent {
 }
 
 export default function MindWidget() {
-  const [daily, setDaily] = useState<DailyContent | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch('/api/practice/daily')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setDaily(d); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: daily, isLoading: loading } = useSWR<DailyContent>('/api/practice/daily');
 
   if (loading) {
     return (

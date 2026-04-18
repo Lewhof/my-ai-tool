@@ -104,10 +104,24 @@ function AgentPageInner() {
 
   useEffect(() => {
     loadHistory();
-    // Poll for new messages every 10 seconds (catches executor plans)
-    const poll = setInterval(loadHistory, 10000);
-    return () => clearInterval(poll);
-  }, []);
+    // Only poll when tab is visible AND an assistant reply is in flight
+    // (catches executor plan insertions). Idle/backgrounded tabs stop polling.
+    let poll: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      if (poll) return;
+      poll = setInterval(() => {
+        if (document.visibilityState === 'visible' && loading) loadHistory();
+      }, 10000);
+    };
+    const stop = () => {
+      if (poll) { clearInterval(poll); poll = null; }
+    };
+    start();
+    const onVis = () => { document.visibilityState === 'visible' ? start() : stop(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { stop(); document.removeEventListener('visibilitychange', onVis); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   // Handle inbound ?prompt= from Dashboard Cerebro widget — auto-send once on mount
   useEffect(() => {

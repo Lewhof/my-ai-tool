@@ -32,13 +32,15 @@ export async function GET(req: Request) {
     .eq('user_id', userId)
     .lt('called_at', cutoff);
 
+  // Cap at 1000 rows (was 5000). Heavy users fall back to the most recent
+  // window; summary is still accurate for p50/p95 and success-rate trends.
   const { data, error } = await supabaseAdmin
     .from('cerebro_tool_metrics')
     .select('tool_name, duration_ms, success, error_message')
     .eq('user_id', userId)
     .gte('called_at', since)
     .order('called_at', { ascending: false })
-    .limit(5000);
+    .limit(1000);
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
 
@@ -77,10 +79,13 @@ export async function GET(req: Request) {
   const totalCalls = rows.length;
   const totalSuccesses = rows.filter((r) => r.success).length;
 
-  return Response.json({
-    window_days: days,
-    total_calls: totalCalls,
-    overall_success_rate: totalCalls > 0 ? totalSuccesses / totalCalls : 1,
-    tools,
-  });
+  return Response.json(
+    {
+      window_days: days,
+      total_calls: totalCalls,
+      overall_success_rate: totalCalls > 0 ? totalSuccesses / totalCalls : 1,
+      tools,
+    },
+    { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' } }
+  );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Sparkles, RefreshCw, AlertTriangle, CheckSquare, ClipboardList, Loader2, Calendar } from 'lucide-react';
@@ -19,26 +19,9 @@ interface BriefingData {
 }
 
 export default function BriefingWidget() {
-  const [data, setData] = useState<BriefingData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchBriefing = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/dashboard/briefing');
-      if (!res.ok) throw new Error('Failed to load');
-      const d = await res.json();
-      setData(d);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchBriefing(); }, []);
+  const { data, isLoading, error, mutate } = useSWR<BriefingData>('/api/dashboard/briefing');
+  const loading = isLoading;
+  const fetchBriefing = () => mutate();
 
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden h-full flex flex-col">
@@ -59,7 +42,7 @@ export default function BriefingWidget() {
             <p className="text-muted-foreground text-sm">Generating briefing...</p>
           </div>
         ) : error ? (
-          <p className="text-red-400 text-sm p-5">{error}</p>
+          <p className="text-red-400 text-sm p-5">{error instanceof Error ? error.message : 'Error loading briefing'}</p>
         ) : data ? (
           <>
             {/* Quick stats */}

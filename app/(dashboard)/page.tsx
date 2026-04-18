@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import useSWR from 'swr';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -191,8 +192,10 @@ const QUICK_ACTIONS = [
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [credits, setCredits] = useState<CreditsData | null>(null);
+  const { data: dashData } = useSWR<DashboardData>('/api/dashboard');
+  const { data: creditsData } = useSWR<CreditsData>('/api/dashboard/credits');
+  const data = dashData ?? null;
+  const credits = creditsData ?? null;
   const [cerebroInput, setCerebroInput] = useState('');
 
   const { isSupported: speechSupported, isListening, transcript, startListening, stopListening, resetTranscript } =
@@ -221,11 +224,6 @@ export default function DashboardPage() {
       toast('Listening...', { description: 'Speak now \u2014 tap mic again to stop' });
     }
   };
-
-  useEffect(() => {
-    fetch('/api/dashboard').then(r => r.json()).then(setData);
-    fetch('/api/dashboard/credits').then(r => r.json()).then(setCredits);
-  }, []);
 
   return (
     <div className="p-4 lg:p-6 space-y-4 animate-fade-up">

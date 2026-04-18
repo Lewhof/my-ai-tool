@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import useSWR from 'swr';
 import { cn } from '@/lib/utils';
 import {
   Bell, AlertTriangle, Clock, Layout, Users, Flame,
@@ -27,24 +28,20 @@ const TYPE_CONFIG: Record<string, { icon: typeof Bell; color: string; bg: string
 };
 
 export default function NudgesWidget() {
-  const [nudges, setNudges] = useState<Nudge[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch('/api/nudges')
-      .then(r => r.json())
-      .then(d => setNudges(d.nudges ?? []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const { data, isLoading, mutate } = useSWR<{ nudges: Nudge[] }>('/api/nudges');
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const nudges = (data?.nudges ?? []).filter(n => !dismissedIds.has(n.id));
+  const loading = isLoading;
 
   const handleAction = async (id: string, action: 'dismiss' | 'snooze') => {
+    // Optimistic — hide immediately, revalidate cache in background
+    setDismissedIds(prev => new Set(prev).add(id));
     await fetch('/api/nudges', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, action }),
     });
-    setNudges(prev => prev.filter(n => n.id !== id));
+    mutate();
   };
 
   if (loading) {
