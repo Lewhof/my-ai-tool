@@ -100,8 +100,7 @@ export default function BookAudioPlayer({ text }: Props) {
         body: JSON.stringify({ text, voice }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'TTS failed' }));
-        toast.error(err.error || 'TTS failed — falling back to browser voice');
+        toast('Using browser voice', { description: 'Neural TTS unavailable — check your API quota in Settings.', duration: 3000 });
         setState('idle');
         playFallback();
         return;

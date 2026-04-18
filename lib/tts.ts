@@ -10,11 +10,19 @@ export interface TTSResult {
   voice: string;
 }
 
+function providerChain(): TTSProvider[] {
+  const chain: TTSProvider[] = [];
+  // ElevenLabs first — if configured, user picked it for premium quality
+  if (process.env.ELEVENLABS_API_KEY) chain.push('elevenlabs');
+  // Gemini second — has a free tier, so prefer over paid providers
+  if (process.env.GEMINI_API_KEY) chain.push('gemini');
+  // OpenAI last — paid, no free quota
+  if (process.env.OPENAI_API_KEY) chain.push('openai');
+  return chain;
+}
+
 function detectProvider(): TTSProvider {
-  if (process.env.ELEVENLABS_API_KEY) return 'elevenlabs';
-  if (process.env.OPENAI_API_KEY) return 'openai';
-  if (process.env.GEMINI_API_KEY) return 'gemini';
-  return 'none';
+  return providerChain()[0] ?? 'none';
 }
 
 function hashText(text: string, voice: string): string {
@@ -101,46 +109,70 @@ async function synthesizeGemini(text: string, _voice: string): Promise<Buffer> {
   return Buffer.from(b64, 'base64');
 }
 
+async function synthesize(provider: TTSProvider, text: string, voice: string): Promise<Buffer> {
+  if (provider === 'openai') return synthesizeOpenAI(text, voice);
+  if (provider === 'elevenlabs') return synthesizeElevenLabs(text, voice);
+  if (provider === 'gemini') return synthesizeGemini(text, voice);
+  throw new Error(`Unknown provider: ${provider}`);
+}
+
 export async function generateTTS(
   userId: string,
   text: string,
   voice?: string
 ): Promise<TTSResult> {
-  const provider = detectProvider();
-  if (provider === 'none') {
-    throw new Error('No TTS provider configured. Set ELEVENLABS_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.');
+  const chain = providerChain();
+  if (chain.length === 0) {
+    throw new Error('No TTS provider configured. Set GEMINI_API_KEY, ELEVENLABS_API_KEY, or OPENAI_API_KEY.');
   }
 
-  const resolvedVoice = voice || listVoices(provider)[0]?.id || 'default';
-  const key = hashText(text, `${provider}:${resolvedVoice}`);
-  const storagePath = `${userId}/${key}.mp3`;
+  const primary = chain[0];
+  const resolvedVoice = voice || listVoices(primary)[0]?.id || 'default';
 
-  // Cache check
-  const { data: existing } = await supabaseAdmin.storage.from('tts').createSignedUrl(storagePath, 3600);
-  if (existing?.signedUrl) {
-    // Verify the object actually exists (createSignedUrl can succeed for non-existent paths)
-    const head = await fetch(existing.signedUrl, { method: 'HEAD' });
+  // Cache check against the primary provider + voice (deterministic)
+  const cacheKey = hashText(text, `${primary}:${resolvedVoice}`);
+  const cachedPath = `${userId}/${cacheKey}.mp3`;
+  const { data: existingSigned } = await supabaseAdmin.storage.from('tts').createSignedUrl(cachedPath, 3600);
+  if (existingSigned?.signedUrl) {
+    const head = await fetch(existingSigned.signedUrl, { method: 'HEAD' });
     if (head.ok) {
-      return { url: existing.signedUrl, provider, cached: true, voice: resolvedVoice };
+      return { url: existingSigned.signedUrl, provider: primary, cached: true, voice: resolvedVoice };
     }
   }
 
-  // Synthesize
-  let audio: Buffer;
-  if (provider === 'openai') audio = await synthesizeOpenAI(text, resolvedVoice);
-  else if (provider === 'elevenlabs') audio = await synthesizeElevenLabs(text, resolvedVoice);
-  else audio = await synthesizeGemini(text, resolvedVoice);
+  // Synthesize with provider fallback chain
+  let audio: Buffer | null = null;
+  let usedProvider: TTSProvider = primary;
+  let usedVoice = resolvedVoice;
+  const failures: string[] = [];
 
-  // Upload
+  for (const p of chain) {
+    try {
+      const voiceForProvider = p === primary ? resolvedVoice : (listVoices(p)[0]?.id || 'default');
+      audio = await synthesize(p, text, voiceForProvider);
+      usedProvider = p;
+      usedVoice = voiceForProvider;
+      break;
+    } catch (err) {
+      failures.push(`${p}: ${err instanceof Error ? err.message.slice(0, 120) : 'unknown'}`);
+      continue;
+    }
+  }
+
+  if (!audio) {
+    throw new Error(`All TTS providers failed. ${failures.join(' | ')}`);
+  }
+
+  const finalPath = `${userId}/${hashText(text, `${usedProvider}:${usedVoice}`)}.mp3`;
   const { error: upErr } = await supabaseAdmin.storage
     .from('tts')
-    .upload(storagePath, audio, { contentType: 'audio/mpeg', upsert: true });
+    .upload(finalPath, audio, { contentType: 'audio/mpeg', upsert: true });
   if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
 
-  const { data: signed } = await supabaseAdmin.storage.from('tts').createSignedUrl(storagePath, 3600);
+  const { data: signed } = await supabaseAdmin.storage.from('tts').createSignedUrl(finalPath, 3600);
   if (!signed?.signedUrl) throw new Error('Could not create signed URL');
 
-  return { url: signed.signedUrl, provider, cached: false, voice: resolvedVoice };
+  return { url: signed.signedUrl, provider: usedProvider, cached: false, voice: usedVoice };
 }
 
 export function getCurrentProvider(): TTSProvider {
