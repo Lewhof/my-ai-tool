@@ -165,7 +165,7 @@ export default function BookAudioPlayer({ text }: Props) {
   const isActive = state === 'playing' || state === 'paused' || state === 'loading';
 
   return (
-    <div className={cn('ml-auto flex items-center gap-1.5 flex-wrap', isActive && 'bg-primary/5 rounded-lg px-1.5 py-0.5')}>
+    <div className={cn('flex items-center gap-1.5 flex-wrap', isActive && 'bg-primary/5 rounded-lg px-1.5 py-1')}>
       <button
         onClick={play}
         disabled={state === 'loading'}

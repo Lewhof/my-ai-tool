@@ -362,7 +362,7 @@ export default function TodosPage() {
           )}
           onClick={() => setExpandedId(expandedId === todo.id ? null : todo.id)}
         >
-          <td className="px-5 py-3">
+          <td className="px-3 sm:px-5 py-3">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -378,15 +378,15 @@ export default function TodosPage() {
               )}
             </button>
           </td>
-          <td className={cn('px-5 py-3 text-sm font-medium', todo.status === 'done' ? 'text-muted-foreground line-through' : 'text-foreground')}>
+          <td className={cn('px-3 sm:px-5 py-3 text-sm font-medium', todo.status === 'done' ? 'text-muted-foreground line-through' : 'text-foreground')}>
             {todo.title}
           </td>
-          <td className="px-5 py-3">
+          <td className="px-3 sm:px-5 py-3">
             <span className={cn('text-xs px-2 py-0.5 rounded border', PRIORITY_COLORS[todo.priority])}>
               {PRIORITY_LABELS[todo.priority]}
             </span>
           </td>
-          <td className="px-5 py-3">
+          <td className="px-3 sm:px-5 py-3">
             <select
               value={todo.status}
               onChange={(e) => { e.stopPropagation(); updateTodo(todo.id, { status: e.target.value }); }}
@@ -396,11 +396,11 @@ export default function TodosPage() {
               {ALL_STATUSES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
             </select>
           </td>
-          <td className="px-5 py-3 text-muted-foreground text-xs">{todo.bucket}</td>
-          <td className="px-5 py-3">
+          <td className="hidden md:table-cell px-3 sm:px-5 py-3 text-muted-foreground text-xs">{todo.bucket}</td>
+          <td className="px-3 sm:px-5 py-3">
             {due && <span className={cn('text-xs', due.className)}>{due.text}</span>}
           </td>
-          <td className="px-3 py-3">
+          <td className="px-2 sm:px-3 py-3">
             <button
               onClick={(e) => { e.stopPropagation(); deleteTodo(todo.id); }}
               className="text-muted-foreground/60 hover:text-red-400 text-sm transition-colors"
@@ -443,19 +443,19 @@ export default function TodosPage() {
     const nonEmptyGroups = groupOrder.filter(g => groupedActive[g].length > 0);
 
     return (
-      <div className="bg-card border border-border rounded-lg overflow-hidden">
-        <table className="w-full">
+      <div className="bg-card border border-border rounded-lg overflow-x-auto">
+        <table className="w-full min-w-[640px]">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 w-8">
+              <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-3 sm:px-5 py-3 w-8">
                 <span className="sr-only">Check</span>
               </th>
-              <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3">Task</th>
-              <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 w-24">Priority</th>
-              <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 w-28">Status</th>
-              <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 w-24">Bucket</th>
-              <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-5 py-3 w-24">Due</th>
-              <th className="w-10"></th>
+              <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-3 sm:px-5 py-3">Task</th>
+              <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-3 sm:px-5 py-3 w-20 sm:w-24">Priority</th>
+              <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-3 sm:px-5 py-3 w-24 sm:w-28">Status</th>
+              <th className="hidden md:table-cell text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-3 sm:px-5 py-3 w-24">Bucket</th>
+              <th className="text-left text-muted-foreground text-xs font-semibold uppercase tracking-wider px-3 sm:px-5 py-3 w-20 sm:w-24">Due</th>
+              <th className="w-8 sm:w-10"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">

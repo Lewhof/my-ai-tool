@@ -866,13 +866,13 @@ function BookDetail({ book, onBack, onStatusChange, onDelete }: {
           <div className="flex-1 min-w-0">
             <h2 className="text-foreground text-lg font-bold">{book.title}</h2>
             {book.author && <p className="text-muted-foreground text-sm mt-0.5">{book.author}</p>}
-            <div className="flex items-center gap-2 mt-3">
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
               {(['want-to-read', 'reading', 'finished'] as const).map(s => (
                 <button
                   key={s}
                   onClick={() => onStatusChange(book.id, s)}
                   className={cn(
-                    'text-[11px] px-2 py-1 rounded border transition-colors',
+                    'text-[11px] px-2 py-1 rounded border transition-colors whitespace-nowrap',
                     book.status === s
                       ? 'border-primary bg-primary/10 text-primary'
                       : 'border-border text-muted-foreground hover:text-foreground'
@@ -881,13 +881,17 @@ function BookDetail({ book, onBack, onStatusChange, onDelete }: {
                   {s === 'want-to-read' ? 'Want to Read' : s.charAt(0).toUpperCase() + s.slice(1)}
                 </button>
               ))}
-              {summary && <BookAudioPlayer text={buildSummaryText()} storageKey={book.id} />}
               <button
                 onClick={() => onDelete(book.id)}
-                className={cn(summary ? '' : 'ml-auto', 'p-1.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors')}
+                className="ml-auto p-1.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
               >
                 <Trash2 size={14} />
               </button>
+              {summary && (
+                <div className="w-full">
+                  <BookAudioPlayer text={buildSummaryText()} storageKey={book.id} />
+                </div>
+              )}
             </div>
           </div>
         </div>
