@@ -7,11 +7,12 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import BuildPanel from '@/components/cerebro/build-panel';
 import {
   Send, Loader2, Bot, User, Sparkles, Mic, MicOff, Camera, X,
   Calendar, CheckSquare, ClipboardList, FileText,
   StickyNote, Cloud, CreditCard, BookOpen, Search,
-  ChevronDown, MoreHorizontal, Archive, Trash2,
+  ChevronDown, MoreHorizontal, Archive, Trash2, Terminal,
   Brain, ThumbsUp, ThumbsDown,
 } from 'lucide-react';
 
@@ -60,6 +61,8 @@ function AgentPageInner() {
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [replyTo, setReplyTo] = useState<{ index: number; content: string; role: string } | null>(null);
+  const [buildPanelOpen, setBuildPanelOpen] = useState(false);
+  const [buildPanelPrompt, setBuildPanelPrompt] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -402,6 +405,12 @@ function AgentPageInner() {
           <p className="text-[11px] text-muted-foreground">Claude Sonnet &middot; access to all your tools</p>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => { setBuildPanelPrompt(''); setBuildPanelOpen(true); }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] text-muted-foreground hover:text-foreground border border-border hover:bg-surface-2 transition-colors"
+            title="Build session — Cerebro spawns Claude Code, streams live, approval-gates destructive tools">
+            <Terminal size={12} /> Build
+          </button>
           <Link href="/cerebro/brain"
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] text-muted-foreground hover:text-foreground border border-border hover:bg-surface-2 transition-colors"
             title="Cerebro Brain — rules, metrics, corrections">
@@ -735,6 +744,12 @@ function AgentPageInner() {
           30% { transform: translateY(-4px); }
         }
       `}</style>
+
+      <BuildPanel
+        open={buildPanelOpen}
+        onClose={() => setBuildPanelOpen(false)}
+        initialPrompt={buildPanelPrompt}
+      />
     </div>
   );
 }
