@@ -20,6 +20,7 @@ const VOICE_KEY = 'book-audio-voice';
 
 export default function BookAudioPlayer({ text }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const fallbackUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [provider, setProvider] = useState<string>('none');
   const [voices, setVoices] = useState<Voice[]>([]);
   const [voice, setVoice] = useState<string>('');
@@ -34,26 +35,53 @@ export default function BookAudioPlayer({ text }: Props) {
       .then((d: { provider: string; voices: Voice[] }) => {
         setProvider(d.provider);
         setVoices(d.voices);
+        // Validate any persisted voice against the current provider's voice list.
+        // A stale ID from a previous provider would silently route through the
+        // fallback chain and degrade quality.
         const savedVoice = typeof window !== 'undefined' ? localStorage.getItem(VOICE_KEY) : null;
-        setVoice(savedVoice || d.voices[0]?.id || '');
+        const validSaved = savedVoice && d.voices.some(v => v.id === savedVoice) ? savedVoice : null;
+        setVoice(validSaved || d.voices[0]?.id || '');
       })
       .catch(() => setProvider('none'));
 
-    const savedSpeed = typeof window !== 'undefined' ? Number(localStorage.getItem(SPEED_KEY)) : 0;
-    if (savedSpeed && SPEEDS.includes(savedSpeed)) setSpeed(savedSpeed);
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(SPEED_KEY) : null;
+    const parsed = raw ? parseFloat(raw) : NaN;
+    if (Number.isFinite(parsed) && SPEEDS.includes(parsed)) setSpeed(parsed);
 
     return () => {
       audioRef.current?.pause();
-      window.speechSynthesis?.cancel();
+      // Only cancel the utterance this player created — speechSynthesis is
+      // global and a blanket cancel kills concurrent players' audio too.
+      const ours = fallbackUtteranceRef.current;
+      if (ours && window.speechSynthesis) {
+        if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+      }
+      fallbackUtteranceRef.current = null;
     };
   }, []);
+
+  // Reset on text prop change — different article means different audio.
+  useEffect(() => {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    if (fallbackUtteranceRef.current && window.speechSynthesis?.speaking) {
+      window.speechSynthesis.cancel();
+    }
+    fallbackUtteranceRef.current = null;
+    setState('idle');
+    setProgress(0);
+    setDuration(0);
+  }, [text]);
 
   const stop = () => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
-    window.speechSynthesis?.cancel();
+    if (fallbackUtteranceRef.current && window.speechSynthesis?.speaking) {
+      window.speechSynthesis.cancel();
+    }
+    fallbackUtteranceRef.current = null;
     setState('idle');
     setProgress(0);
   };
@@ -63,8 +91,9 @@ export default function BookAudioPlayer({ text }: Props) {
     u.rate = speed * 0.95;
     u.pitch = 1;
     u.lang = 'en-ZA';
-    u.onend = () => setState('idle');
-    u.onerror = () => setState('idle');
+    u.onend = () => { setState('idle'); fallbackUtteranceRef.current = null; };
+    u.onerror = () => { setState('idle'); fallbackUtteranceRef.current = null; };
+    fallbackUtteranceRef.current = u;
     window.speechSynthesis.speak(u);
     setState('playing');
   };
@@ -105,7 +134,15 @@ export default function BookAudioPlayer({ text }: Props) {
         playFallback();
         return;
       }
-      const data = await res.json() as { url: string; cached: boolean };
+      const data = await res.json() as { url: string; cached: boolean; provider: string };
+      // If the server fell through to a non-primary provider, the user is
+      // hearing degraded audio. Tell them why so they can fix it.
+      if (data.provider !== provider) {
+        toast(`Using ${data.provider} voice`, {
+          description: `Primary TTS provider unavailable; quality may differ.`,
+          duration: 3500,
+        });
+      }
       const audio = new Audio(data.url);
       audio.playbackRate = speed;
       audio.ontimeupdate = () => {
@@ -115,8 +152,15 @@ export default function BookAudioPlayer({ text }: Props) {
       audio.onended = () => { setState('idle'); setProgress(0); };
       audio.onerror = () => { toast.error('Playback error'); setState('idle'); };
       audioRef.current = audio;
-      await audio.play();
-      setState('playing');
+      try {
+        await audio.play();
+        setState('playing');
+      } catch {
+        // Autoplay policy or user gesture missing — distinguish from load error.
+        toast('Tap play again', { description: 'Browser blocked autoplay.', duration: 2500 });
+        setState('idle');
+        return;
+      }
       if (data.cached) toast('Audio loaded from cache', { duration: 1500 });
     } catch {
       toast.error('Could not load audio — using browser voice');
@@ -226,7 +270,7 @@ export default function BookAudioPlayer({ text }: Props) {
       )}
 
       {provider === 'none' && (
-        <span className="text-[10px] text-muted-foreground/60" title="Add OPENAI_API_KEY, ELEVENLABS_API_KEY, or GEMINI_API_KEY for natural voices">browser voice</span>
+        <span className="text-[10px] text-muted-foreground/60" title="No TTS provider configured. Set OPENAI_API_KEY for natural voices.">browser voice</span>
       )}
     </div>
   );

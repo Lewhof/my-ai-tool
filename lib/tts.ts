@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { supabaseAdmin } from '@/lib/supabase-server';
 
-export type TTSProvider = 'edge' | 'azure' | 'openai' | 'elevenlabs' | 'gemini' | 'none';
+export type TTSProvider = 'openai' | 'elevenlabs' | 'azure' | 'edge' | 'gemini' | 'none';
 
 export interface TTSResult {
   url: string;
@@ -10,19 +10,22 @@ export interface TTSResult {
   voice: string;
 }
 
+// Per-chunk char ceiling. gpt-4o-mini-tts handles ~4096 tokens; 1500 chars
+// gives faster TTFB on long articles and lets us parallelise.
+const CHUNK_MAX_CHARS = 1500;
+
 function providerChain(): TTSProvider[] {
   const chain: TTSProvider[] = [];
-  // ElevenLabs first — if configured, user picked it for premium quality
-  if (process.env.ELEVENLABS_API_KEY) chain.push('elevenlabs');
-  // Azure second — 500k chars/month free, Audible-tier neural voices
-  if (process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION) chain.push('azure');
-  // Edge — same underlying voices as Azure, no API key needed (uses Edge browser's endpoint)
-  // Enabled by default; set DISABLE_EDGE_TTS=1 to opt out.
-  if (!process.env.DISABLE_EDGE_TTS) chain.push('edge');
-  // Gemini — also free via existing key, preview quality
-  if (process.env.GEMINI_API_KEY) chain.push('gemini');
-  // OpenAI last — paid, no free quota
+  // OpenAI primary — gpt-4o-mini-tts: cheap (~$0.012/1K chars), 300–600ms TTFB,
+  // production-tier voice quality. The default Lew picked.
   if (process.env.OPENAI_API_KEY) chain.push('openai');
+  // ElevenLabs Flash v2.5 — premium upgrade if user enables a key
+  if (process.env.ELEVENLABS_API_KEY) chain.push('elevenlabs');
+  // Azure neural — 500k chars/month free, last commercial fallback
+  if (process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION) chain.push('azure');
+  // Edge / Gemini — kept available but no longer default. Set DISABLE_EDGE_TTS=1 to opt out.
+  if (process.env.GEMINI_API_KEY) chain.push('gemini');
+  if (!process.env.DISABLE_EDGE_TTS) chain.push('edge');
   return chain;
 }
 
@@ -36,13 +39,18 @@ function hashText(text: string, voice: string): string {
 
 export function listVoices(provider: TTSProvider): Array<{ id: string; label: string }> {
   if (provider === 'openai') {
+    // gpt-4o-mini-tts voice library. `ash` is locked default per platform-level-up scope.
     return [
+      { id: 'ash', label: 'Ash (warm, grounded — default)' },
+      { id: 'sage', label: 'Sage (calm, thoughtful)' },
+      { id: 'ballad', label: 'Ballad (expressive, narrator)' },
+      { id: 'coral', label: 'Coral (bright, female)' },
       { id: 'nova', label: 'Nova (warm, female)' },
       { id: 'onyx', label: 'Onyx (deep, male)' },
       { id: 'alloy', label: 'Alloy (neutral)' },
       { id: 'shimmer', label: 'Shimmer (bright, female)' },
-      { id: 'fable', label: 'Fable (British)' },
       { id: 'echo', label: 'Echo (calm, male)' },
+      { id: 'fable', label: 'Fable (British)' },
     ];
   }
   if (provider === 'elevenlabs') {
@@ -53,7 +61,6 @@ export function listVoices(provider: TTSProvider): Array<{ id: string; label: st
     ];
   }
   if (provider === 'azure' || provider === 'edge') {
-    // Same underlying voices; Edge hits the browser endpoint without an API key
     return [
       { id: 'en-US-AndrewNeural', label: 'Andrew (US, male, natural)' },
       { id: 'en-US-AvaNeural', label: 'Ava (US, female, expressive)' },
@@ -73,22 +80,106 @@ export function listVoices(provider: TTSProvider): Array<{ id: string; label: st
   return [];
 }
 
+// Split long text into MP3-concat-safe chunks. Paragraph-first, sentence-fallback,
+// hard-cut as last resort. Each chunk stays under CHUNK_MAX_CHARS.
+function chunkText(text: string, max: number = CHUNK_MAX_CHARS): string[] {
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error('Empty TTS input after trim');
+  if (trimmed.length <= max) return [trimmed];
+
+  const paragraphs = trimmed.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+  const chunks: string[] = [];
+  let buf = '';
+
+  const flush = () => { if (buf.trim()) chunks.push(buf.trim()); buf = ''; };
+
+  // Grapheme-aware hard split: Array.from yields code points (no surrogate pair tearing).
+  const hardSplit = (s: string): string[] => {
+    const cps = Array.from(s);
+    const out: string[] = [];
+    for (let i = 0; i < cps.length; i += max) out.push(cps.slice(i, i + max).join('').trim());
+    return out.filter(Boolean);
+  };
+
+  for (const para of paragraphs) {
+    if (para.length > max) {
+      flush();
+      const sentences = para.match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g) ?? [para];
+      for (const sent of sentences) {
+        if (sent.length > max) {
+          for (const piece of hardSplit(sent)) chunks.push(piece);
+        } else if ((buf + sent).length > max) {
+          flush();
+          buf = sent;
+        } else {
+          buf += sent;
+        }
+      }
+      flush();
+    } else if ((buf ? buf.length + 2 : 0) + para.length > max) {
+      flush();
+      buf = para;
+    } else {
+      buf = buf ? `${buf}\n\n${para}` : para;
+    }
+  }
+  flush();
+  return chunks;
+}
+
+// Strip an ID3v2 tag from the head of an MP3 buffer if present. OpenAI's mp3
+// response includes ID3v2; concatenating multiple responses leaves headers
+// mid-stream and corrupts seek/duration on stricter decoders (Safari, iOS WV).
+function stripID3v2(buf: Buffer): Buffer {
+  if (buf.length < 10) return buf;
+  if (buf[0] !== 0x49 || buf[1] !== 0x44 || buf[2] !== 0x33) return buf; // not "ID3"
+  // Synchsafe int: 4 bytes, top bit of each byte cleared
+  const size = (buf[6] << 21) | (buf[7] << 14) | (buf[8] << 7) | buf[9];
+  const total = 10 + size;
+  if (total >= buf.length) return buf;
+  return buf.subarray(total);
+}
+
+// Truncate upstream error bodies before they propagate — they sometimes echo
+// the request, which here means the user's article content leaking into logs.
+function safeUpstreamError(label: string, status: number, body: string): Error {
+  const cleaned = body.replace(/"input"\s*:\s*"[^"]*"/g, '"input":"<redacted>"').slice(0, 120);
+  return new Error(`${label} ${status} ${cleaned}`);
+}
+
+// Per-chunk fetch with one retry on 429/5xx (exponential backoff).
+async function fetchOpenAIChunk(chunk: string, voice: string): Promise<Buffer> {
+  let lastErr: Error | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, 400 * attempt));
+    const res = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini-tts',
+        voice,
+        input: chunk,
+        response_format: 'mp3',
+      }),
+    });
+    if (res.ok) return Buffer.from(await res.arrayBuffer());
+    const body = await res.text().catch(() => '');
+    lastErr = safeUpstreamError('OpenAI TTS', res.status, body);
+    // Only retry on transient errors; 4xx is permanent.
+    if (res.status !== 429 && res.status < 500) break;
+  }
+  throw lastErr ?? new Error('OpenAI TTS failed');
+}
+
 async function synthesizeOpenAI(text: string, voice: string): Promise<Buffer> {
-  const res = await fetch('https://api.openai.com/v1/audio/speech', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'tts-1-hd',
-      voice,
-      input: text,
-      response_format: 'mp3',
-    }),
-  });
-  if (!res.ok) throw new Error(`OpenAI TTS failed: ${res.status} ${await res.text().catch(() => '')}`);
-  return Buffer.from(await res.arrayBuffer());
+  const chunks = chunkText(text);
+  const buffers = await Promise.all(chunks.map(chunk => fetchOpenAIChunk(chunk, voice)));
+  // Strip ID3v2 from every chunk after the first so the decoder sees one stream.
+  const cleaned = buffers.map((b, i) => i === 0 ? b : stripID3v2(b));
+  return Buffer.concat(cleaned);
 }
 
 async function synthesizeElevenLabs(text: string, voiceId: string): Promise<Buffer> {
@@ -105,19 +196,13 @@ async function synthesizeElevenLabs(text: string, voiceId: string): Promise<Buff
       voice_settings: { stability: 0.5, similarity_boost: 0.75 },
     }),
   });
-  if (!res.ok) throw new Error(`ElevenLabs failed: ${res.status} ${await res.text().catch(() => '')}`);
+  if (!res.ok) throw safeUpstreamError('ElevenLabs', res.status, await res.text().catch(() => ''));
   return Buffer.from(await res.arrayBuffer());
 }
 
-// ── Microsoft Edge TTS ──────────────────────────────────────────────
-// Uses the same WebSocket endpoint Edge browser's Read Aloud feature hits.
-// No API key; free forever; identical voices to Azure Neural.
-// Microsoft added Sec-MS-GEC header validation in 2024 — must compute it.
 const EDGE_TRUSTED_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
 
 function generateSecMsGec(): string {
-  // Convert current Unix time to Windows file time ticks (100ns intervals since 1601).
-  // Round down to the nearest 5-minute interval (3e9 ticks) to match Edge's behavior.
   const unixSeconds = Math.floor(Date.now() / 1000);
   const ticks = (unixSeconds + 11_644_473_600) * 10_000_000;
   const rounded = Math.floor(ticks / 3_000_000_000) * 3_000_000_000;
@@ -188,7 +273,6 @@ async function synthesizeEdge(text: string, voice: string): Promise<Buffer> {
 
     ws.on('message', (data: Buffer, isBinary: boolean) => {
       if (isBinary) {
-        // Binary frame: first 2 bytes = uint16 BE header length, then header, then audio
         if (data.length < 2) return;
         const headerLen = data.readUInt16BE(0);
         if (data.length > 2 + headerLen) {
@@ -222,9 +306,8 @@ async function synthesizeEdge(text: string, voice: string): Promise<Buffer> {
 async function synthesizeAzure(text: string, voice: string): Promise<Buffer> {
   const key = process.env.AZURE_SPEECH_KEY!;
   const region = process.env.AZURE_SPEECH_REGION!;
-  // SSML wrapper — allows prosody tweaks later
   const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-  const lang = voice.slice(0, 5); // e.g. "en-ZA"
+  const lang = voice.slice(0, 5);
   const ssml = `<speak version='1.0' xml:lang='${lang}'><voice name='${voice}'>${escape(text)}</voice></speak>`;
 
   const res = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
@@ -237,7 +320,7 @@ async function synthesizeAzure(text: string, voice: string): Promise<Buffer> {
     },
     body: ssml,
   });
-  if (!res.ok) throw new Error(`Azure TTS failed: ${res.status} ${await res.text().catch(() => '')}`);
+  if (!res.ok) throw safeUpstreamError('Azure TTS', res.status, await res.text().catch(() => ''));
   return Buffer.from(await res.arrayBuffer());
 }
 
@@ -254,7 +337,7 @@ async function synthesizeGemini(text: string, _voice: string): Promise<Buffer> {
       }),
     }
   );
-  if (!res.ok) throw new Error(`Gemini TTS failed: ${res.status} ${await res.text().catch(() => '')}`);
+  if (!res.ok) throw safeUpstreamError('Gemini TTS', res.status, await res.text().catch(() => ''));
   const data = await res.json();
   const b64 = data.candidates?.[0]?.content?.parts?.find((p: { inlineData?: { data: string } }) => p.inlineData)?.inlineData?.data;
   if (!b64) throw new Error('Gemini returned no audio');
@@ -262,10 +345,10 @@ async function synthesizeGemini(text: string, _voice: string): Promise<Buffer> {
 }
 
 async function synthesize(provider: TTSProvider, text: string, voice: string): Promise<Buffer> {
-  if (provider === 'edge') return synthesizeEdge(text, voice);
-  if (provider === 'azure') return synthesizeAzure(text, voice);
   if (provider === 'openai') return synthesizeOpenAI(text, voice);
   if (provider === 'elevenlabs') return synthesizeElevenLabs(text, voice);
+  if (provider === 'azure') return synthesizeAzure(text, voice);
+  if (provider === 'edge') return synthesizeEdge(text, voice);
   if (provider === 'gemini') return synthesizeGemini(text, voice);
   throw new Error(`Unknown provider: ${provider}`);
 }
@@ -277,7 +360,7 @@ export async function generateTTS(
 ): Promise<TTSResult> {
   const chain = providerChain();
   if (chain.length === 0) {
-    throw new Error('No TTS provider configured. Set AZURE_SPEECH_KEY+AZURE_SPEECH_REGION, GEMINI_API_KEY, ELEVENLABS_API_KEY, or OPENAI_API_KEY.');
+    throw new Error('No TTS provider configured. Set OPENAI_API_KEY (recommended), ELEVENLABS_API_KEY, AZURE_SPEECH_KEY+AZURE_SPEECH_REGION, or GEMINI_API_KEY.');
   }
 
   const primary = chain[0];
