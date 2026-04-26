@@ -3,6 +3,7 @@
 import useSWR from 'swr';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { cn } from '@/lib/utils';
 import {
   Sparkles, AlertTriangle, ArrowRight, CheckCircle2, FileText, BookOpen, Activity,
   RefreshCw, Loader2, Zap, Brain, Calendar, Clock,
@@ -60,13 +61,17 @@ const CHANGE_LABELS: Record<TodayData['changes'][number]['kind'], string> = {
 
 export default function TodayPage() {
   const { data, isLoading, error, mutate } = useSWR<TodayData>('/api/today');
+  const hardError = !!error && !data;
   const [refreshingBriefing, setRefreshingBriefing] = useState(false);
 
   const refreshBriefing = async () => {
     setRefreshingBriefing(true);
     try {
-      // Hit the briefing endpoint — it regenerates if no cache for today
-      await fetch('/api/dashboard/briefing');
+      // Read the body to ensure the briefing has actually been generated and
+      // persisted before mutating; await on fetch alone resolves on headers.
+      const res = await fetch('/api/dashboard/briefing');
+      if (!res.ok) throw new Error(`Briefing ${res.status}`);
+      await res.json().catch(() => null);
       await mutate();
       toast.success('Briefing refreshed');
     } catch {
@@ -99,8 +104,16 @@ export default function TodayPage() {
       }
     >
       <div className="space-y-8 pb-12">
+        {hardError && (
+          <EmptyState
+            icon={<Sparkles />}
+            title="Couldn't load today"
+            description="The dashboard backend didn't respond. Try again or check your connection."
+            action={{ label: 'Retry', onClick: () => mutate() }}
+          />
+        )}
         {/* Stat tiles */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className={cn('grid grid-cols-2 lg:grid-cols-4 gap-3', hardError && 'hidden')}>
           {isLoading || !data ? (
             <>
               <StatTileSkeleton /><StatTileSkeleton /><StatTileSkeleton /><StatTileSkeleton />

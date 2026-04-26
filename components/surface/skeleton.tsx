@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 
-interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {}
+type SkeletonProps = React.HTMLAttributes<HTMLDivElement>;
 
 // Shimmer skeleton primitive. Use as a low-level placeholder for any
 // loading region while data hydrates.

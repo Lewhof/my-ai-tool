@@ -53,6 +53,10 @@ export function getSession(id: string): Session | undefined {
   return sessions.get(id);
 }
 
+export function listSessions(): Session[] {
+  return Array.from(sessions.values());
+}
+
 export async function destroySession(id: string): Promise<void> {
   const s = sessions.get(id);
   if (!s) return;
@@ -67,14 +71,16 @@ export function emit(session: Session, event: StreamEvent): void {
   }
 }
 
-// Wait for the dashboard to approve or deny a destructive tool.
-function awaitApproval(session: Session, id: string, timeoutMs = 5 * 60_000): Promise<boolean> {
+// Wait for the dashboard to approve or deny a destructive tool. On timeout,
+// emit a tool_result so the UI doesn't show "pending" forever.
+function awaitApproval(session: Session, toolUseId: string, timeoutMs = 5 * 60_000): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     const timer = setTimeout(() => {
-      session.pendingApprovals.delete(id);
+      session.pendingApprovals.delete(toolUseId);
+      emit(session, { type: 'tool_result', id: toolUseId, output: { timed_out: true }, ok: false });
       resolve(false);
     }, timeoutMs);
-    session.pendingApprovals.set(id, {
+    session.pendingApprovals.set(toolUseId, {
       resolve: (approve: boolean) => {
         clearTimeout(timer);
         resolve(approve);

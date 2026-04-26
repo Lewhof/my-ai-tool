@@ -14,24 +14,36 @@ export interface Memory {
 
 const EMBED_MODEL = 'text-embedding-3-small';
 const EMBED_DIMS = 1536;
+const EMBED_TIMEOUT_MS = 8_000;
+const MAX_CONTENT_CHARS = 4000;
 
 // Generate an embedding for a chunk of text. Single-vendor (OpenAI) keeps
 // the dimension contract stable — switching providers requires a full
 // re-embed of the table.
 export async function embed(text: string): Promise<number[]> {
-  const res = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ model: EMBED_MODEL, input: text }),
-  });
-  if (!res.ok) throw new Error(`Embedding failed: ${res.status}`);
-  const data = await res.json();
-  const vec = data.data?.[0]?.embedding as number[] | undefined;
-  if (!vec || vec.length !== EMBED_DIMS) throw new Error(`Bad embedding shape: ${vec?.length}`);
-  return vec;
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY is not set — required for cerebro_memory embeddings');
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), EMBED_TIMEOUT_MS);
+  try {
+    const res = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model: EMBED_MODEL, input: text }),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Embedding failed: ${res.status}`);
+    const data = await res.json();
+    const vec = data.data?.[0]?.embedding as number[] | undefined;
+    if (!vec || vec.length !== EMBED_DIMS) throw new Error(`Bad embedding shape: ${vec?.length}`);
+    return vec;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function saveMemory(
@@ -46,6 +58,9 @@ export async function saveMemory(
 ): Promise<Memory> {
   const trimmed = content.trim();
   if (!trimmed) throw new Error('Empty memory content');
+  if (trimmed.length > MAX_CONTENT_CHARS) {
+    throw new Error(`Memory content exceeds ${MAX_CONTENT_CHARS} chars — truncate before saving`);
+  }
   const vec = await embed(trimmed);
   const { data, error } = await supabaseAdmin
     .from('cerebro_memory')

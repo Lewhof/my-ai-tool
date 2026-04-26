@@ -43,12 +43,16 @@ const TOOL_ICONS: Record<string, React.ComponentType<{ size?: number; className?
 export default function BuildPanel({ open, onClose, initialPrompt = '', initialRepoUrl = '' }: BuildPanelProps) {
   const [prompt, setPrompt] = useState(initialPrompt);
   const [repoUrl, setRepoUrl] = useState(initialRepoUrl);
-  const [status, setStatus] = useState<'idle' | 'connecting' | 'running' | 'done' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'connecting' | 'running' | 'done' | 'error' | 'unconfigured'>('idle');
   const [text, setText] = useState('');
   const [tools, setTools] = useState<ToolEntry[]>([]);
   const [logs, setLogs] = useState<string[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  // Mirror status into a ref so WS event handlers (which capture closures
+  // at registration time) read the current value, not the value at register.
+  const statusRef = useRef<typeof status>('idle');
+  statusRef.current = status;
 
   const reset = useCallback(() => {
     setText('');
@@ -79,6 +83,10 @@ export default function BuildPanel({ open, onClose, initialPrompt = '', initialR
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoUrl: repoUrl.trim() || undefined }),
       });
+      if (res.status === 503) {
+        setStatus('unconfigured');
+        return;
+      }
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `Bridge unavailable (${res.status})`);
@@ -86,9 +94,12 @@ export default function BuildPanel({ open, onClose, initialPrompt = '', initialR
       const { session_id, ws_url, bearer } = await res.json() as { session_id: string; ws_url: string; bearer: string };
       sessionIdRef.current = session_id;
 
-      // Step 2: open the WebSocket. Bearer is signed server-side and embedded
-      // as a query param because the browser can't set Authorization on WS.
-      const ws = new WebSocket(`${ws_url}?token=${encodeURIComponent(bearer)}`);
+      // Step 2: open the WebSocket. Bearer rides in Sec-WebSocket-Protocol
+      // (encoded with dots since colons are forbidden in WS subprotocol
+      // values) so the credential never lands in nginx/CDN access logs the
+      // way a `?token=` query string would.
+      const protoBearer = `bearer.${bearer.replace(/:/g, '.')}`;
+      const ws = new WebSocket(ws_url, [protoBearer]);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -140,7 +151,9 @@ export default function BuildPanel({ open, onClose, initialPrompt = '', initialR
       };
 
       ws.onclose = () => {
-        if (status === 'running') setStatus('done');
+        // Use the ref so we read the *current* status, not the stale value
+        // captured when this handler was registered.
+        if (statusRef.current === 'running') setStatus('done');
         wsRef.current = null;
       };
     } catch (err) {
@@ -177,6 +190,7 @@ export default function BuildPanel({ open, onClose, initialPrompt = '', initialR
             <h2 className="text-foreground font-bold text-sm">Build session</h2>
             <p className="text-muted-foreground text-[11px]">
               {status === 'idle' && 'Cerebro → Claude Code'}
+              {status === 'unconfigured' && 'Bridge not configured'}
               {status === 'connecting' && 'Connecting…'}
               {status === 'running' && 'Live'}
               {status === 'done' && 'Completed'}
@@ -197,6 +211,23 @@ export default function BuildPanel({ open, onClose, initialPrompt = '', initialR
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {status === 'unconfigured' && (
+          <div className="bg-card border border-border rounded-xl p-6 text-center">
+            <Terminal size={28} className="mx-auto text-muted-foreground/40 mb-3" />
+            <p className="text-foreground font-semibold">Bridge not configured</p>
+            <p className="text-muted-foreground text-sm mt-1.5 max-w-sm mx-auto">
+              Set <code className="text-foreground bg-secondary px-1 rounded text-xs">CLAUDE_CODE_BRIDGE_URL</code> and
+              <code className="text-foreground bg-secondary px-1 rounded text-xs ml-1">CLAUDE_CODE_BRIDGE_SECRET</code> in
+              the Vercel project, then deploy. Setup steps live in <code className="text-foreground bg-secondary px-1 rounded text-xs">services/claude-code-bridge/README.md</code>.
+            </p>
+            <button
+              onClick={() => setStatus('idle')}
+              className="mt-4 text-xs text-muted-foreground hover:text-foreground underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
         {status === 'idle' && (
           <>
             <label className="block">

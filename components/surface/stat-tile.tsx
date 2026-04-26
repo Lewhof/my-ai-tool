@@ -35,6 +35,7 @@ export function StatTile({ icon, label, value, unit, tone = 'neutral', accent, p
   return (
     <Component
       onClick={onClick}
+      type={onClick ? 'button' : undefined}
       className={cn(
         'bg-card border rounded-xl p-4 relative overflow-hidden text-left w-full',
         accent ? `${toneStyle.ring} ${toneStyle.glow}` : 'border-border',

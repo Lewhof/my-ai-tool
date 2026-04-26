@@ -38,7 +38,9 @@ export async function GET() {
   const today = now.toISOString().slice(0, 10);
   const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
 
-  const [briefingRes, openTodosRes, doneTodayRes, notesTodayRes, kbTodayRes, metricsTodayRes] = await Promise.all([
+  // Promise.allSettled: a missing/renamed table or transient Supabase
+  // error in one source must NOT take down the whole /today response.
+  const settled = await Promise.allSettled([
     supabaseAdmin
       .from('briefings').select('content').eq('user_id', userId).eq('date', today).limit(1).maybeSingle(),
     supabaseAdmin
@@ -64,25 +66,30 @@ export async function GET() {
       .order('recorded_at', { ascending: false }).limit(10),
   ]);
 
-  const openTodos = openTodosRes.data ?? [];
+  type Settled<T> = { data: T | null };
+  const get = <T>(i: number, fallback: T): T => {
+    const r = settled[i];
+    if (r.status !== 'fulfilled') return fallback;
+    const v = (r.value as Settled<T>).data;
+    return v ?? fallback;
+  };
+
+  const briefingRes = { data: get<{ content: string } | null>(0, null) };
+  const openTodos = get<Array<{ id: string; title: string; priority: string; due_date: string | null; status: string; updated_at: string }>>(1, []);
+  const doneToday = get<Array<{ id: string; title: string; updated_at: string }>>(2, []);
+  const notesToday = get<Array<{ id: string; title: string; created_at: string }>>(3, []);
+  const kbToday = get<Array<{ id: string; title: string; created_at: string }>>(4, []);
+  const metricsToday = get<Array<{ id: string; metric_type: string; value: number; recorded_at: string }>>(5, []);
   const overdue = openTodos.filter(t => t.due_date && t.due_date < today);
   const dueToday = openTodos.filter(t => t.due_date === today);
 
   const next_action = pickNextAction(openTodos, overdue, dueToday);
 
   const changes: ChangeItem[] = [];
-  for (const t of doneTodayRes.data ?? []) {
-    changes.push({ kind: 'todo_done', title: t.title, at: t.updated_at, href: '/todos' });
-  }
-  for (const n of notesTodayRes.data ?? []) {
-    changes.push({ kind: 'note_created', title: n.title || 'Untitled note', at: n.created_at, href: '/notes' });
-  }
-  for (const k of kbTodayRes.data ?? []) {
-    changes.push({ kind: 'kb_created', title: k.title, at: k.created_at, href: '/kb' });
-  }
-  for (const m of metricsTodayRes.data ?? []) {
-    changes.push({ kind: 'metric_logged', title: `${m.metric_type}: ${m.value}`, at: m.recorded_at, href: '/wellness' });
-  }
+  for (const t of doneToday) changes.push({ kind: 'todo_done', title: t.title, at: t.updated_at, href: '/todos' });
+  for (const n of notesToday) changes.push({ kind: 'note_created', title: n.title || 'Untitled note', at: n.created_at, href: '/notes' });
+  for (const k of kbToday) changes.push({ kind: 'kb_created', title: k.title, at: k.created_at, href: '/kb' });
+  for (const m of metricsToday) changes.push({ kind: 'metric_logged', title: `${m.metric_type}: ${m.value}`, at: m.recorded_at, href: '/wellness' });
   changes.sort((a, b) => b.at.localeCompare(a.at));
 
   const response: TodayResponse = {
@@ -92,7 +99,7 @@ export async function GET() {
     stats: {
       todos_due_today: dueToday.length,
       todos_overdue: overdue.length,
-      todos_done_today: (doneTodayRes.data ?? []).length,
+      todos_done_today: doneToday.length,
       calendar_events_today: 0,
     },
   };

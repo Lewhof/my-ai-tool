@@ -21,6 +21,27 @@ create table if not exists cerebro_memory (
 create index if not exists cerebro_memory_user_idx on cerebro_memory (user_id);
 create index if not exists cerebro_memory_decay_idx on cerebro_memory (decay_at) where decay_at is not null;
 
+-- RLS — match the pattern in 20260410_agent_evolution.sql (auth.uid() compared
+-- to user_id::text). Service-role admin client bypasses RLS, but this stops
+-- any client-side read accidentally crossing user boundaries.
+alter table cerebro_memory enable row level security;
+
+drop policy if exists cerebro_memory_select on cerebro_memory;
+create policy cerebro_memory_select on cerebro_memory
+  for select using (auth.uid()::text = user_id);
+
+drop policy if exists cerebro_memory_insert on cerebro_memory;
+create policy cerebro_memory_insert on cerebro_memory
+  for insert with check (auth.uid()::text = user_id);
+
+drop policy if exists cerebro_memory_update on cerebro_memory;
+create policy cerebro_memory_update on cerebro_memory
+  for update using (auth.uid()::text = user_id);
+
+drop policy if exists cerebro_memory_delete on cerebro_memory;
+create policy cerebro_memory_delete on cerebro_memory
+  for delete using (auth.uid()::text = user_id);
+
 -- ANN index for cosine similarity. ivfflat with 100 lists is sized for
 -- single-user scale (10k–1M rows). Rebuild with `lists = sqrt(rows)` if Lew
 -- starts hitting recall latency past a few hundred ms.
@@ -47,32 +68,35 @@ returns table (
 )
 language plpgsql
 as $$
+declare
+  matched_ids uuid[];
 begin
-  return query
-  with hits as (
-    select m.id, m.content, m.source_kind, m.source_id, m.importance,
-           1 - (m.embedding <=> p_query) as similarity, m.created_at
+  -- Run the ANN scan once. Capture both the rows we'll return AND the ids
+  -- to update, so the telemetry bump doesn't re-execute the cosine search.
+  select array_agg(t.id) into matched_ids
+  from (
+    select m.id
     from cerebro_memory m
     where m.user_id = p_user_id
       and m.embedding is not null
       and (m.decay_at is null or m.decay_at > now())
+      and 1 - (m.embedding <=> p_query) >= p_min_sim
     order by m.embedding <=> p_query
     limit p_match_count
-  )
-  select h.id, h.content, h.source_kind, h.source_id, h.importance, h.similarity, h.created_at
-  from hits h
-  where h.similarity >= p_min_sim;
+  ) t;
 
-  -- Bump telemetry on the matched rows so we can prune cold memories later.
-  update cerebro_memory m
-  set hits = m.hits + 1, last_recalled = now()
-  where m.user_id = p_user_id
-    and m.id in (
-      select m2.id from cerebro_memory m2
-      where m2.user_id = p_user_id and m2.embedding is not null
-        and (m2.decay_at is null or m2.decay_at > now())
-      order by m2.embedding <=> p_query
-      limit p_match_count
-    );
+  return query
+  select m.id, m.content, m.source_kind, m.source_id, m.importance,
+         1 - (m.embedding <=> p_query) as similarity, m.created_at
+  from cerebro_memory m
+  where m.id = any(coalesce(matched_ids, array[]::uuid[]))
+  order by m.embedding <=> p_query;
+
+  -- Bump telemetry on the matched rows only — no extra ANN scan.
+  if matched_ids is not null then
+    update cerebro_memory
+    set hits = hits + 1, last_recalled = now()
+    where id = any(matched_ids);
+  end if;
 end;
 $$;

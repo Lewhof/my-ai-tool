@@ -26,9 +26,12 @@ server-side.
 - `WS /ws/:session_id` — duplex stream. Inbound `ControlEvent`, outbound
   `StreamEvent` (see `src/sessions.ts` for the union types).
 
-All routes require `Authorization: Bearer <ts>:<session_id>:<hmac>` where
-the hmac is `HMAC-SHA256(BRIDGE_SECRET, "${ts}:${session_id}")` and `ts`
-is unix-millis within a 60 s freshness window.
+All HTTP routes require `Authorization: Bearer <ts>:<session_id>:<hmac>`
+where the hmac is `HMAC-SHA256(BRIDGE_SECRET, "${ts}:${session_id}")` and
+`ts` is unix-millis within a 60 s freshness window. The WebSocket upgrade
+uses `Sec-WebSocket-Protocol: bearer.<ts>.<session_id>.<hmac>` instead
+(dot-separated, since browsers can't set Authorization on `new WebSocket()`
+and subprotocol values aren't logged by default by most reverse proxies).
 
 ## Tools that require approval
 
