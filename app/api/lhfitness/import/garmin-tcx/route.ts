@@ -1,3 +1,5 @@
+import { auth } from '@clerk/nextjs/server';
+
 // Parse a single Garmin TCX file (XML, one activity per file).
 // TCX shape (simplified):
 //   <TrainingCenterDatabase>
@@ -61,6 +63,9 @@ function parseFloatSafe(s: string | undefined): number | undefined {
 }
 
 export async function POST(req: Request) {
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const formData = await req.formData();
     const file = formData.get('file');

@@ -1,3 +1,4 @@
+import { auth } from '@clerk/nextjs/server';
 import { anthropic, MODELS } from '@/lib/anthropic';
 
 // Plan synthesis: takes the coach conversation + context, returns a structured TrainingPlan.
@@ -85,6 +86,9 @@ function nextMonday(): string {
 }
 
 export async function POST(req: Request) {
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const body: ApiRequest = await req.json();
     const { messages, context, weeks = 4 } = body;

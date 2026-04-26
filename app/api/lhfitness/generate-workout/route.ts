@@ -1,3 +1,4 @@
+import { auth } from '@clerk/nextjs/server';
 import { anthropic, MODELS } from '@/lib/anthropic';
 
 interface GenerateRequest {
@@ -46,6 +47,9 @@ Return ONLY valid JSON in this exact shape:
 No markdown, no commentary — just the JSON object.`;
 
 export async function POST(req: Request) {
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const body: GenerateRequest = await req.json();
     const { goal, difficulty, duration_min, equipment, focus, notes } = body;

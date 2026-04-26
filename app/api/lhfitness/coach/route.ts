@@ -1,3 +1,4 @@
+import { auth } from '@clerk/nextjs/server';
 import { anthropic, MODELS } from '@/lib/anthropic';
 
 interface CoachRequest {
@@ -25,6 +26,9 @@ Boundaries:
 You're embedded in an app with: workout library, AI workout generator, live training session tracker, body metric logging, and PR tracking.`;
 
 export async function POST(req: Request) {
+  const { userId } = await auth();
+  if (!userId) return new Response('Unauthorized', { status: 401 });
+
   try {
     const body: CoachRequest = await req.json();
     const { messages, context } = body;

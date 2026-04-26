@@ -15,8 +15,6 @@ const isPublicRoute = createRouteMatcher([
   '/api/widget(.*)',
   '/api/webhook(.*)',
   '/diagrams/share(.*)',
-  '/lhfitness(.*)',
-  '/api/lhfitness(.*)',
 ]);
 
 const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
