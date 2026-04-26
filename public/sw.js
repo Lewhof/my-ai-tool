@@ -1,4 +1,5 @@
-const CACHE_NAME = 'lewhof-ai-v2';
+// Bump version when shipping SW changes — forces a re-precache on next visit
+const CACHE_NAME = 'lewhof-ai-v3';
 const API_CACHE = 'lewhof-api-v1';
 const OFFLINE_URL = '/offline';
 
@@ -10,6 +11,9 @@ const PRECACHE_URLS = [
   '/calendar',
   '/notes',
   '/offline',
+  // LH Fitness app shell — installable as its own PWA via /lhfitness/manifest.webmanifest
+  '/lhfitness',
+  '/lhfitness/manifest.webmanifest',
 ];
 
 // API routes to cache for offline reading

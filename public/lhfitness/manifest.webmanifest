@@ -1,0 +1,72 @@
+{
+  "name": "LH Fitness — Your AI Trainer",
+  "short_name": "LH Fitness",
+  "description": "AI-generated workouts, live session tracking, training plans, and personal records. Your AI personal trainer.",
+  "id": "/lhfitness",
+  "start_url": "/lhfitness",
+  "scope": "/lhfitness",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#2E2318",
+  "theme_color": "#E07A2E",
+  "categories": ["health", "fitness", "lifestyle", "sports"],
+  "lang": "en-ZA",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Today",
+      "short_name": "Today",
+      "description": "Today's session and stats",
+      "url": "/lhfitness?view=today",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Open Plan",
+      "short_name": "Plan",
+      "description": "Calendar of training",
+      "url": "/lhfitness?view=plan",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Ask Coach",
+      "short_name": "Coach",
+      "description": "AI training coach",
+      "url": "/lhfitness?view=coach",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Workout Library",
+      "short_name": "Library",
+      "description": "Browse or generate workouts",
+      "url": "/lhfitness?view=library",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
+}

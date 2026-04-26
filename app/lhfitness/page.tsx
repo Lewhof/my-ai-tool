@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { Home, Dumbbell, Sparkles, TrendingUp, User, ArrowLeft, Zap, Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -34,6 +34,19 @@ export default function LHFitnessPage() {
   const [view, setView] = useState<View>('today');
   const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null);
   const [activeScheduledId, setActiveScheduledId] = useState<string | null>(null);
+
+  // PWA shortcut deep-links (?view=plan|coach|library|today|progress|profile)
+  // Lets the home-screen long-press menu jump straight to a section.
+  // Reads window.location directly (no useSearchParams) to keep the page out of
+  // Next.js 16's Suspense-boundary requirement for static prerendering.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get('view');
+    if (v && (NAV as Array<{ id: string }>).some(n => n.id === v)) {
+      setView(v as View);
+    }
+  }, []);
 
   // Find the most recent prior session of the same workout (for "last time" reference in session view)
   const priorSession = useMemo(() => {
