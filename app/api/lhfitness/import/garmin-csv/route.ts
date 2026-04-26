@@ -1,3 +1,5 @@
+import { auth } from '@clerk/nextjs/server';
+
 // Parses a Garmin Connect Activities CSV export.
 // Garmin's CSV has these typical columns:
 //   Activity Type, Date, Favorite, Title, Distance, Calories, Time, Avg HR, Max HR,
@@ -98,6 +100,9 @@ function parseDate(s: string): string | undefined {
 }
 
 export async function POST(req: Request) {
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const formData = await req.formData();
     const file = formData.get('file');

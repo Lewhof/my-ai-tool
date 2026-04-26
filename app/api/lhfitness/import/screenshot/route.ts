@@ -2,6 +2,7 @@
 // Uses Claude Haiku for cost; one screenshot can contain multiple activities.
 // Output is a structured tool_use call so we always get clean JSON.
 
+import { auth } from '@clerk/nextjs/server';
 import { anthropic, MODELS } from '@/lib/anthropic';
 
 const SYSTEM = `You are extracting structured workout data from a fitness app screenshot (typically Garmin Connect, but also Strava, Apple Fitness, Polar, etc.).
@@ -50,6 +51,9 @@ const TOOL = {
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 export async function POST(req: Request) {
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const formData = await req.formData();
     const file = formData.get('file');

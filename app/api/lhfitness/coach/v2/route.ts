@@ -1,3 +1,4 @@
+import { auth } from '@clerk/nextjs/server';
 import { anthropic, MODELS } from '@/lib/anthropic';
 
 // AGI-level coach: Sonnet + adaptive thinking + native web_search.
@@ -34,6 +35,9 @@ STYLE:
 You're embedded in an app with: workout library, AI workout generator, live training session tracker, body metric logging, PR tracking, calendar/plan view.`;
 
 export async function POST(req: Request) {
+  const { userId } = await auth();
+  if (!userId) return new Response('Unauthorized', { status: 401 });
+
   try {
     const body: ApiRequest = await req.json();
     const { messages, context, thinking_budget = 4096, enable_web_search = true } = body;
