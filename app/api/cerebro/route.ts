@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { CEREBRO_TOOLS } from '@/lib/cerebro/tools';
 import { executeTool } from '@/lib/cerebro/executor';
 import { getLearnedRules, bumpRuleHits } from '@/lib/cerebro/evolution';
+import { recallMemory } from '@/lib/cerebro/memory';
 
 // ── STATIC portion of the Cerebro system prompt ──
 // This is cached via prompt caching (5-min TTL). Never reference
@@ -65,7 +66,7 @@ CRITICAL — TASK DEDUPLICATION:
  * The static portion is cached (90% discount on reads).
  * The dynamic portion (current time + learned rules) is added fresh each request.
  */
-async function getSystemPrompt(userId: string, learnedRules: string): Promise<Anthropic.Messages.TextBlockParam[]> {
+async function getSystemPrompt(userId: string, learnedRules: string, recallQuery?: string): Promise<Anthropic.Messages.TextBlockParam[]> {
   const now = new Date();
   const sast = new Date(now.getTime() + 2 * 60 * 60 * 1000); // UTC+2
   const dateStr = sast.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -95,7 +96,23 @@ async function getSystemPrompt(userId: string, learnedRules: string): Promise<An
       (wb.length ? `\n- Top whiteboard items: ${wb.map(w => `${w.title} [${w.status}]`).join(', ')}` : '');
   } catch { /* snapshot is optional — never block the prompt */ }
 
-  const dynamic = [timeBlock, snapshot, learnedRules].filter(Boolean).join('\n\n');
+  // Recalled memories — top semantic matches against the latest user turn.
+  // These are injected silently as context so Cerebro can naturally reference
+  // past decisions/preferences without the user re-explaining.
+  let memoryBlock = '';
+  if (recallQuery && process.env.OPENAI_API_KEY) {
+    try {
+      const matches = await recallMemory(userId, recallQuery, { matchCount: 5, minSim: 0.6 });
+      if (matches.length > 0) {
+        const lines = matches.map(m =>
+          `- [importance ${m.importance}/10, ${(m.similarity ?? 0).toFixed(2)} match] ${m.content}`
+        );
+        memoryBlock = `\n\nRECALLED MEMORIES (top matches for this turn — reference naturally; do not list verbatim):\n${lines.join('\n')}`;
+      }
+    } catch { /* recall is best-effort; never block on it */ }
+  }
+
+  const dynamic = [timeBlock, snapshot, memoryBlock, learnedRules].filter(Boolean).join('\n\n');
   return cachedSystem(CEREBRO_STATIC_PROMPT, dynamic);
 }
 
@@ -306,7 +323,8 @@ export async function POST(req: Request) {
 
   // Load learned rules once per turn and inject into the system prompt.
   const learnedRules = await getLearnedRules(userId);
-  const systemPrompt = await getSystemPrompt(userId, learnedRules);
+  // Recall semantically-matching memories against the user's current turn.
+  const systemPrompt = await getSystemPrompt(userId, learnedRules, message);
 
   // SSE stream — text chunks arrive in real-time, tool iterations happen server-side
   const encoder = new TextEncoder();

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import {
   Brain, ArrowLeft, Plus, Trash2, Check, X, Wand2,
   BarChart3, MessageSquareWarning, Sparkles, Loader2, ChevronRight,
+  Database, Search,
 } from 'lucide-react';
 
 type Rule = {
@@ -51,7 +52,26 @@ type CandidateRule = {
   reasoning: string;
 };
 
-type Tab = 'rules' | 'metrics' | 'corrections' | 'reflect';
+type Tab = 'memory' | 'rules' | 'metrics' | 'corrections' | 'reflect';
+
+interface Memory {
+  id: string;
+  content: string;
+  source_kind: 'chat' | 'rule' | 'note' | 'briefing' | 'manual' | 'reflection';
+  source_id: string | null;
+  importance: number;
+  similarity?: number;
+  created_at: string;
+}
+
+const MEMORY_SOURCE_BG: Record<Memory['source_kind'], string> = {
+  manual:     'bg-primary/10 text-primary border-primary/30',
+  chat:       'bg-blue-500/10 text-blue-400 border-blue-500/30',
+  reflection: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+  briefing:   'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+  rule:       'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
+  note:       'bg-orange-500/10 text-orange-400 border-orange-500/30',
+};
 
 const CATEGORY_STYLES: Record<Rule['category'], { label: string; color: string; bg: string }> = {
   do:     { label: 'DO',     color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30' },
@@ -67,7 +87,7 @@ const SOURCE_LABELS: Record<Rule['source'], string> = {
 };
 
 export default function BrainPage() {
-  const [tab, setTab] = useState<Tab>('rules');
+  const [tab, setTab] = useState<Tab>('memory');
 
   return (
     <div className="p-6 space-y-6 max-w-5xl">
@@ -87,8 +107,9 @@ export default function BrainPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-border">
+      <div className="flex gap-1 border-b border-border overflow-x-auto scrollbar-hidden">
         {([
+          { id: 'memory',      label: 'Memory',      icon: Database },
           { id: 'rules',       label: 'Rules',       icon: Brain },
           { id: 'metrics',     label: 'Tool Metrics', icon: BarChart3 },
           { id: 'corrections', label: 'Corrections', icon: MessageSquareWarning },
@@ -100,7 +121,7 @@ export default function BrainPage() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-medium border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-medium border-b-2 transition-colors shrink-0 ${
                 active
                   ? 'border-primary text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -112,10 +133,191 @@ export default function BrainPage() {
         })}
       </div>
 
+      {tab === 'memory' && <MemoryTab />}
       {tab === 'rules' && <RulesTab />}
       {tab === 'metrics' && <MetricsTab />}
       {tab === 'corrections' && <CorrectionsTab />}
       {tab === 'reflect' && <ReflectTab />}
+    </div>
+  );
+}
+
+// ── MEMORY TAB ──
+function MemoryTab() {
+  const [memories, setMemories] = useState<Memory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [matches, setMatches] = useState<Memory[] | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newContent, setNewContent] = useState('');
+  const [newImportance, setNewImportance] = useState(5);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/cerebro/memory');
+      const data = await res.json();
+      setMemories(data.memories ?? []);
+    } catch {
+      toast.error('Failed to load memories');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const search = async (q: string) => {
+    if (!q.trim()) { setMatches(null); return; }
+    setSearching(true);
+    try {
+      const res = await fetch(`/api/cerebro/memory?q=${encodeURIComponent(q)}&limit=12`);
+      const data = await res.json();
+      setMatches(data.matches ?? []);
+    } catch {
+      toast.error('Recall failed');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const addMemory = async () => {
+    if (!newContent.trim()) return;
+    const res = await fetch('/api/cerebro/memory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: newContent.trim(), source: 'manual', importance: newImportance }),
+    });
+    if (res.ok) {
+      toast.success('Memory saved');
+      setNewContent('');
+      setShowAdd(false);
+      load();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      toast.error(err.error || 'Save failed');
+    }
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm('Delete this memory? This cannot be undone.')) return;
+    const res = await fetch(`/api/cerebro/memory?id=${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      toast.success('Memory deleted');
+      setMemories(m => m.filter(x => x.id !== id));
+      setMatches(m => m ? m.filter(x => x.id !== id) : m);
+    }
+  };
+
+  const display = matches ?? memories;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-foreground text-sm font-semibold">{memories.length} memories</p>
+          <p className="text-muted-foreground text-[11px]">
+            Persistent semantic memory. Cerebro retrieves the top matches every turn.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowAdd((v) => !v)}
+          className="bg-primary text-foreground px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors"
+        >
+          <Plus size={12} /> Save memory
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={searchQuery}
+          onChange={(e) => { setSearchQuery(e.target.value); search(e.target.value); }}
+          placeholder="Recall anything — e.g. what did we decide about Stripe?"
+          className="w-full bg-secondary border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"
+        />
+        {searching && (
+          <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
+        )}
+      </div>
+
+      {showAdd && (
+        <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+          <textarea
+            value={newContent}
+            onChange={(e) => setNewContent(e.target.value)}
+            placeholder="A fact, decision, or preference Cerebro should remember…"
+            rows={3}
+            className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground resize-none"
+          />
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Importance</span>
+              <input
+                type="range" min={0} max={10} step={1}
+                value={newImportance}
+                onChange={(e) => setNewImportance(Number(e.target.value))}
+                className="w-24"
+              />
+              <span className="text-foreground tabular-nums w-4">{newImportance}</span>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setShowAdd(false)} className="text-muted-foreground hover:text-foreground px-3 py-1 text-xs">Cancel</button>
+              <button onClick={addMemory} className="bg-primary text-foreground px-4 py-1 rounded text-xs font-medium">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <p className="text-muted-foreground text-sm">Loading memories…</p>
+      ) : display.length === 0 ? (
+        <div className="bg-card border border-border rounded-lg p-10 text-center">
+          <Database size={32} className="mx-auto text-muted-foreground/40 mb-3" />
+          <p className="text-foreground font-semibold">{matches !== null ? 'Nothing matched' : 'No memories yet'}</p>
+          <p className="text-muted-foreground text-sm mt-1 max-w-md mx-auto">
+            {matches !== null
+              ? 'Try a different phrasing — recall is semantic, not keyword.'
+              : 'Save a fact, decision, or preference and Cerebro will recall it on every relevant turn.'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {display.map((m) => {
+            const sourceStyle = MEMORY_SOURCE_BG[m.source_kind] ?? MEMORY_SOURCE_BG.manual;
+            return (
+              <div key={m.id} className="bg-card border border-border rounded-lg p-3 flex items-start gap-3">
+                <span className={`px-2 py-0.5 text-[10px] font-bold rounded border shrink-0 mt-0.5 uppercase ${sourceStyle}`}>
+                  {m.source_kind}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-foreground text-sm whitespace-pre-wrap">{m.content}</p>
+                  <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground">
+                    <span>importance {m.importance}/10</span>
+                    {typeof m.similarity === 'number' && (
+                      <>
+                        <span>·</span>
+                        <span className="text-primary">match {(m.similarity * 100).toFixed(0)}%</span>
+                      </>
+                    )}
+                    <span>·</span>
+                    <span>{new Date(m.created_at).toLocaleDateString()}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => remove(m.id)}
+                  className="text-muted-foreground hover:text-red-400 p-1.5 rounded hover:bg-secondary"
+                  title="Delete"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

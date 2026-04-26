@@ -17,9 +17,10 @@ const SIDEBAR_GROUPS = [
   {
     label: 'Home',
     items: [
+      { name: 'Today', href: '/today', icon: Sparkles, isBrand: true },
       { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-      { name: 'Cerebro', href: '/cerebro', icon: Bot, isBrand: true },
-      { name: 'Cerebro Brain', href: '/cerebro/brain', icon: Sparkles },
+      { name: 'Cerebro', href: '/cerebro', icon: Bot },
+      { name: 'Cerebro Brain', href: '/cerebro/brain', icon: Brain },
       { name: 'Social', href: '/social', icon: Globe },
     ],
   },
@@ -73,6 +74,7 @@ export default function Sidebar() {
     if (href === '/') return pathname === '/';
     // /cerebro should not match /cerebro/brain — treat top-level cerebro as exact
     if (href === '/cerebro') return pathname === '/cerebro';
+    if (href === '/today') return pathname === '/today';
     return pathname.startsWith(href);
   };
 
