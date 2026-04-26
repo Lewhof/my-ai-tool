@@ -29,8 +29,21 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const clerkKeyValid = !!clerkKey && (clerkKey.startsWith('pk_test_') || clerkKey.startsWith('pk_live_'));
+
+  // In non-production sandboxes without valid Clerk keys, render without ClerkProvider so the
+  // app stays viewable. Production must always wrap with ClerkProvider — letting it crash on a
+  // misconfigured key is the right behaviour (silent no-auth fallback would be a security hole).
+  const allowFallback = process.env.NODE_ENV !== 'production';
+  const Provider = clerkKeyValid || !allowFallback
+    ? ({ children: c }: { children: React.ReactNode }) => (
+        <ClerkProvider publishableKey={clerkKey}>{c}</ClerkProvider>
+      )
+    : ({ children: c }: { children: React.ReactNode }) => <>{c}</>;
+
   return (
-    <ClerkProvider publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}>
+    <Provider>
       <html lang="en">
         <head>
           <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -65,6 +78,6 @@ export default function RootLayout({
           </ThemeProvider>
         </body>
       </html>
-    </ClerkProvider>
+    </Provider>
   );
 }

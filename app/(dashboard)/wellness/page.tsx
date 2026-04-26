@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Activity, Heart, Moon, Zap, Footprints, Dumbbell, Plus, TrendingUp, Sparkles, Trash2, Timer, Flame, Target, Calendar, Beef } from 'lucide-react';
+import Link from 'next/link';
+import { Activity, Heart, Moon, Zap, Footprints, Dumbbell, Plus, TrendingUp, Sparkles, Trash2, Timer, Flame, Target, Calendar, Beef, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import NutritionTab from '@/components/wellness/nutrition-tab';
@@ -443,6 +444,33 @@ export default function WellnessPage() {
           </div>
         )}
       </div>
+
+      {/* LH Fitness app — featured launcher */}
+      <Link
+        href="/lhfitness"
+        className="group relative block overflow-hidden rounded-2xl border border-border hover:border-primary/40 bg-gradient-to-br from-primary/15 via-card to-card p-5 sm:p-6 transition-all"
+      >
+        <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-primary/15 blur-3xl pointer-events-none" />
+        <div className="relative flex items-center gap-4 sm:gap-5">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-primary flex items-center justify-center shrink-0 shadow-[0_0_24px_var(--brand-glow)]">
+            <Zap size={22} className="text-primary-foreground" fill="currentColor" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] uppercase tracking-wider text-primary font-bold bg-primary/15 px-1.5 py-0.5 rounded">New</span>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">AI Trainer</span>
+            </div>
+            <h3 className="text-foreground font-bold text-lg sm:text-xl">LH Fitness</h3>
+            <p className="text-muted-foreground text-sm mt-0.5 max-w-md">
+              Full training app — AI-generated workouts, live session tracking, PRs, and a personal coach.
+            </p>
+          </div>
+          <div className="hidden sm:flex items-center gap-1 text-primary text-sm font-bold whitespace-nowrap group-hover:translate-x-1 transition-transform">
+            Open <ArrowRight size={14} />
+          </div>
+          <ArrowRight className="sm:hidden text-primary" size={18} />
+        </div>
+      </Link>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-card border border-border rounded-xl p-1 w-fit">
