@@ -4,10 +4,22 @@ import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
-  Calendar, Clock, CheckSquare, Focus, Coffee, Lock,
+  Calendar, CheckSquare, Focus, Coffee, Lock,
   RefreshCw, Loader2, GripVertical, ChevronLeft, ChevronRight,
   AlertTriangle,
 } from 'lucide-react';
+import {
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  useDraggable,
+  closestCenter,
+} from '@dnd-kit/core';
+import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 
 interface PlanBlock {
   id: string;
@@ -50,15 +62,42 @@ const HOUR_HEIGHT = 60; // px per hour
 const TIMELINE_HEIGHT = TIMELINE_HOURS * HOUR_HEIGHT; // 780px
 const HOURS = Array.from({ length: TIMELINE_HOURS + 1 }, (_, i) => i + TIMELINE_START);
 
+// Snap drops to a 15-min grid so blocks stay aligned with the timeline.
+const SNAP_MINUTES = 15;
+
+function timeToMins(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+
+function minsToTime(total: number): string {
+  const wrapped = ((total % 1440) + 1440) % 1440;
+  const h = Math.floor(wrapped / 60);
+  const m = wrapped % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function snap(mins: number, step: number = SNAP_MINUTES): number {
+  return Math.round(mins / step) * step;
+}
+
 export default function PlannerPage() {
   const [plan, setPlan] = useState<DailyPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const isToday = date === new Date().toISOString().split('T')[0];
+
+  // dnd-kit sensors: pointer for desktop, touch with 100ms longpress for
+  // Capacitor mobile, keyboard for a11y. Distance/delay tuning prevents
+  // accidental drags during scroll on touch.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } }),
+    useSensor(KeyboardSensor),
+  );
 
   const fetchPlan = useCallback(async (refresh = false) => {
     setLoading(true);
@@ -106,9 +145,8 @@ export default function PlannerPage() {
     setSaving(false);
   };
 
-  const saveOrder = async (newBlocks: PlanBlock[]) => {
+  const persistBlocks = async (newBlocks: PlanBlock[]) => {
     if (!plan) return;
-    setPlan(prev => prev ? { ...prev, blocks: newBlocks } : null);
     await fetch('/api/planner', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -116,34 +154,35 @@ export default function PlannerPage() {
     });
   };
 
-  // Drag and drop handlers
-  const handleDragStart = (index: number) => {
-    if (plan?.locked) return;
-    setDraggedIndex(index);
-  };
+  // Drag-to-reschedule: convert vertical drag delta to a minute delta on
+  // the timeline. Snap to 15-min grid, clamp inside the visible window,
+  // then sort by start time so the array reflects timeline order.
+  const handleDragEnd = (event: DragEndEvent) => {
+    if (!plan || plan.locked) return;
+    const blockId = String(event.active.id);
+    const block = plan.blocks.find(b => b.id === blockId);
+    if (!block || block.locked) return;
+    const dy = event.delta.y;
+    if (Math.abs(dy) < 4) return; // tap, not drag
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    if (draggedIndex === null || draggedIndex === index) return;
-    if (!plan) return;
+    const minutesDelta = (dy / HOUR_HEIGHT) * 60;
+    const startMins = timeToMins(block.time);
+    let newStart = snap(startMins + minutesDelta);
 
-    const blocks = [...plan.blocks];
-    const dragged = blocks[draggedIndex];
+    const minStart = TIMELINE_START * 60;
+    const maxStart = (TIMELINE_START + TIMELINE_HOURS) * 60 - block.duration;
+    newStart = Math.max(minStart, Math.min(maxStart, newStart));
+    if (newStart === startMins) return;
 
-    // Don't allow moving locked (calendar) items
-    if (dragged.locked) return;
+    const newEnd = newStart + block.duration;
+    const updated: PlanBlock = { ...block, time: minsToTime(newStart), endTime: minsToTime(newEnd) };
+    const newBlocks = plan.blocks
+      .map(b => (b.id === blockId ? updated : b))
+      .sort((a, b) => timeToMins(a.time) - timeToMins(b.time));
 
-    blocks.splice(draggedIndex, 1);
-    blocks.splice(index, 0, dragged);
-    setPlan({ ...plan, blocks });
-    setDraggedIndex(index);
-  };
-
-  const handleDragEnd = () => {
-    if (plan && draggedIndex !== null) {
-      saveOrder(plan.blocks);
-    }
-    setDraggedIndex(null);
+    setPlan({ ...plan, blocks: newBlocks });
+    persistBlocks(newBlocks);
+    toast.success(`Moved to ${updated.time}`);
   };
 
   // Navigate dates
@@ -342,6 +381,12 @@ export default function PlannerPage() {
             </div>
 
             {/* Timeline content */}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+              onDragEnd={handleDragEnd}
+            >
             <div className="flex-1 relative" style={{ height: `${TIMELINE_HEIGHT}px` }}>
               {/* Hour gridlines */}
               {HOURS.map((hour) => (
@@ -361,7 +406,7 @@ export default function PlannerPage() {
               )}
 
               {/* Plan blocks */}
-              {plan.blocks.map((block, index) => {
+              {plan.blocks.map((block) => {
                 const config = TYPE_CONFIG[block.type] || TYPE_CONFIG.task;
                 const Icon = config.icon;
                 const topPx = getBlockTop(block.time);
@@ -387,55 +432,88 @@ export default function PlannerPage() {
                 }
 
                 return (
-                  <div
+                  <DraggablePlanBlock
                     key={block.id}
-                    draggable={!block.locked && !plan.locked}
-                    onDragStart={() => handleDragStart(index)}
-                    onDragOver={(e) => handleDragOver(e, index)}
-                    onDragEnd={handleDragEnd}
-                    className={cn(
-                      'absolute left-2 right-2 rounded-lg border overflow-hidden transition-all z-10',
-                      config.bg, config.border,
-                      block.locked ? 'opacity-80' : 'cursor-grab active:cursor-grabbing hover:shadow-lg',
-                      draggedIndex === index && 'opacity-50 scale-95',
-                    )}
-                    style={{
-                      top: `${topPx}px`,
-                      height: `${Math.max(heightPx - 2, 20)}px`,
-                    }}
-                  >
-                    <div className={cn('flex items-center gap-2 h-full', isCompact ? 'px-2' : 'px-3 py-1')}>
-                      {!block.locked && !plan.locked && (
-                        <GripVertical size={isCompact ? 10 : 12} className="text-muted-foreground/40 shrink-0" />
-                      )}
-                      <Icon size={isCompact ? 10 : 12} className={cn(config.color, 'shrink-0')} />
-                      {block.priority && (
-                        <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', PRIORITY_DOTS[block.priority])} />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        {isCompact ? (
-                          <p className="text-foreground text-[11px] font-medium truncate">
-                            {block.title}
-                            <span className="text-muted-foreground/50 ml-1.5">{block.time}</span>
-                          </p>
-                        ) : (
-                          <>
-                            <p className="text-foreground text-xs font-medium truncate">{block.title}</p>
-                            <p className="text-muted-foreground/60 text-[10px]">{block.time} - {block.endTime} ({block.duration}m)</p>
-                          </>
-                        )}
-                      </div>
-                      {block.locked && <Lock size={10} className="text-muted-foreground/40 shrink-0" />}
-                      {block.type === 'task' && block.priority === 'urgent' && (
-                        <AlertTriangle size={10} className="text-red-400 shrink-0" />
-                      )}
-                    </div>
-                  </div>
+                    block={block}
+                    topPx={topPx}
+                    heightPx={heightPx}
+                    isCompact={isCompact}
+                    disabled={block.locked || plan.locked}
+                    Icon={Icon}
+                    bgClass={config.bg}
+                    borderClass={config.border}
+                    iconColor={config.color}
+                  />
                 );
               })}
             </div>
-
+            </DndContext>
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface DraggableBlockProps {
+  block: PlanBlock;
+  topPx: number;
+  heightPx: number;
+  isCompact: boolean;
+  disabled: boolean;
+  Icon: typeof Calendar;
+  bgClass: string;
+  borderClass: string;
+  iconColor: string;
+}
+
+function DraggablePlanBlock({ block, topPx, heightPx, isCompact, disabled, Icon, bgClass, borderClass, iconColor }: DraggableBlockProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: block.id,
+    disabled,
+  });
+
+  const dy = transform?.y ?? 0;
+  const top = topPx + dy;
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...(disabled ? {} : listeners)}
+      {...attributes}
+      className={cn(
+        'absolute left-2 right-2 rounded-lg border overflow-hidden z-10',
+        bgClass, borderClass,
+        disabled ? 'opacity-80' : 'cursor-grab active:cursor-grabbing hover:shadow-lg',
+        isDragging && 'shadow-2xl ring-2 ring-primary/40 z-30 cursor-grabbing',
+        !isDragging && 'transition-all',
+      )}
+      style={{
+        top: `${top}px`,
+        height: `${Math.max(heightPx - 2, 20)}px`,
+        touchAction: disabled ? 'auto' : 'none',
+      }}
+    >
+      <div className={cn('flex items-center gap-2 h-full', isCompact ? 'px-2' : 'px-3 py-1')}>
+        {!disabled && <GripVertical size={isCompact ? 10 : 12} className="text-muted-foreground/40 shrink-0" />}
+        <Icon size={isCompact ? 10 : 12} className={cn(iconColor, 'shrink-0')} />
+        {block.priority && <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', PRIORITY_DOTS[block.priority])} />}
+        <div className="flex-1 min-w-0">
+          {isCompact ? (
+            <p className="text-foreground text-[11px] font-medium truncate">
+              {block.title}
+              <span className="text-muted-foreground/50 ml-1.5">{block.time}</span>
+            </p>
+          ) : (
+            <>
+              <p className="text-foreground text-xs font-medium truncate">{block.title}</p>
+              <p className="text-muted-foreground/60 text-[10px]">{block.time} - {block.endTime} ({block.duration}m)</p>
+            </>
+          )}
+        </div>
+        {block.locked && <Lock size={10} className="text-muted-foreground/40 shrink-0" />}
+        {block.type === 'task' && block.priority === 'urgent' && (
+          <AlertTriangle size={10} className="text-red-400 shrink-0" />
         )}
       </div>
     </div>
