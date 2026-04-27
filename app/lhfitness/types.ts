@@ -183,7 +183,8 @@ export interface ScheduledSession {
   workout_id?: string;
   ai_template?: PlanDay['template'];
   status: ScheduledStatus;
-  completed_session_id?: string;
+  completed_session_id?: string;     // when completed via in-app live SessionView
+  completed_import_id?: string;      // when completed via Garmin/external import auto-link
   rescheduled_to?: string;
   notes?: string;
   created_at: string;

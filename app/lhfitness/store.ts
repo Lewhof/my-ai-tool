@@ -9,6 +9,8 @@ import type {
 import { SEED_WORKOUTS } from './seed';
 
 const STORAGE_KEY = 'lhfitness:v1';
+const STORAGE_TS_KEY = 'lhfitness:v1:updated_at';
+const SERVER_SYNC_DEBOUNCE_MS = 1500;
 
 const EMPTY_STATE: FitnessState = {
   profile: null,
@@ -59,8 +61,42 @@ function saveState(state: FitnessState) {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    window.localStorage.setItem(STORAGE_TS_KEY, new Date().toISOString());
   } catch {
     /* quota or private mode — ignore */
+  }
+}
+
+function getLocalUpdatedAt(): string | null {
+  if (typeof window === 'undefined') return null;
+  try { return window.localStorage.getItem(STORAGE_TS_KEY); } catch { return null; }
+}
+
+// Pull a server snapshot. Returns null on no-server-row or any failure
+// — callers must treat absence as "no remote yet, use local".
+async function fetchServerState(): Promise<{ state: FitnessState; updated_at: string } | null> {
+  try {
+    const res = await fetch('/api/lhfitness/state', { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json() as { state: FitnessState | null; updated_at: string | null };
+    if (!data.state || !data.updated_at) return null;
+    return { state: data.state, updated_at: data.updated_at };
+  } catch {
+    return null;
+  }
+}
+
+// Fire-and-forget upsert to the server. Quietly fails — local stays
+// authoritative until the next successful sync.
+async function pushServerState(state: FitnessState): Promise<void> {
+  try {
+    await fetch('/api/lhfitness/state', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state }),
+    });
+  } catch {
+    /* best-effort — next mutation will retry */
   }
 }
 
@@ -449,6 +485,200 @@ export function getScheduledTodayOrNext(state: FitnessState): ScheduledSession |
     .filter(ss => ss.status === 'scheduled' && ss.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date));
   return upcoming[0];
+}
+
+// ── Training summary (for coach personalisation) ──────────────────────
+
+export interface TrainingSummary {
+  // Combined activity counts
+  last_7d_total: number;
+  last_30d_total: number;
+  last_30d_by_type: Record<string, number>; // "Running": 8, "Strength Training": 12
+  last_30d_running_km: number;
+  last_30d_strength_volume_kg: number;
+  last_30d_active_days: number;
+  // Habit / recency
+  longest_recent_gap_days: number;
+  current_streak_days: number;
+  // Specific recent activities (for direct citation by coach)
+  most_recent_activities: Array<{
+    date: string;
+    kind: 'session' | 'import';
+    name: string;
+    duration_min?: number;
+    distance_km?: number;
+    volume_kg?: number;
+    avg_hr?: number;
+    rating?: number;
+  }>;
+  // Frequency signals
+  median_running_distance_km?: number;
+  weekly_target: number;
+  weekly_target_pct: number; // % of target this week (sessions + imports)
+}
+
+function within(days: number, dateStr: string): boolean {
+  const t = new Date(dateStr).getTime();
+  return Date.now() - t < days * 86400000;
+}
+
+export function buildTrainingSummary(state: FitnessState): TrainingSummary {
+  const sessions = state.sessions;
+  const imports = state.imported_workouts;
+  const target = state.profile?.weekly_target ?? 4;
+
+  // Running-type matcher (covers Running, Trail Run, Easy Run, etc.)
+  const isRunning = (type: string) => /run|jog/i.test(type);
+  const isCycling = (type: string) => /cycl|bike|ride/i.test(type);
+  const isStrength = (type: string) => /strength|lift|gym|weight/i.test(type);
+
+  // Last 7d / 30d activity counts (sessions + imports combined)
+  const last7d_sessions = sessions.filter(s => within(7, s.started_at)).length;
+  const last7d_imports = imports.filter(i => within(7, i.date)).length;
+  const last30d_sessions = sessions.filter(s => within(30, s.started_at));
+  const last30d_imports = imports.filter(i => within(30, i.date));
+
+  // By type breakdown (uses session.workout_name as proxy, imports use type)
+  const byType: Record<string, number> = {};
+  last30d_sessions.forEach(s => {
+    // Best-effort: map session workout_name to a category
+    const n = s.workout_name.toLowerCase();
+    const cat = isRunning(n) ? 'Running'
+      : isCycling(n) ? 'Cycling'
+      : 'Strength / gym';
+    byType[cat] = (byType[cat] || 0) + 1;
+  });
+  last30d_imports.forEach(i => {
+    byType[i.type] = (byType[i.type] || 0) + 1;
+  });
+
+  // Distance/volume aggregations
+  const runs30d = last30d_imports.filter(i => isRunning(i.type) && i.distance_km);
+  const last30d_running_km = runs30d.reduce((s, i) => s + (i.distance_km || 0), 0);
+  const last30d_strength_volume_kg = last30d_sessions.reduce((s, sess) => s + (sess.total_volume_kg || 0), 0);
+
+  // Active days (any activity)
+  const activeDays = new Set<string>();
+  last30d_sessions.forEach(s => activeDays.add(s.started_at.slice(0, 10)));
+  last30d_imports.forEach(i => activeDays.add(i.date.slice(0, 10)));
+
+  // Longest gap (within last 30 days)
+  const sortedDays = Array.from(activeDays).sort();
+  let longestGap = 0;
+  for (let i = 1; i < sortedDays.length; i++) {
+    const gap = (new Date(sortedDays[i]).getTime() - new Date(sortedDays[i - 1]).getTime()) / 86400000;
+    if (gap - 1 > longestGap) longestGap = Math.floor(gap - 1);
+  }
+
+  // Current streak (using existing helper)
+  const streak = streakDays(sessions);
+
+  // Most recent activities (top 8, mixed sessions + imports, newest first)
+  const sessionActivities = sessions.slice(0, 8).map(s => ({
+    date: s.started_at,
+    kind: 'session' as const,
+    name: s.workout_name,
+    duration_min: s.duration_seconds ? Math.round(s.duration_seconds / 60) : undefined,
+    volume_kg: s.total_volume_kg,
+    rating: s.rating,
+  }));
+  const importActivities = imports.slice(0, 8).map(i => ({
+    date: i.date,
+    kind: 'import' as const,
+    name: i.name || i.type,
+    duration_min: i.duration_seconds ? Math.round(i.duration_seconds / 60) : undefined,
+    distance_km: i.distance_km,
+    avg_hr: i.avg_hr,
+  }));
+  const mostRecent = [...sessionActivities, ...importActivities]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 8);
+
+  // Median running distance (for pace/load context)
+  let medianRunKm: number | undefined;
+  if (runs30d.length > 0) {
+    const sorted = runs30d.map(r => r.distance_km!).sort((a, b) => a - b);
+    medianRunKm = sorted[Math.floor(sorted.length / 2)];
+  }
+
+  // Weekly target progress (combined sessions + imports this week)
+  const weekTotal = last7d_sessions + last7d_imports;
+  const targetPct = Math.min(100, Math.round((weekTotal / target) * 100));
+
+  return {
+    last_7d_total: weekTotal,
+    last_30d_total: last30d_sessions.length + last30d_imports.length,
+    last_30d_by_type: byType,
+    last_30d_running_km: Math.round(last30d_running_km * 10) / 10,
+    last_30d_strength_volume_kg: Math.round(last30d_strength_volume_kg),
+    last_30d_active_days: activeDays.size,
+    longest_recent_gap_days: longestGap,
+    current_streak_days: streak,
+    most_recent_activities: mostRecent,
+    median_running_distance_km: medianRunKm ? Math.round(medianRunKm * 10) / 10 : undefined,
+    weekly_target: target,
+    weekly_target_pct: targetPct,
+  };
+}
+
+// Auto-link imports to scheduled sessions on the same date when types match.
+// Called after `appendImports` — examines newly-added imports + existing scheduled
+// sessions and marks the scheduled session complete if a matching import lands on
+// the same date. Cheap heuristic; user can always undo by manually flipping status.
+export function autoLinkImports(
+  newImports: ImportedWorkout[],
+  update: (m: (s: FitnessState) => FitnessState) => void
+): { linked: number } {
+  let linked = 0;
+  update((s) => {
+    const importsByDate = new Map<string, ImportedWorkout[]>();
+    newImports.forEach(i => {
+      const d = i.date.slice(0, 10);
+      const arr = importsByDate.get(d) ?? [];
+      arr.push(i);
+      importsByDate.set(d, arr);
+    });
+
+    const matchType = (importType: string, workoutText: string): boolean => {
+      const it = importType.toLowerCase();
+      const wt = workoutText.toLowerCase();
+      if (/run|jog/.test(it) && /run|jog|tempo|interval|5k|10k|cardio/.test(wt)) return true;
+      if (/cycl|bike|ride/.test(it) && /cycl|bike|ride|spin/.test(wt)) return true;
+      if (/strength|lift|gym|weight/.test(it) && /(push|pull|leg|chest|back|shoulder|arm|squat|bench|dead|lift|strength|gym|hypertroph)/.test(wt)) return true;
+      if (/yoga|stretch|mobility/.test(it) && /yoga|stretch|mobility|recovery/.test(wt)) return true;
+      if (/swim/.test(it) && /swim/.test(wt)) return true;
+      if (/walk|hike/.test(it) && /walk|hike/.test(wt)) return true;
+      if (/hiit/.test(it) && /hiit|interval|burner/.test(wt)) return true;
+      return false;
+    };
+
+    const nextScheduled = s.scheduled_sessions.map(ss => {
+      if (ss.status !== 'scheduled') return ss;
+      const dayImports = importsByDate.get(ss.date);
+      if (!dayImports || dayImports.length === 0) return ss;
+
+      // Build a string describing the planned session
+      const plannedText = ss.workout_id
+        ? (s.workouts.find(w => w.id === ss.workout_id)?.name || '') + ' ' +
+          (s.workouts.find(w => w.id === ss.workout_id)?.goal || '') + ' ' +
+          (s.workouts.find(w => w.id === ss.workout_id)?.primary_muscles?.join(' ') || '')
+        : (ss.ai_template?.name || '') + ' ' + (ss.ai_template?.primary_muscles?.join(' ') || '');
+
+      const match = dayImports.find(i => matchType(i.type, plannedText));
+      if (match) {
+        linked++;
+        return {
+          ...ss,
+          status: 'completed' as const,
+          completed_import_id: match.id,
+        };
+      }
+      return ss;
+    });
+
+    return { ...s, scheduled_sessions: nextScheduled };
+  });
+  return { linked };
 }
 
 // ── Derived data helpers ──────────────────────────────────────────────

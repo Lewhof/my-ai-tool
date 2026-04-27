@@ -4,11 +4,28 @@ import { anthropic, MODELS } from '@/lib/anthropic';
 // Plan synthesis: takes the coach conversation + context, returns a structured TrainingPlan.
 // Uses Anthropic tool_choice forced JSON output. No web search, no thinking — pure synthesis.
 
+interface TrainingSummaryShape {
+  last_7d_total: number;
+  last_30d_total: number;
+  last_30d_by_type: Record<string, number>;
+  last_30d_running_km: number;
+  last_30d_strength_volume_kg: number;
+  last_30d_active_days: number;
+  longest_recent_gap_days: number;
+  current_streak_days: number;
+  median_running_distance_km?: number;
+  weekly_target: number;
+  weekly_target_pct: number;
+}
+
 interface ApiRequest {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
   context?: {
     profile?: { goals?: string[]; difficulty?: string; weight_kg?: number; weekly_target?: number; available_equipment?: string[] };
     library_workouts?: Array<{ id: string; name: string; goal: string; difficulty: string; duration_min: number; primary_muscles: string[]; equipment: string[] }>;
+    // Aggregated training history — sessions + Garmin/external imports — so the plan
+    // anchors realistic volume/frequency to the user's actual baseline, not a guess.
+    training_summary?: TrainingSummaryShape;
   };
   weeks?: number;        // default 4
   starts_on?: string;    // ISO YYYY-MM-DD; default = next Monday
@@ -107,6 +124,30 @@ export async function POST(req: Request) {
       if (p.weekly_target) lines.push(`- Sessions per week target: ${p.weekly_target}`);
       if (p.available_equipment?.length) lines.push(`- Available equipment: ${p.available_equipment.join(', ')}`);
     }
+
+    // Anchor the plan to the user's actual training baseline — both manual
+    // sessions and imported Garmin/external activities. Critical for realistic
+    // volume / progression: a user already running 40km/week should NOT get
+    // a beginner couch-to-5k plan.
+    const ts = context?.training_summary;
+    if (ts) {
+      lines.push('');
+      lines.push('Existing training baseline (last 30 days, includes external/Garmin imports):');
+      lines.push(`- Active days: ${ts.last_30d_active_days}/30 · Current streak: ${ts.current_streak_days} day${ts.current_streak_days === 1 ? '' : 's'}`);
+      const typeLines = Object.entries(ts.last_30d_by_type)
+        .sort((a, b) => b[1] - a[1])
+        .map(([t, n]) => `${n}× ${t}`)
+        .join(', ');
+      if (typeLines) lines.push(`- Activity mix: ${typeLines}`);
+      if (ts.last_30d_running_km > 0) {
+        lines.push(`- Running mileage: ${ts.last_30d_running_km}km/30d${ts.median_running_distance_km ? ` (median run ${ts.median_running_distance_km}km)` : ''}`);
+      }
+      if (ts.last_30d_strength_volume_kg > 0) {
+        lines.push(`- Strength volume: ${ts.last_30d_strength_volume_kg.toLocaleString()}kg/30d`);
+      }
+      lines.push('- IMPORTANT: progression must build from this baseline. Do not regress; do not radically jump.');
+    }
+
     if (context?.library_workouts?.length) {
       lines.push(`\nAvailable library workouts (use workout_id to bind):`);
       context.library_workouts.slice(0, 30).forEach(w => {

@@ -6,10 +6,37 @@ import { anthropic, MODELS } from '@/lib/anthropic';
 // compact JSON manifest line beginning with `\n\n[[META]]` containing thinking
 // summary + sources + tool uses, so the client can show those in the UI.
 
+interface TrainingSummaryShape {
+  last_7d_total: number;
+  last_30d_total: number;
+  last_30d_by_type: Record<string, number>;
+  last_30d_running_km: number;
+  last_30d_strength_volume_kg: number;
+  last_30d_active_days: number;
+  longest_recent_gap_days: number;
+  current_streak_days: number;
+  most_recent_activities: Array<{
+    date: string;
+    kind: 'session' | 'import';
+    name: string;
+    duration_min?: number;
+    distance_km?: number;
+    volume_kg?: number;
+    avg_hr?: number;
+    rating?: number;
+  }>;
+  median_running_distance_km?: number;
+  weekly_target: number;
+  weekly_target_pct: number;
+}
+
 interface ApiRequest {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
   context?: {
     profile?: { goal?: string; difficulty?: string; weight_kg?: number; weekly_target?: number };
+    // New: rich digest of all activity (sessions + imports). Replaces bare recent_sessions.
+    training_summary?: TrainingSummaryShape;
+    // Legacy field kept for compatibility — Quick mode v1 still passes this
     recent_sessions?: Array<{ name: string; date: string; volume_kg?: number; rating?: number }>;
     recent_prs?: Array<{ exercise: string; type: string; value: number; unit: string }>;
     active_plan?: { name: string; week_num: number; weeks_total: number } | null;
@@ -44,10 +71,13 @@ export async function POST(req: Request) {
 
     if (!messages?.length) return new Response('No messages', { status: 400 });
 
-    // Build a context preamble — gives the coach grounding in the user's actual data
+    // Build a context preamble — gives the coach grounding in the user's actual data.
+    // The training_summary block aggregates BOTH manual in-app sessions AND imported
+    // Garmin/external activities, so the coach sees the user's actual training load
+    // (not just what they logged via the workout tracker).
     let systemWithContext = SYSTEM;
     if (context) {
-      const lines: string[] = ['\n\nUser context:'];
+      const lines: string[] = ['\n\nUser context (use this to ground every recommendation):'];
       if (context.profile) {
         const p = context.profile;
         lines.push(`- Goal(s): ${p.goal ?? 'not set'}`);
@@ -55,20 +85,57 @@ export async function POST(req: Request) {
         if (p.weight_kg) lines.push(`- Body weight: ${p.weight_kg}kg`);
         if (p.weekly_target) lines.push(`- Weekly target: ${p.weekly_target} sessions`);
       }
-      if (context.recent_sessions?.length) {
+
+      const ts = context.training_summary;
+      if (ts) {
+        lines.push('');
+        lines.push('Training load (last 30 days, includes both in-app sessions AND imported Garmin/external activities):');
+        lines.push(`- Active days: ${ts.last_30d_active_days}/30 · This week: ${ts.last_7d_total}/${ts.weekly_target} target (${ts.weekly_target_pct}%)`);
+        lines.push(`- Current streak: ${ts.current_streak_days} day${ts.current_streak_days === 1 ? '' : 's'} · Longest gap in last 30d: ${ts.longest_recent_gap_days} day${ts.longest_recent_gap_days === 1 ? '' : 's'}`);
+        const typeLines = Object.entries(ts.last_30d_by_type)
+          .sort((a, b) => b[1] - a[1])
+          .map(([t, n]) => `${n}× ${t}`)
+          .join(', ');
+        if (typeLines) lines.push(`- Activity mix: ${typeLines}`);
+        if (ts.last_30d_running_km > 0) {
+          lines.push(`- Running mileage (30d): ${ts.last_30d_running_km}km${ts.median_running_distance_km ? ` · median run ${ts.median_running_distance_km}km` : ''}`);
+        }
+        if (ts.last_30d_strength_volume_kg > 0) {
+          lines.push(`- Strength volume (30d): ${ts.last_30d_strength_volume_kg.toLocaleString()}kg lifted`);
+        }
+        if (ts.most_recent_activities.length > 0) {
+          lines.push('');
+          lines.push('Most recent activities (newest first):');
+          ts.most_recent_activities.forEach(a => {
+            const date = new Date(a.date).toLocaleDateString('en-ZA', { month: 'short', day: 'numeric' });
+            const kindTag = a.kind === 'import' ? ' [external]' : '';
+            const detail = [
+              a.duration_min ? `${a.duration_min}min` : null,
+              a.distance_km ? `${a.distance_km.toFixed(2)}km` : null,
+              a.volume_kg ? `${Math.round(a.volume_kg)}kg vol` : null,
+              a.avg_hr ? `avg ${a.avg_hr}bpm` : null,
+              a.rating ? `felt ${a.rating}/5` : null,
+            ].filter(Boolean).join(' · ');
+            lines.push(`  · ${date} — ${a.name}${kindTag}${detail ? ` (${detail})` : ''}`);
+          });
+        }
+      } else if (context.recent_sessions?.length) {
+        // Legacy path (Quick mode v1)
         lines.push(`- Last ${context.recent_sessions.length} sessions:`);
         context.recent_sessions.forEach(s => {
           const date = new Date(s.date).toLocaleDateString('en-ZA', { month: 'short', day: 'numeric' });
           lines.push(`  · ${date} — ${s.name}${s.volume_kg ? ` (${Math.round(s.volume_kg)}kg total volume)` : ''}${s.rating ? ` — felt ${s.rating}/5` : ''}`);
         });
       }
+
       if (context.recent_prs?.length) {
-        lines.push(`- Recent PRs: ${context.recent_prs.map(p => `${p.exercise} ${p.value}${p.unit}`).join(', ')}`);
+        lines.push('');
+        lines.push(`Recent PRs: ${context.recent_prs.map(p => `${p.exercise} ${p.value}${p.unit}`).join(', ')}`);
       }
       if (context.active_plan) {
-        lines.push(`- Currently on plan "${context.active_plan.name}" — week ${context.active_plan.week_num}/${context.active_plan.weeks_total}`);
+        lines.push(`Currently on plan "${context.active_plan.name}" — week ${context.active_plan.week_num}/${context.active_plan.weeks_total}`);
       } else if (context.active_plan === null) {
-        lines.push('- No active training plan');
+        lines.push('No active training plan');
       }
       systemWithContext += lines.join('\n');
     }

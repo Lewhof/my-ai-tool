@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useRef } from 'react';
-import { User, Target, Wrench, Calendar, Download, Upload, RotateCcw, Activity, FileUp, Image as ImageIcon, Loader2, Trash2, AlertCircle, Check } from 'lucide-react';
+import { User, Target, Wrench, Calendar, Download, Upload, RotateCcw, Activity, FileUp, Image as ImageIcon, Loader2, Trash2, AlertCircle, Check, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { FitnessState, Profile, Equipment, Goal, ImportedWorkout } from './types';
-import { exportData, importData, resetAll, setProfile, appendImports, isDuplicate, deleteImport } from './store';
+import { exportData, importData, resetAll, setProfile, appendImports, isDuplicate, deleteImport, autoLinkImports, buildTrainingSummary } from './store';
 
 interface Props {
   state: FitnessState;
@@ -223,6 +223,9 @@ export default function ProfileView({ state, dispatch }: Props) {
         </div>
       </section>
 
+      {/* What the AI knows — derived from sessions + imports + profile */}
+      <KnowledgeCard state={state} />
+
       {/* Import workouts */}
       <ImportSection state={state} dispatch={dispatch} />
 
@@ -264,6 +267,105 @@ function Field({ label, value }: { label: string; value: string }) {
     <div>
       <p className="text-muted-foreground text-[10px] uppercase tracking-wide">{label}</p>
       <p className="text-foreground text-sm font-medium mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+// ── Knowledge card ────────────────────────────────────────────────────
+// Shows the user exactly what the AI sees when personalising recommendations,
+// so they can verify imports were processed correctly and understand "why" the
+// coach recommends what it does.
+
+function KnowledgeCard({ state }: { state: FitnessState }) {
+  const summary = buildTrainingSummary(state);
+  const types = Object.entries(summary.last_30d_by_type).sort((a, b) => b[1] - a[1]);
+  const topImports = state.imported_workouts.slice(0, 5);
+
+  return (
+    <section className="bg-card border border-border rounded-2xl p-6">
+      <h3 className="text-foreground font-bold mb-1 flex items-center gap-2">
+        <Sparkles size={16} className="text-primary" /> What the AI knows about you
+      </h3>
+      <p className="text-muted-foreground text-sm mb-4">
+        This is the digest your coach sees. Imports + sessions + PRs together — it's how recommendations stay anchored to reality.
+      </p>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <KStat label="Active days (30d)" value={`${summary.last_30d_active_days}/30`} />
+        <KStat label="This week" value={`${summary.last_7d_total}/${summary.weekly_target}`} sub={`${summary.weekly_target_pct}% of target`} />
+        <KStat label="Streak" value={`${summary.current_streak_days}d`} />
+        <KStat label="Longest gap (30d)" value={`${summary.longest_recent_gap_days}d`} />
+      </div>
+
+      {(summary.last_30d_running_km > 0 || summary.last_30d_strength_volume_kg > 0) && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {summary.last_30d_running_km > 0 && (
+            <KStat
+              label="Running mileage (30d)"
+              value={`${summary.last_30d_running_km}km`}
+              sub={summary.median_running_distance_km ? `median run ${summary.median_running_distance_km}km` : undefined}
+            />
+          )}
+          {summary.last_30d_strength_volume_kg > 0 && (
+            <KStat
+              label="Strength volume (30d)"
+              value={`${summary.last_30d_strength_volume_kg.toLocaleString()}kg`}
+              sub={`across ${state.sessions.filter(s => Date.now() - new Date(s.started_at).getTime() < 30*86400000).length} sessions`}
+            />
+          )}
+        </div>
+      )}
+
+      {types.length > 0 && (
+        <div className="mb-4">
+          <p className="text-foreground text-xs uppercase tracking-wide font-bold mb-2">Activity mix (30d)</p>
+          <div className="flex flex-wrap gap-1.5">
+            {types.map(([type, count]) => (
+              <div key={type} className="bg-secondary border border-border rounded-full px-2.5 py-1 text-xs flex items-center gap-1.5">
+                <span className="text-foreground font-medium">{type}</span>
+                <span className="text-muted-foreground tabular-nums">×{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {topImports.length > 0 && (
+        <div>
+          <p className="text-foreground text-xs uppercase tracking-wide font-bold mb-2">
+            Imported activities recognised ({state.imported_workouts.length} total)
+          </p>
+          <div className="space-y-1">
+            {topImports.map(i => (
+              <div key={i.id} className="text-xs text-muted-foreground bg-secondary/50 rounded px-2 py-1.5 flex items-center gap-2">
+                <span className="text-foreground font-medium">{i.name || i.type}</span>
+                <span className="opacity-60">·</span>
+                <span>{new Date(i.date).toLocaleDateString()}</span>
+                {i.duration_seconds && <><span className="opacity-60">·</span><span>{Math.round(i.duration_seconds / 60)}m</span></>}
+                {i.distance_km && <><span className="opacity-60">·</span><span>{i.distance_km.toFixed(2)}km</span></>}
+                {i.avg_hr && <><span className="opacity-60">·</span><span>{i.avg_hr}bpm</span></>}
+              </div>
+            ))}
+            {state.imported_workouts.length > 5 && (
+              <p className="text-[10px] text-muted-foreground/60 italic mt-1">+ {state.imported_workouts.length - 5} more · all visible on the Plan calendar</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {summary.last_30d_total === 0 && (
+        <p className="text-muted-foreground text-sm italic">No activity in the last 30 days. Log a session, run a workout, or import from Garmin to give the AI something to work with.</p>
+      )}
+    </section>
+  );
+}
+
+function KStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="bg-secondary/50 border border-border rounded-lg px-3 py-2">
+      <p className="text-muted-foreground text-[10px] uppercase tracking-wide">{label}</p>
+      <p className="text-foreground text-lg font-bold tabular-nums">{value}</p>
+      {sub && <p className="text-muted-foreground text-[10px] truncate">{sub}</p>}
     </div>
   );
 }
@@ -353,7 +455,10 @@ function ImportSection({
       return;
     }
     appendImports(toAdd, dispatch);
-    toast.success(`Imported ${toAdd.length} activit${toAdd.length === 1 ? 'y' : 'ies'}`);
+    // Auto-link imports to scheduled sessions on the same date when types match
+    const { linked } = autoLinkImports(toAdd, dispatch);
+    const linkedNote = linked > 0 ? ` · ${linked} planned session${linked === 1 ? '' : 's'} marked complete` : '';
+    toast.success(`Imported ${toAdd.length} activit${toAdd.length === 1 ? 'y' : 'ies'}${linkedNote}`);
     setPending([]);
     setDupes([]);
   };

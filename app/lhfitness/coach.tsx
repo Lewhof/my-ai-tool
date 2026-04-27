@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import type { FitnessState, CoachMessage, CoachThread, CoachMode, TrainingPlan, PlanWeek, MuscleGroup } from './types';
 import {
   newThread, setActiveThread, appendThreadMessage, deleteThread,
-  setThreadPlan, commitPlan, getActivePlan,
+  setThreadPlan, commitPlan, getActivePlan, buildTrainingSummary,
 } from './store';
 
 interface Props {
@@ -86,6 +86,7 @@ export default function CoachView({ state, dispatch, onPlanCommitted }: Props) {
 
     try {
       const activePlan = getActivePlan(state);
+      const summary = buildTrainingSummary(state);
       const context = {
         profile: state.profile ? {
           goal: state.profile.goals.length === 1 ? state.profile.goals[0] : `hybrid (${state.profile.goals.join(', ')})`,
@@ -93,12 +94,9 @@ export default function CoachView({ state, dispatch, onPlanCommitted }: Props) {
           weight_kg: state.profile.weight_kg,
           weekly_target: state.profile.weekly_target,
         } : undefined,
-        recent_sessions: state.sessions.slice(0, 5).map(s => ({
-          name: s.workout_name,
-          date: s.started_at,
-          volume_kg: s.total_volume_kg,
-          rating: s.rating,
-        })),
+        // Rich digest of EVERYTHING — both manual sessions AND Garmin/external imports
+        // — aggregated into actionable signals (mileage, volume, streak, gaps).
+        training_summary: summary,
         recent_prs: state.prs.slice(-5).map(p => ({
           exercise: p.exercise_name,
           type: p.type,
@@ -227,6 +225,8 @@ export default function CoachView({ state, dispatch, onPlanCommitted }: Props) {
               primary_muscles: w.primary_muscles,
               equipment: w.equipment,
             })),
+            // Anchor plan progression to actual baseline (sessions + Garmin imports)
+            training_summary: buildTrainingSummary(state),
           },
           weeks: 4,
         }),

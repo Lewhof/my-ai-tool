@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { Flame, TrendingUp, Calendar, Trophy, Play, Sparkles, Dumbbell, Clock, ArrowRight, Brain } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { FitnessState, Workout, ScheduledSession } from './types';
+import type { FitnessState, Workout, ScheduledSession, ImportedWorkout, Session } from './types';
 import { streakDays, sessionsThisWeek, totalVolumeThisWeek, getActivePlan } from './store';
 
 interface Props {
@@ -18,8 +18,14 @@ export default function TodayView({ state, onStartWorkout, onNavigate }: Props) 
 
   const streak = streakDays(sessions);
   const week = sessionsThisWeek(sessions);
-  const weekProgress = Math.min(100, Math.round((week.length / profile.weekly_target) * 100));
+  // Imports this week — Garmin/external activities also count toward target
+  const weekImports = importsThisWeek(state.imported_workouts);
+  const weekTotalActivities = week.length + weekImports.length;
+  const weekProgress = Math.min(100, Math.round((weekTotalActivities / profile.weekly_target) * 100));
   const volumeWeek = totalVolumeThisWeek(sessions);
+  const runningKmWeek = weekImports
+    .filter(i => /run|jog/i.test(i.type) && i.distance_km)
+    .reduce((s, i) => s + (i.distance_km || 0), 0);
 
   // Today's scheduled session takes priority over the auto-recommendation
   const today = new Date().toISOString().slice(0, 10);
@@ -38,7 +44,7 @@ export default function TodayView({ state, onStartWorkout, onNavigate }: Props) 
   const featuredFromPlan = !!scheduledWorkout && !!scheduledToday;
 
   const greeting = getGreeting();
-  const motivational = getMotivationalLine(streak, week.length, profile.weekly_target);
+  const motivational = getMotivationalLine(streak, weekTotalActivities, profile.weekly_target);
 
   // Recent PRs (last 14 days)
   const recentPrs = prs
@@ -70,15 +76,17 @@ export default function TodayView({ state, onStartWorkout, onNavigate }: Props) 
         <StatTile
           icon={<Calendar className="text-blue-400" size={18} />}
           label="This week"
-          value={`${week.length}`}
+          value={`${weekTotalActivities}`}
           unit={`/ ${profile.weekly_target}`}
           progress={weekProgress}
         />
         <StatTile
           icon={<TrendingUp className="text-emerald-400" size={18} />}
-          label="Volume"
-          value={volumeWeek > 1000 ? (volumeWeek / 1000).toFixed(1) + 'k' : String(Math.round(volumeWeek))}
-          unit="kg"
+          label={runningKmWeek > 0 ? 'Run / Vol' : 'Volume'}
+          value={runningKmWeek > 0
+            ? `${runningKmWeek.toFixed(1)}km`
+            : (volumeWeek > 1000 ? (volumeWeek / 1000).toFixed(1) + 'k' : String(Math.round(volumeWeek)))}
+          unit={runningKmWeek > 0 ? '+ lifts' : 'kg'}
         />
         <StatTile
           icon={<Trophy className="text-yellow-400" size={18} />}
@@ -227,28 +235,34 @@ export default function TodayView({ state, onStartWorkout, onNavigate }: Props) 
         </section>
       </div>
 
-      {/* Recent sessions */}
-      {sessions.length > 0 && (
+      {/* Recent activity — unified feed of in-app sessions + Garmin/external imports */}
+      {(sessions.length > 0 || state.imported_workouts.length > 0) && (
         <section>
-          <h2 className="text-foreground font-bold text-lg mb-3">Recent sessions</h2>
+          <h2 className="text-foreground font-bold text-lg mb-3">Recent activity</h2>
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="divide-y divide-border">
-              {sessions.slice(0, 5).map(s => (
-                <div key={s.id} className="px-4 py-3 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <Dumbbell size={14} className="text-primary" />
+              {mergeRecentActivity(sessions, state.imported_workouts).slice(0, 6).map(item => (
+                <div key={item.kind + ':' + item.id} className="px-4 py-3 flex items-center gap-3">
+                  <div className={cn(
+                    'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
+                    item.kind === 'session' ? 'bg-primary/10' : 'bg-blue-500/10'
+                  )}>
+                    {item.kind === 'session'
+                      ? <Dumbbell size={14} className="text-primary" />
+                      : <span className="text-blue-400 text-[10px] font-bold">EXT</span>}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-foreground text-sm font-medium truncate">{s.workout_name}</p>
+                    <p className="text-foreground text-sm font-medium truncate">{item.name}</p>
                     <p className="text-muted-foreground text-xs">
-                      {new Date(s.started_at).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })}
-                      {s.duration_seconds ? ` · ${Math.round(s.duration_seconds / 60)} min` : ''}
+                      {new Date(item.date).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })}
+                      {item.duration_min ? ` · ${item.duration_min} min` : ''}
+                      {item.distance_km ? ` · ${item.distance_km.toFixed(2)}km` : ''}
                     </p>
                   </div>
-                  {s.total_volume_kg && s.total_volume_kg > 0 && (
+                  {item.right_value && (
                     <div className="text-right">
-                      <p className="text-foreground text-sm font-bold tabular-nums">{Math.round(s.total_volume_kg)}<span className="text-xs text-muted-foreground ml-1">kg</span></p>
-                      <p className="text-muted-foreground text-[10px]">total volume</p>
+                      <p className="text-foreground text-sm font-bold tabular-nums">{item.right_value}</p>
+                      <p className="text-muted-foreground text-[10px]">{item.right_label}</p>
                     </div>
                   )}
                 </div>
@@ -319,6 +333,51 @@ function getMotivationalLine(streak: number, weekCount: number, target: number):
   if (weekCount >= target) return { headline: 'Weekly target hit.', sub: 'Anything from here is a bonus. Train smart.' };
   if (weekCount > 0) return { headline: `${weekCount}/${target} sessions this week.`, sub: `${target - weekCount} to go. You've got this.` };
   return { headline: 'Time to get to work.', sub: 'Start today, build the habit, change the trajectory.' };
+}
+
+// Imports landing in the last 7 days (rolling window matching sessionsThisWeek)
+function importsThisWeek(imports: ImportedWorkout[]): ImportedWorkout[] {
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(now.getDate() - 6);
+  start.setHours(0, 0, 0, 0);
+  return imports.filter(i => new Date(i.date) >= start);
+}
+
+interface ActivityItem {
+  id: string;
+  kind: 'session' | 'import';
+  date: string;
+  name: string;
+  duration_min?: number;
+  distance_km?: number;
+  right_value?: string;
+  right_label?: string;
+}
+
+function mergeRecentActivity(sessions: Session[], imports: ImportedWorkout[]): ActivityItem[] {
+  const sessionItems: ActivityItem[] = sessions.map(s => ({
+    id: s.id,
+    kind: 'session',
+    date: s.started_at,
+    name: s.workout_name,
+    duration_min: s.duration_seconds ? Math.round(s.duration_seconds / 60) : undefined,
+    right_value: s.total_volume_kg && s.total_volume_kg > 0
+      ? `${Math.round(s.total_volume_kg)}kg`
+      : undefined,
+    right_label: s.total_volume_kg && s.total_volume_kg > 0 ? 'volume' : undefined,
+  }));
+  const importItems: ActivityItem[] = imports.map(i => ({
+    id: i.id,
+    kind: 'import',
+    date: i.date,
+    name: i.name || i.type,
+    duration_min: i.duration_seconds ? Math.round(i.duration_seconds / 60) : undefined,
+    distance_km: i.distance_km,
+    right_value: i.calories ? `${i.calories}` : i.avg_hr ? `${i.avg_hr}` : undefined,
+    right_label: i.calories ? 'kcal' : i.avg_hr ? 'avg bpm' : undefined,
+  }));
+  return [...sessionItems, ...importItems].sort((a, b) => b.date.localeCompare(a.date));
 }
 
 function pickRecommended(state: FitnessState): Workout | undefined {
