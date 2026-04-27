@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import type {
   FitnessState, Profile, Workout, Session, BodyMetric, PersonalRecord,
   CoachMessage, CoachThread, CoachMode, LoggedExercise, LoggedSet,
@@ -113,8 +113,36 @@ export function useFitnessState() {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setState(loadState());
+    // 1) Hydrate from localStorage immediately so the UI doesn't flash.
+    const local = loadState();
+    setState(local);
     setHydrated(true);
+
+    // 2) In parallel, ask the server for a snapshot. If the server has
+    //    something AND this device doesn't (or the server is newer than
+    //    this device's last save), adopt it. This is what makes "I
+    //    onboarded on desktop, opening on mobile" Just Work.
+    void (async () => {
+      const remote = await fetchServerState();
+      if (!remote) {
+        // No server row yet. If we have a local profile, push it up so
+        // the next device gets it.
+        if (local.profile) void pushServerState(local);
+        return;
+      }
+      const localUpdatedAt = getLocalUpdatedAt();
+      const serverIsNewer = !localUpdatedAt || remote.updated_at > localUpdatedAt;
+      if (!local.profile || serverIsNewer) {
+        // Adopt the server state and persist locally.
+        setState(remote.state);
+        saveState(remote.state);
+        setTimeout(emitSync, 0);
+      } else if (localUpdatedAt && localUpdatedAt > remote.updated_at) {
+        // Local is newer — push it up.
+        void pushServerState(local);
+      }
+    })();
+
     const onSync = () => setState(loadState());
     window.addEventListener(SYNC_EVENT, onSync);
     window.addEventListener('storage', onSync);
@@ -124,12 +152,18 @@ export function useFitnessState() {
     };
   }, []);
 
+  // Debounce server pushes so a flurry of mutations (e.g. an active
+  // session logging set after set) collapses into one PUT.
+  const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const update = useCallback((mutator: (s: FitnessState) => FitnessState) => {
     setState((prev) => {
       const next = mutator(prev);
       saveState(next);
-      // Defer the broadcast so other listeners pick up the new value
       setTimeout(emitSync, 0);
+      // Debounced server push.
+      if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+      pushTimerRef.current = setTimeout(() => { void pushServerState(next); }, SERVER_SYNC_DEBOUNCE_MS);
       return next;
     });
   }, []);
