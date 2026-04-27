@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { getMicrosoftToken } from '@/lib/microsoft-token';
 import { getGoogleToken } from '@/lib/google-token';
+import { fetchFitnessSessions } from '@/lib/lhfitness-bridge';
 
 // Provider-agnostic calendar event fetcher. Used by the briefing, planner,
 // and Cerebro's get_calendar tool — anything that needs "what's on the
@@ -13,7 +14,7 @@ export interface CalendarEvent {
   end: string;            // ISO datetime
   accountId: string;
   accountLabel: string;
-  provider: 'microsoft' | 'microsoft-work' | 'google';
+  provider: 'microsoft' | 'microsoft-work' | 'google' | 'lhfitness';
 }
 
 interface CalendarAccount {
@@ -43,9 +44,8 @@ export async function fetchCalendarEvents(
     .in('provider', ['microsoft', 'microsoft-work', 'google']);
 
   const accounts = (rawAccounts ?? []) as CalendarAccount[];
-  if (accounts.length === 0) return [];
 
-  const perAccount = await Promise.all(accounts.map(async (acc) => {
+  const accountFetches = accounts.map(async (acc) => {
     try {
       const label = acc.alias || acc.label || providerLabel(acc.provider);
       if (acc.provider === 'google') {
@@ -55,13 +55,22 @@ export async function fetchCalendarEvents(
     } catch {
       return [];
     }
-  }));
+  });
 
-  const flat = perAccount.flat();
+  // LH Fitness scheduled sessions are a fourth source. Failure-isolated:
+  // if the bridge throws, calendar still renders the other providers.
+  const fitnessFetch = fetchFitnessSessions(userId, startIso, endIso).catch(() => [] as CalendarEvent[]);
+
+  const settled = await Promise.all([...accountFetches, fitnessFetch]);
+
+  const flat = settled.flat();
   // Dedupe across accounts: same meeting often lands on both personal +
-  // work calendars or on a shared Google + invited Microsoft.
+  // work calendars or on a shared Google + invited Microsoft. We never
+  // dedupe LH Fitness sessions against external events — a coincidentally-
+  // titled Outlook event must not hide a training session.
   const seen = new Set<string>();
   const deduped = flat.filter(e => {
+    if (e.provider === 'lhfitness') return true;
     const key = `${e.subject}|${e.start}`;
     if (seen.has(key)) return false;
     seen.add(key);

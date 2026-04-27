@@ -1,17 +1,17 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS } from '@/lib/anthropic';
-import { fetchCalendarEvents } from '@/lib/calendar-events';
+import { fetchCalendarEvents, type CalendarEvent } from '@/lib/calendar-events';
 
 export interface PlanBlock {
   id: string;
   time: string;       // HH:MM
   endTime: string;     // HH:MM
   title: string;
-  type: 'calendar' | 'task' | 'focus' | 'break';
-  refId?: string;      // todo id or calendar event id
+  type: 'calendar' | 'task' | 'focus' | 'break' | 'fitness';
+  refId?: string;      // todo id, calendar event id, or 'lhfitness:<sched-id>'
   priority?: string;
   accountLabel?: string; // which calendar this event came from
-  locked: boolean;     // calendar events are locked
+  locked: boolean;     // calendar events + fitness sessions are locked
   duration: number;    // minutes
 }
 
@@ -64,17 +64,21 @@ export async function generateDailyPlan(userId: string): Promise<PlanBlock[]> {
   const data = await gatherPlannerData(userId);
   const now = new Date();
 
-  // Build calendar blocks (locked) — now with account labels
+  // Build calendar blocks (locked) — now with account labels.
+  // LH Fitness sessions arrive through the same aggregator with
+  // accountId === 'lhfitness'; they emit as fitness-typed locked blocks
+  // so the planner timeline tints them orange via TYPE_CONFIG.
   const calendarBlocks: PlanBlock[] = data.calendarEvents.map((e, i) => {
     const start = new Date(e.start);
     const end = new Date(e.end);
-    const label = ('accountLabel' in e ? (e as { accountLabel?: string }).accountLabel : '') || '';
+    const isFitness = e.accountId === 'lhfitness';
+    const label = e.accountLabel || '';
     return {
       id: `cal-${i}`,
       time: formatTime(start),
       endTime: formatTime(end),
-      title: label ? `${e.subject} [${label}]` : e.subject,
-      type: 'calendar' as const,
+      title: isFitness || !label ? e.subject : `${e.subject} [${label}]`,
+      type: isFitness ? 'fitness' as const : 'calendar' as const,
       refId: e.id,
       accountLabel: label,
       locked: true,
@@ -99,7 +103,7 @@ export async function generateDailyPlan(userId: string): Promise<PlanBlock[]> {
   }
 
   const calendarContext = calendarBlocks.length > 0
-    ? calendarBlocks.map(b => `- ${b.time}-${b.endTime}: ${b.title} (LOCKED)`).join('\n')
+    ? calendarBlocks.map(b => `- ${b.time}-${b.endTime}: ${b.title} (LOCKED${b.type === 'fitness' ? ' · FITNESS' : ''})`).join('\n')
     : 'No calendar events today.';
 
   const taskContext = sortedTasks.map((t, i) =>
@@ -191,8 +195,13 @@ Return ONLY the JSON array. No prose, no markdown, no code fences.`,
     return calendarBlocks;
   }
 
+  // Guard against Haiku echoing locked blocks (especially fitness sessions)
+  // back into its output as plain task blocks — drop any AI block whose
+  // title matches a locked title.
+  const lockedTitles = new Set(calendarBlocks.map(b => b.title.toLowerCase()));
+
   const taskBlocks: PlanBlock[] = aiBlocks
-    .filter(b => b && b.time && b.title)
+    .filter(b => b && b.time && b.title && !lockedTitles.has(b.title.toLowerCase()))
     .map((b, i) => ({
       id: `ai-${i}`,
       time: b.time!,
@@ -379,15 +388,14 @@ function formatTime(d: Date): string {
   return d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Africa/Johannesburg' });
 }
 
-async function fetchTodayCalendarEvents(userId: string): Promise<Array<{ id: string; subject: string; start: string; end: string; accountLabel: string }>> {
+async function fetchTodayCalendarEvents(userId: string): Promise<CalendarEvent[]> {
   try {
     const now = new Date();
     const startOfDay = new Date(now);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(now);
     endOfDay.setHours(23, 59, 59, 999);
-    const events = await fetchCalendarEvents(userId, startOfDay.toISOString(), endOfDay.toISOString());
-    return events.map(e => ({ id: e.id, subject: e.subject, start: e.start, end: e.end, accountLabel: e.accountLabel }));
+    return await fetchCalendarEvents(userId, startOfDay.toISOString(), endOfDay.toISOString());
   } catch {
     return [];
   }

@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { fetchCompletedSessionsToday } from '@/lib/lhfitness-bridge';
 
 interface NextAction {
   id: string;
@@ -35,8 +36,11 @@ export async function GET() {
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
   const now = new Date();
-  const today = now.toISOString().slice(0, 10);
-  const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
+  // SAST-anchored "today" — important so we don't drift on Vercel UTC servers.
+  // SAST has no DST, fixed offset +02:00.
+  const sastNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  const today = sastNow.toISOString().slice(0, 10);
+  const startOfDay = new Date(`${today}T00:00:00+02:00`);
 
   // Promise.allSettled: a missing/renamed table or transient Supabase
   // error in one source must NOT take down the whole /today response.
@@ -64,6 +68,7 @@ export async function GET() {
       .from('body_metrics').select('id, metric_type, value, recorded_at')
       .eq('user_id', userId).gte('recorded_at', startOfDay.toISOString())
       .order('recorded_at', { ascending: false }).limit(10),
+    fetchCompletedSessionsToday(userId, startOfDay.toISOString()),
   ]);
 
   type Settled<T> = { data: T | null };
@@ -80,6 +85,7 @@ export async function GET() {
   const notesToday = get<Array<{ id: string; title: string; created_at: string }>>(3, []);
   const kbToday = get<Array<{ id: string; title: string; created_at: string }>>(4, []);
   const metricsToday = get<Array<{ id: string; metric_type: string; value: number; recorded_at: string }>>(5, []);
+  const fitnessDoneToday = get<Array<{ scheduled_id: string; title: string; at: string }>>(6, []);
   const overdue = openTodos.filter(t => t.due_date && t.due_date < today);
   const dueToday = openTodos.filter(t => t.due_date === today);
 
@@ -90,6 +96,7 @@ export async function GET() {
   for (const n of notesToday) changes.push({ kind: 'note_created', title: n.title || 'Untitled note', at: n.created_at, href: '/notes' });
   for (const k of kbToday) changes.push({ kind: 'kb_created', title: k.title, at: k.created_at, href: '/kb' });
   for (const m of metricsToday) changes.push({ kind: 'metric_logged', title: `${m.metric_type}: ${m.value}`, at: m.recorded_at, href: '/wellness' });
+  for (const s of fitnessDoneToday) changes.push({ kind: 'workout_done', title: s.title, at: s.at, href: '/lhfitness' });
   changes.sort((a, b) => b.at.localeCompare(a.at));
 
   const response: TodayResponse = {

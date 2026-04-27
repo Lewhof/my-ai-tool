@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
-  Calendar, CheckSquare, Focus, Coffee, Lock,
+  Calendar, CheckSquare, Focus, Coffee, Lock, Zap,
   RefreshCw, Loader2, GripVertical, ChevronLeft, ChevronRight,
   AlertTriangle,
 } from 'lucide-react';
@@ -26,9 +26,10 @@ interface PlanBlock {
   time: string;
   endTime: string;
   title: string;
-  type: 'calendar' | 'task' | 'focus' | 'break';
+  type: 'calendar' | 'task' | 'focus' | 'break' | 'fitness';
   refId?: string;
   priority?: string;
+  accountLabel?: string;
   locked: boolean;
   duration: number;
 }
@@ -46,6 +47,7 @@ const TYPE_CONFIG: Record<string, { icon: typeof Calendar; color: string; bg: st
   task: { icon: CheckSquare, color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30' },
   focus: { icon: Focus, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/30' },
   break: { icon: Coffee, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/30' },
+  fitness: { icon: Zap, color: 'text-orange-300', bg: 'bg-orange-500/15', border: 'border-orange-500/40' },
 };
 
 const PRIORITY_DOTS: Record<string, string> = {
@@ -87,6 +89,10 @@ export default function PlannerPage() {
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  // Drives the "Plan a training session" pointer — only render for users
+  // who've actually onboarded into LH Fitness, otherwise it's unsolicited
+  // cross-product marketing on every empty fitness day.
+  const [lhfitnessActive, setLhfitnessActive] = useState(false);
 
   const isToday = date === new Date().toISOString().split('T')[0];
 
@@ -119,6 +125,20 @@ export default function PlannerPage() {
   }, [date]);
 
   useEffect(() => { fetchPlan(); }, [fetchPlan]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/lhfitness/state')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled) return;
+        const profile = data?.state?.profile;
+        const target = typeof profile?.weekly_target === 'number' ? profile.weekly_target : 0;
+        setLhfitnessActive(Boolean(profile && target > 0));
+      })
+      .catch(() => { /* silent — pointer just stays hidden */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const regenerate = async () => {
     setGenerating(true);
@@ -315,6 +335,17 @@ export default function PlannerPage() {
                     <p className="text-foreground text-lg font-bold">{Math.round(plan.blocks.reduce((s, b) => s + b.duration, 0) / 60)}h</p>
                   </div>
                 </div>
+
+                {lhfitnessActive && plan.blocks.filter(b => b.type === 'fitness').length === 0 && (
+                  <a
+                    href="/lhfitness/plan"
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-orange-500/20 bg-orange-500/5 text-orange-300 hover:border-orange-500/40 hover:bg-orange-500/10 transition-colors text-[11px]"
+                  >
+                    <Zap size={12} className="shrink-0" />
+                    <span className="flex-1">No training session today.</span>
+                    <span className="opacity-70">Plan one →</span>
+                  </a>
+                )}
 
                 {/* Block list (compact) */}
                 <div>
