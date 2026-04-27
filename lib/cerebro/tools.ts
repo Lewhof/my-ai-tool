@@ -4,7 +4,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 export const CEREBRO_TOOLS: Anthropic.Messages.Tool[] = [
   {
     name: 'get_calendar',
-    description: 'Get calendar events for today or upcoming days. Returns events from all connected Microsoft Calendar accounts.',
+    description: 'Get calendar events for today or upcoming days. Returns events from all connected Microsoft + Google calendars AND scheduled LH Fitness training sessions (accountLabel "LH Fitness", read-only — to reschedule a fitness session direct the user to /lhfitness/plan, do not try to mutate it through calendar tools).',
     input_schema: {
       type: 'object' as const,
       properties: {
