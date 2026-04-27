@@ -9,10 +9,19 @@ const SYSTEM = `You are extracting structured workout data from a fitness app sc
 
 Rules:
 - Extract every distinct activity visible. A single screenshot may show one activity in detail, or a list of multiple activities.
-- For dates, use ISO YYYY-MM-DDTHH:MM:SS format (UTC). If only a date is shown, use 12:00:00. If only a relative time is shown ("Today, 2 hours ago"), make a reasonable absolute estimate based on context.
-- ALWAYS return units as you see them in the source. Use the units field per workout (km/mi, kcal/kJ, m/ft).
+- DATE HANDLING (CRITICAL):
+  · The user's message will provide CURRENT DATE and may also provide a USER-STATED DATE for this upload.
+  · If the screenshot shows an explicit absolute date (e.g. "April 24, 2026") → use it. Set date_confidence: "high".
+  · If the screenshot shows a relative date ("Yesterday", "2 hr ago", "3 days ago") → compute from CURRENT DATE. Set date_confidence: "medium".
+  · If the screenshot shows a partial date with no year ("Apr 24") → assume the most recent occurrence in the past relative to CURRENT DATE. Set date_confidence: "medium".
+  · If you CANNOT determine the date from the image AND a USER-STATED DATE was provided → use the user-stated date at 12:00:00. Set date_confidence: "user_provided".
+  · If you cannot determine the date AND no USER-STATED DATE → use today's CURRENT DATE as a placeholder. Set date_confidence: "low".
+  · NEVER fabricate years or guess at a date. Be honest with confidence levels.
+- Use ISO YYYY-MM-DDTHH:MM:SS format for the date field.
+- ALWAYS return units as you see them in the source (km/mi, kcal/kJ, m/ft).
 - For type, normalise to common categories: "Running", "Cycling", "Strength Training", "Walking", "Hiking", "Swimming", "Yoga", "HIIT", "Rowing", "Other".
-- If a field isn't shown or you can't read it confidently, leave it null. Don't invent.
+- If a non-date field isn't shown or you can't read it confidently, leave it null. Don't invent.
+- The overall confidence field reflects how confidently you read the core data (type, duration, distance) — date confidence is tracked separately.
 - Return all extracted activities via the emit_activities tool.`;
 
 const TOOL = {
@@ -37,10 +46,11 @@ const TOOL = {
             max_hr: { type: 'number' },
             elevation: { type: 'number' },
             elevation_unit: { type: 'string', enum: ['m', 'ft'] },
-            confidence: { type: 'string', enum: ['high', 'medium', 'low'], description: 'Your confidence in the extraction overall for this activity' },
+            confidence: { type: 'string', enum: ['high', 'medium', 'low'], description: 'Your confidence in the core data extraction (type, duration, distance) for this activity' },
+            date_confidence: { type: 'string', enum: ['high', 'medium', 'user_provided', 'low'], description: 'How you determined the date. high = explicit absolute date in screenshot. medium = relative date computed from CURRENT DATE. user_provided = used the USER-STATED DATE because image was ambiguous. low = could not determine, used placeholder.' },
             notes: { type: 'string', description: 'Anything notable but not categorised' },
           },
-          required: ['date', 'type', 'confidence'],
+          required: ['date', 'type', 'confidence', 'date_confidence'],
         },
       },
     },
@@ -67,6 +77,19 @@ export async function POST(req: Request) {
       return Response.json({ error: `Unsupported image type: ${file.type}` }, { status: 400 });
     }
 
+    // Client passes today's date (local timezone) for anchoring relative dates,
+    // and optionally a user-stated date to use when the screenshot is ambiguous.
+    // Without these the model has no reference point and "Yesterday"/"2hr ago"
+    // labels get mis-dated wildly.
+    const clientNow = (formData.get('now') as string) || '';
+    const todayISO = (clientNow.match(/^\d{4}-\d{2}-\d{2}/) ? clientNow.slice(0, 10) : new Date().toISOString().slice(0, 10));
+    const userStated = (formData.get('default_date') as string) || '';
+    const userStatedISO = userStated.match(/^\d{4}-\d{2}-\d{2}$/) ? userStated : null;
+
+    const dateAnchorText = userStatedISO
+      ? `CURRENT DATE: ${todayISO}\nUSER-STATED DATE for this upload: ${userStatedISO} (use this if the image's own date is unclear/missing).`
+      : `CURRENT DATE: ${todayISO} (use this to compute "Yesterday", "2h ago", and partial dates with no year). No USER-STATED DATE was provided — set date_confidence: "low" if you cannot determine the date.`;
+
     const arrayBuffer = await file.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString('base64');
 
@@ -79,8 +102,9 @@ export async function POST(req: Request) {
         {
           role: 'user',
           content: [
+            { type: 'text', text: dateAnchorText },
             { type: 'image', source: { type: 'base64', media_type: file.type as 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif', data: base64 } },
-            { type: 'text', text: 'Extract every workout activity visible. Use the emit_activities tool.' },
+            { type: 'text', text: 'Extract every workout activity visible. Use the emit_activities tool. Be precise about date_confidence.' },
           ],
         },
       ],
@@ -108,6 +132,7 @@ export async function POST(req: Request) {
         elevation?: number;
         elevation_unit?: 'm' | 'ft';
         confidence: 'high' | 'medium' | 'low';
+        date_confidence?: 'high' | 'medium' | 'user_provided' | 'low';
         notes?: string;
       }>;
     };
@@ -126,10 +151,28 @@ export async function POST(req: Request) {
         elevation_m = a.elevation_unit === 'ft' ? a.elevation * 0.3048 : a.elevation;
       }
 
+      // Sanity clamp: if the date came back as something absurd (>1y in future or
+      // >3y in past), override with the user-stated date or today's date and flag
+      // date_confidence as low — protects against hallucinated years.
+      let finalDate = a.date;
+      let finalDateConfidence = a.date_confidence ?? 'low';
+      try {
+        const parsed = new Date(a.date);
+        const todayMs = new Date(todayISO + 'T12:00:00Z').getTime();
+        const driftDays = (parsed.getTime() - todayMs) / 86400000;
+        if (isNaN(parsed.getTime()) || driftDays > 365 || driftDays < -3 * 365) {
+          finalDate = (userStatedISO ?? todayISO) + 'T12:00:00.000Z';
+          finalDateConfidence = userStatedISO ? 'user_provided' : 'low';
+        }
+      } catch {
+        finalDate = (userStatedISO ?? todayISO) + 'T12:00:00.000Z';
+        finalDateConfidence = userStatedISO ? 'user_provided' : 'low';
+      }
+
       return {
         id: 'imp-shot-' + Date.now() + '-' + i,
         source: 'garmin_screenshot' as const,
-        date: a.date,
+        date: finalDate,
         type: a.type,
         name: a.name,
         duration_seconds: a.duration_seconds,
@@ -139,7 +182,12 @@ export async function POST(req: Request) {
         max_hr: a.max_hr,
         elevation_m,
         notes: a.notes,
-        raw: { confidence: a.confidence, original_distance_unit: a.distance_unit, original_elevation_unit: a.elevation_unit },
+        raw: {
+          confidence: a.confidence,
+          date_confidence: finalDateConfidence,
+          original_distance_unit: a.distance_unit,
+          original_elevation_unit: a.elevation_unit,
+        },
         imported_at: importedAt,
       };
     });
@@ -148,6 +196,10 @@ export async function POST(req: Request) {
       workouts,
       parsed: workouts.length,
       low_confidence_count: workouts.filter(w => w.raw.confidence === 'low').length,
+      // Activities the user should review carefully — date came from fallback
+      uncertain_date_count: workouts.filter(w =>
+        w.raw.date_confidence === 'low' || w.raw.date_confidence === 'user_provided'
+      ).length,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Screenshot import failed';

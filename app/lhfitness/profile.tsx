@@ -384,6 +384,9 @@ function ImportSection({
   const [busy, setBusy] = useStateReact(false);
   const [pending, setPending] = useStateReact<ImportedWorkout[]>([]);
   const [dupes, setDupes] = useStateReact<DupeRow[]>([]);
+  // Optional date hint for screenshots — if the screenshot doesn't show a clear
+  // date, we tell the AI to use this. Defaults to today.
+  const [shotDate, setShotDate] = useStateReact(() => new Date().toISOString().slice(0, 10));
   const fileRef = useRef<HTMLInputElement>(null);
   const shotRef = useRef<HTMLInputElement>(null);
 
@@ -412,6 +415,12 @@ function ImportSection({
 
       const fd = new FormData();
       fd.append('file', file);
+      // For screenshots only: tell the API today's date (anchor for relative
+      // labels) and the user-stated date (fallback when image is ambiguous).
+      if (isImage) {
+        fd.append('now', new Date().toISOString());
+        if (shotDate) fd.append('default_date', shotDate);
+      }
       const res = await fetch(endpoint, { method: 'POST', body: fd });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -438,7 +447,10 @@ function ImportSection({
       setDupes(dupeRows);
 
       const lowConfNote = data.low_confidence_count ? ` · ${data.low_confidence_count} low confidence` : '';
-      toast.success(`Parsed ${workouts.length} activit${workouts.length === 1 ? 'y' : 'ies'}${lowConfNote}`);
+      const uncertainDateNote = data.uncertain_date_count
+        ? ` · ${data.uncertain_date_count} need date check`
+        : '';
+      toast.success(`Parsed ${workouts.length} activit${workouts.length === 1 ? 'y' : 'ies'}${lowConfNote}${uncertainDateNote}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Import failed');
     } finally {
@@ -474,6 +486,40 @@ function ImportSection({
       <p className="text-muted-foreground text-sm mb-4">
         Bring in your Garmin (or any tracker) history. Dedupe is granular — exact start time + duration match within 60 seconds.
       </p>
+
+      {/* Optional date hint — applies to screenshot uploads when the image's
+          own date is unclear/missing. AI uses this as the fallback. */}
+      <div className="mb-3 flex items-center gap-2 flex-wrap">
+        <label className="text-foreground text-xs uppercase tracking-wide font-bold">When was this activity?</label>
+        <input
+          type="date"
+          value={shotDate}
+          onChange={(e) => setShotDate(e.target.value)}
+          max={new Date().toISOString().slice(0, 10)}
+          className="bg-secondary border border-border rounded-lg px-3 py-1.5 text-sm text-foreground focus:border-primary/60 focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            const d = new Date();
+            d.setDate(d.getDate() - 1);
+            setShotDate(d.toISOString().slice(0, 10));
+          }}
+          className="text-xs px-2.5 py-1 rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
+        >
+          Yesterday
+        </button>
+        <button
+          type="button"
+          onClick={() => setShotDate(new Date().toISOString().slice(0, 10))}
+          className="text-xs px-2.5 py-1 rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
+        >
+          Today
+        </button>
+        <span className="text-[10px] text-muted-foreground/60 italic w-full sm:w-auto">
+          Used for screenshot uploads when the image doesn't show a clear date.
+        </span>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
         <button
@@ -529,6 +575,9 @@ function ImportSection({
           dupes={dupes}
           onDiscard={() => { setPending([]); setDupes([]); }}
           onCommit={commitAll}
+          onUpdatePending={(id, patch) => {
+            setPending(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+          }}
         />
       )}
 
@@ -566,13 +615,22 @@ function ImportSection({
 }
 
 function ReviewPane({
-  pending, dupes, onDiscard, onCommit,
+  pending, dupes, onDiscard, onCommit, onUpdatePending,
 }: {
   pending: ImportedWorkout[];
   dupes: DupeRow[];
   onDiscard: () => void;
   onCommit: (includeOverlaps: boolean) => void;
+  onUpdatePending: (id: string, patch: Partial<ImportedWorkout>) => void;
 }) {
+  // Activities with uncertain dates surface a date picker so user can correct
+  // before commit. Anything flagged low / user_provided gets the picker; high /
+  // medium are display-only.
+  const needsDateConfirm = (w: ImportedWorkout): boolean => {
+    const dc = (w.raw as { date_confidence?: string } | undefined)?.date_confidence;
+    return dc === 'low' || dc === 'user_provided';
+  };
+
   return (
     <div className="bg-background border border-primary/30 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between">
@@ -590,15 +648,57 @@ function ReviewPane({
           <p className="text-emerald-400 text-[11px] uppercase tracking-wide font-bold mb-1.5">
             New ({pending.length})
           </p>
-          <div className="space-y-1 max-h-36 overflow-y-auto">
-            {pending.map(p => (
-              <div key={p.id} className="text-xs text-foreground bg-emerald-500/5 border border-emerald-500/20 rounded px-2 py-1.5">
-                <span className="font-medium">{p.name || p.type}</span>
-                <span className="text-muted-foreground"> · {new Date(p.date).toLocaleDateString()}</span>
-                {p.duration_seconds && <span className="text-muted-foreground"> · {Math.round(p.duration_seconds / 60)}m</span>}
-                {p.distance_km && <span className="text-muted-foreground"> · {p.distance_km.toFixed(2)}km</span>}
-              </div>
-            ))}
+          <div className="space-y-1.5 max-h-60 overflow-y-auto">
+            {pending.map(p => {
+              const dc = (p.raw as { date_confidence?: string } | undefined)?.date_confidence;
+              const dateNeedsConfirm = needsDateConfirm(p);
+              return (
+                <div
+                  key={p.id}
+                  className={cn(
+                    'text-xs rounded px-2 py-2 border',
+                    dateNeedsConfirm
+                      ? 'bg-yellow-500/5 border-yellow-500/30'
+                      : 'bg-emerald-500/5 border-emerald-500/20'
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-foreground font-medium">{p.name || p.type}</span>
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                      {p.duration_seconds && <span>{Math.round(p.duration_seconds / 60)}m</span>}
+                      {p.distance_km && <span>· {p.distance_km.toFixed(2)}km</span>}
+                      {p.calories && <span>· {p.calories}kcal</span>}
+                      {p.avg_hr && <span>· {p.avg_hr}bpm</span>}
+                    </div>
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    {dateNeedsConfirm ? (
+                      <>
+                        <AlertCircle size={11} className="text-yellow-400 shrink-0" />
+                        <span className="text-yellow-400 text-[10px] uppercase tracking-wide font-bold">Confirm date:</span>
+                        <input
+                          type="date"
+                          value={p.date.slice(0, 10)}
+                          onChange={(e) => {
+                            const newDate = e.target.value + 'T12:00:00.000Z';
+                            onUpdatePending(p.id, { date: newDate });
+                          }}
+                          className="bg-card border border-border rounded px-2 py-0.5 text-[11px] text-foreground focus:border-primary/60 focus:outline-none"
+                        />
+                        <span className="text-muted-foreground text-[10px] italic">
+                          ({dc === 'user_provided' ? 'used your date' : 'AI couldn\'t read it'})
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-muted-foreground text-[10px]">{new Date(p.date).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        {dc === 'medium' && <span className="text-[9px] text-muted-foreground/60 italic">(relative date — AI computed)</span>}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
