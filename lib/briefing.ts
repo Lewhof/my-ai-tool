@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { anthropic, MODELS, cachedSystem } from '@/lib/anthropic';
 import { getMicrosoftToken } from '@/lib/microsoft-token';
+import { fetchCalendarEvents } from '@/lib/calendar-events';
 
 // Static system prompt — cached via prompt caching (5-min TTL, 10% read cost).
 // Hit daily by briefing cron + manual refreshes → break-even on cache after 1 hit.
@@ -302,54 +303,17 @@ async function getAllMicrosoftAccounts(userId: string) {
 }
 
 /**
- * Fetch today's calendar events from ALL connected Microsoft accounts.
+ * Fetch today's calendar events from ALL connected accounts (Microsoft + Google).
  */
 async function fetchAllCalendarEvents(userId: string): Promise<Array<{ subject: string; start: string; end: string; accountLabel?: string }>> {
   try {
-    const accounts = await getAllMicrosoftAccounts(userId);
-    if (accounts.length === 0) return [];
-
     const now = new Date();
     const startOfDay = new Date(now);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(now);
     endOfDay.setHours(23, 59, 59, 999);
-
-    const allEvents = await Promise.all(
-      accounts.map(async (account) => {
-        try {
-          const token = await getMicrosoftToken(userId, account.id);
-          if (!token) return [];
-
-          const res = await fetch(
-            `https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=${startOfDay.toISOString()}&endDateTime=${endOfDay.toISOString()}&$orderby=start/dateTime&$top=20&$select=subject,start,end`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          if (!res.ok) return [];
-          const data = await res.json();
-          const label = account.alias || account.label || '';
-          return (data.value ?? []).map((e: { subject: string; start: { dateTime: string }; end: { dateTime: string } }) => ({
-            subject: e.subject,
-            start: e.start.dateTime,
-            end: e.end.dateTime,
-            accountLabel: label,
-          }));
-        } catch {
-          return [];
-        }
-      })
-    );
-
-    // Flatten, dedupe by subject+start (same meeting on multiple accounts), sort chronologically
-    const flat = allEvents.flat();
-    const seen = new Set<string>();
-    const deduped = flat.filter(e => {
-      const key = `${e.subject}|${e.start}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    return deduped.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+    const events = await fetchCalendarEvents(userId, startOfDay.toISOString(), endOfDay.toISOString(), { perAccountLimit: 20 });
+    return events.map(e => ({ subject: e.subject, start: e.start, end: e.end, accountLabel: e.accountLabel }));
   } catch {
     return [];
   }

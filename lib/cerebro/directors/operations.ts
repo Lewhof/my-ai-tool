@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { getMicrosoftToken } from '@/lib/microsoft-token';
+import { fetchCalendarEvents } from '@/lib/calendar-events';
 import { runEmailTriage } from '@/lib/email-triage';
 
 export const OPERATIONS_TOOLS = [
@@ -33,43 +34,23 @@ export async function handle(
         const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
         const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days).toISOString();
 
-        const { data: accounts } = await supabaseAdmin
-          .from('calendar_accounts')
-          .select('id, label, alias, provider')
-          .eq('user_id', userId);
+        // Provider-agnostic — pulls Microsoft + Google in one shot.
+        const events = await fetchCalendarEvents(userId, start, end, { perAccountLimit: 50 });
 
-        if (!accounts?.length) return 'No calendar accounts connected. Go to Settings > Connections to add one.';
-
-        const allEvents: Array<{ time: string; subject: string; label: string; startIso: string }> = [];
-        for (const acc of accounts) {
-          try {
-            const token = await getMicrosoftToken(userId, acc.id);
-            if (!token) continue;
-
-            const res = await fetch(
-              `https://graph.microsoft.com/v1.0/me/calendarview?startDateTime=${start}&endDateTime=${end}&$orderby=start/dateTime&$top=20&$select=subject,start,end,location`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-            if (res.ok) {
-              const data = await res.json();
-              const label = acc.alias || acc.label || 'Calendar';
-              for (const e of data.value ?? []) {
-                const startIso = e.start?.dateTime || '';
-                allEvents.push({
-                  time: startIso.slice(11, 16),
-                  subject: e.subject,
-                  label,
-                  startIso,
-                });
-              }
-            }
-          } catch { /* skip failed account */ }
+        if (events.length === 0) {
+          // Distinguish "no accounts" from "no events" so Cerebro can guide the user.
+          const { data: accounts } = await supabaseAdmin
+            .from('calendar_accounts')
+            .select('id')
+            .eq('user_id', userId)
+            .limit(1);
+          if (!accounts?.length) {
+            return 'No calendar accounts connected. Go to Settings > Connections to add one.';
+          }
+          return 'No events found for this period.';
         }
 
-        allEvents.sort((a, b) => a.startIso.localeCompare(b.startIso));
-        return allEvents.length > 0
-          ? `Calendar events:\n${allEvents.map(e => `${e.time} - ${e.subject} (${e.label})`).join('\n')}`
-          : 'No events found for this period.';
+        return `Calendar events:\n${events.map(e => `${e.start.slice(11, 16)} - ${e.subject} (${e.accountLabel})`).join('\n')}`;
       }
 
       case 'create_calendar_event': {
