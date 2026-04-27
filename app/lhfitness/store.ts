@@ -113,35 +113,60 @@ export function useFitnessState() {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    // 1) Hydrate from localStorage immediately so the UI doesn't flash.
     const local = loadState();
-    setState(local);
-    setHydrated(true);
 
-    // 2) In parallel, ask the server for a snapshot. If the server has
-    //    something AND this device doesn't (or the server is newer than
-    //    this device's last save), adopt it. This is what makes "I
-    //    onboarded on desktop, opening on mobile" Just Work.
-    void (async () => {
-      const remote = await fetchServerState();
-      if (!remote) {
-        // No server row yet. If we have a local profile, push it up so
-        // the next device gets it.
-        if (local.profile) void pushServerState(local);
-        return;
-      }
-      const localUpdatedAt = getLocalUpdatedAt();
-      const serverIsNewer = !localUpdatedAt || remote.updated_at > localUpdatedAt;
-      if (!local.profile || serverIsNewer) {
-        // Adopt the server state and persist locally.
-        setState(remote.state);
-        saveState(remote.state);
-        setTimeout(emitSync, 0);
-      } else if (localUpdatedAt && localUpdatedAt > remote.updated_at) {
-        // Local is newer — push it up.
-        void pushServerState(local);
-      }
-    })();
+    // CRITICAL: if this device has no local profile (fresh browser / PWA
+    // install / cache cleared / cookies wiped), we MUST wait for the server
+    // fetch before declaring hydration done. Otherwise the page renders
+    // "no profile" → onboarding flashes up → user starts typing → server
+    // snapshot arrives 300ms later → race / overwrites their inputs.
+    //
+    // Hard rule:
+    //   - local has profile → hydrate now, sync in background
+    //   - local empty → wait for server (max 3s), then hydrate
+
+    if (local.profile) {
+      setState(local);
+      setHydrated(true);
+
+      // Background sync — adopt newer server state if it exists
+      void (async () => {
+        const remote = await fetchServerState();
+        if (!remote) {
+          void pushServerState(local);
+          return;
+        }
+        const localUpdatedAt = getLocalUpdatedAt();
+        const serverIsNewer = !localUpdatedAt || remote.updated_at > localUpdatedAt;
+        if (serverIsNewer) {
+          setState(remote.state);
+          saveState(remote.state);
+          setTimeout(emitSync, 0);
+        } else if (localUpdatedAt && localUpdatedAt > remote.updated_at) {
+          void pushServerState(local);
+        }
+      })();
+    } else {
+      // No local data — block hydration until server resolves (with timeout).
+      void (async () => {
+        try {
+          const remote = await Promise.race<typeof local | null | { state: FitnessState; updated_at: string }>([
+            fetchServerState(),
+            new Promise((resolve) => setTimeout(() => resolve(null), 3000)),
+          ]);
+          if (remote && 'state' in remote && remote.state?.profile) {
+            // Server has data — adopt it. User skips onboarding correctly.
+            setState(remote.state);
+            saveState(remote.state);
+          } else {
+            // Genuinely new user (or server timed out + nothing locally) — onboard.
+            setState(local);
+          }
+        } finally {
+          setHydrated(true);
+        }
+      })();
+    }
 
     const onSync = () => setState(loadState());
     window.addEventListener(SYNC_EVENT, onSync);
