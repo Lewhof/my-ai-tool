@@ -9,7 +9,7 @@ import {
   Calendar, CalendarDays, Mail, KeyRound, Settings, MessageSquare,
   Zap, BookOpen, Image as ImageIcon, Focus, StickyNote, GitFork,
   ClipboardList, CreditCard, ChevronLeft, ChevronRight, Globe,
-  Wallet, Target, Brain, Activity, Sparkles,
+  Wallet, Target, Brain, Activity, Sparkles, Dumbbell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +21,7 @@ const SIDEBAR_GROUPS = [
       { name: 'Dashboard', href: '/', icon: LayoutDashboard },
       { name: 'Cerebro', href: '/cerebro', icon: Bot },
       { name: 'Cerebro Brain', href: '/cerebro/brain', icon: Brain },
+      { name: 'Fitness', href: '/lhfitness', icon: Dumbbell },
       { name: 'Social', href: '/social', icon: Globe },
     ],
   },
@@ -75,6 +76,7 @@ export default function Sidebar() {
     // /cerebro should not match /cerebro/brain — treat top-level cerebro as exact
     if (href === '/cerebro') return pathname === '/cerebro';
     if (href === '/today') return pathname === '/today';
+    // /lhfitness has many sub-routes — startsWith is correct
     return pathname.startsWith(href);
   };
 
