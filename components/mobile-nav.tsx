@@ -9,20 +9,23 @@ import {
   MessageSquare, Calendar, CalendarDays, Mail, StickyNote, GitFork, Zap,
   ClipboardList, BookOpen, KeyRound, Settings, CreditCard,
   Globe, Focus, Image as ImageIcon, Wallet, Target, Brain, Activity, Sparkles,
+  Dumbbell,
 } from 'lucide-react';
 
 const TABS = [
   { name: 'Home', href: '/', icon: LayoutDashboard },
+  { name: 'Fitness', href: '/lhfitness', icon: Dumbbell },
   { name: 'Cerebro', href: '/cerebro', icon: Bot, isBrand: true },
   { name: 'Tasks', href: '/todos', icon: CheckSquare },
-  { name: 'Docs', href: '/documents', icon: FileText },
   { name: 'More', href: '#more', icon: MoreHorizontal },
 ];
 
 const MORE_GRID = [
-  { name: 'Cerebro Brain', href: '/cerebro/brain', icon: Sparkles },
+  { name: 'Today', href: '/today', icon: Sparkles },
+  { name: 'Cerebro Brain', href: '/cerebro/brain', icon: Brain },
   { name: 'Planner', href: '/planner', icon: CalendarDays },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
+  { name: 'Docs', href: '/documents', icon: FileText },
   { name: 'Email', href: '/email', icon: Mail },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Notes', href: '/notes', icon: StickyNote },
