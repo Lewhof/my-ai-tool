@@ -1,10 +1,13 @@
 import { auth } from '@clerk/nextjs/server';
 import { anthropic, MODELS } from '@/lib/anthropic';
+import { COACH_TOOLS, executeCoachTool } from '@/lib/lhfitness-coach-tools';
 
-// AGI-level coach: Sonnet + adaptive thinking + native web_search.
-// Streams text deltas back as plain text. After streaming completes, appends a
-// compact JSON manifest line beginning with `\n\n[[META]]` containing thinking
-// summary + sources + tool uses, so the client can show those in the UI.
+// AGI-level coach: Sonnet + adaptive thinking + native web_search +
+// calendar mutation tools (mark_rest_day, skip_session, reschedule_session,
+// swap_workout, get_schedule). Streams text deltas back as plain text.
+// After streaming completes, appends a compact JSON manifest line beginning
+// with `\n\n[[META]]` containing thinking summary + sources + tool uses +
+// state_invalidated flag (so the client knows to refetch lhfitness_state).
 
 interface TrainingSummaryShape {
   last_7d_total: number;
@@ -45,6 +48,8 @@ interface ApiRequest {
   enable_web_search?: boolean;
 }
 
+const MAX_TOOL_TURNS = 5;
+
 const SYSTEM = `You are an elite strength & conditioning coach inside the LH Fitness app. You operate at the level of a top-1% personal trainer — think Joe Bennett, Greg Nuckols, Mike Israetel — combining current sports-science research with practical programming sense.
 
 WAY OF WORKING:
@@ -52,7 +57,16 @@ WAY OF WORKING:
 2. **Cite when you research**. If you use the web_search tool, weave findings into the conversation naturally — "the latest meta-analysis on volume landmarks suggests..." rather than dumping URLs.
 3. **Be opinionated**. Top trainers have strong views. Don't hedge. If the user's idea is wrong, say so — and explain why with mechanism.
 4. **Honour boundaries**. No medical advice; defer injury/pain questions to a physio. No supplement-magic-bullet claims.
-5. **Plan synthesis**. When the user signals they're ready ("build me a plan", "let's lock this in", "design the block"), tell them you'll synthesise the plan in a separate step — don't try to dump a full week-by-week table in chat. The synthesis tool runs after this conversation ends.
+5. **Plan synthesis vs targeted edits**. For full plan rebuilds (replacing the active 4-week block), tell the user to click "Build the plan from this conversation" — that runs the synthesis flow. For targeted edits to specific scheduled sessions, USE the calendar tools below.
+
+CALENDAR TOOLS (you can act on the user's plan):
+- get_schedule(from, to) — read what's planned in a date range
+- mark_rest_day(date) — make a date a rest day (skips all sessions on that date)
+- skip_session(scheduled_id) — skip ONE specific session (use when there are multiple on the same day)
+- reschedule_session(scheduled_id, new_date) — move a session to a different date
+- swap_workout(scheduled_id, workout_id?, template?) — replace the workout on a session
+
+When the user asks to change their schedule, USE A TOOL. Never claim "I've removed it" / "marked as rest" / "moved it" without actually calling the tool. If the user's reference is ambiguous ("today's session", "tomorrow", "this week"), call get_schedule first to disambiguate, then act. Confirm what you did using the actual tool result, not what you intended.
 
 STYLE:
 - Direct, warm, no fluff. 2–4 short paragraphs is the sweet spot.
@@ -60,6 +74,16 @@ STYLE:
 - Reference user data (PRs, recent sessions, profile goals) when relevant.
 
 You're embedded in an app with: workout library, AI workout generator, live training session tracker, body metric logging, PR tracking, calendar/plan view.`;
+
+interface CollectedToolUse {
+  tool: string;
+  query?: string;
+  sources?: Array<{ title: string; url: string; snippet?: string }>;
+  // For client tools (mark_rest_day, etc.)
+  input?: unknown;
+  result?: unknown;
+  ok?: boolean;
+}
 
 export async function POST(req: Request) {
   const { userId } = await auth();
@@ -140,8 +164,8 @@ export async function POST(req: Request) {
       systemWithContext += lines.join('\n');
     }
 
-    // Tool config
-    const tools: Array<Record<string, unknown>> = [];
+    // Tool config — coach mutation tools always available; web_search optional.
+    const tools: Array<Record<string, unknown>> = [...COACH_TOOLS];
     if (enable_web_search) {
       tools.push({
         type: 'web_search_20260209',
@@ -150,88 +174,173 @@ export async function POST(req: Request) {
       });
     }
 
-    // Stream — use the modern adaptive thinking API
-    // Note: Helicone proxy may strip thinking blocks; we attempt anyway and fall back gracefully.
-    type CreateParams = Parameters<typeof anthropic.messages.stream>[0];
-    const params: CreateParams = {
-      model: MODELS.smart,
-      max_tokens: 8192,
-      system: systemWithContext,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
-      // adaptive thinking — newer pattern; budget bounds the reasoning tokens
-      thinking: { type: 'enabled', budget_tokens: Math.max(1024, Math.min(16384, thinking_budget)) },
-    };
-    if (tools.length > 0) (params as unknown as { tools: typeof tools }).tools = tools;
-
-    const stream = await anthropic.messages.stream(params);
+    // ── Multi-turn streaming with tool-use loop ──
+    // Anthropic's messages.stream() runs ONE assistant turn. To handle our
+    // client-defined tools (mark_rest_day etc.), we loop:
+    //   stream → collect tool_use blocks → execute → append tool_result →
+    //   stream again, until model emits no more tool_use.
+    // web_search is a server tool (Anthropic-executed), so it does NOT
+    // round-trip through this loop — it appears in the stream as
+    // server_tool_use + web_search_tool_result inline.
+    const conversation: Array<{ role: 'user' | 'assistant'; content: unknown }> =
+      messages.map(m => ({ role: m.role, content: m.content }));
 
     const encoder = new TextEncoder();
-    // Track meta to flush at the end
     const collectedThinking: string[] = [];
-    const collectedToolUses: Array<{ tool: string; query?: string; sources?: Array<{ title: string; url: string; snippet?: string }> }> = [];
+    const collectedToolUses: CollectedToolUse[] = [];
+    let stateInvalidated = false;
 
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          let currentToolUse: { tool: string; query?: string; sources?: Array<{ title: string; url: string; snippet?: string }> } | null = null;
+          let toolCapHitWithPendingTools = false;
 
-          for await (const event of stream) {
-            switch (event.type) {
-              case 'content_block_start': {
-                const block = event.content_block;
-                if (block.type === 'server_tool_use' && block.name === 'web_search') {
-                  currentToolUse = { tool: 'web_search', sources: [] };
-                  // Stream a subtle marker so the client can show "Searching the web..."
-                  controller.enqueue(encoder.encode('​')); // zero-width space — keeps stream alive without visible char
-                } else if (block.type === 'web_search_tool_result') {
-                  // Results arrive as a content block with the search results
-                  const results = (block as unknown as { content?: Array<{ url?: string; title?: string; encrypted_content?: string }> }).content;
-                  if (currentToolUse && Array.isArray(results)) {
-                    currentToolUse.sources = results.slice(0, 5).map(r => ({
-                      title: r.title || r.url || 'source',
-                      url: r.url || '',
-                      snippet: undefined,
-                    }));
-                    collectedToolUses.push(currentToolUse);
-                    currentToolUse = null;
+          for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
+            type CreateParams = Parameters<typeof anthropic.messages.stream>[0];
+            const params: CreateParams = {
+              model: MODELS.smart,
+              max_tokens: 8192,
+              system: systemWithContext,
+              messages: conversation as CreateParams['messages'],
+              thinking: { type: 'enabled', budget_tokens: Math.max(1024, Math.min(16384, thinking_budget)) },
+            };
+            (params as unknown as { tools: typeof tools }).tools = tools;
+
+            const stream = await anthropic.messages.stream(params);
+
+            // Per-turn state — text + thinking buffered by content_block index;
+            // tool_use blocks come from finalMessage().content (canonical) so
+            // we don't accumulate them separately.
+            const assistantBlocks: Array<Record<string, unknown>> = [];
+            const blockBuffers = new Map<number, { type: string; text: string }>();
+            let currentSearchToolUse: CollectedToolUse | null = null;
+
+            for await (const event of stream) {
+              switch (event.type) {
+                case 'content_block_start': {
+                  const block = event.content_block;
+                  blockBuffers.set(event.index, { type: block.type, text: '' });
+                  if (block.type === 'server_tool_use' && block.name === 'web_search') {
+                    currentSearchToolUse = { tool: 'web_search', sources: [] };
+                    // Subtle stream marker so client can show "Searching the web..."
+                    controller.enqueue(encoder.encode('​')); // zero-width space
+                  } else if (block.type === 'web_search_tool_result') {
+                    const results = (block as unknown as { content?: Array<{ url?: string; title?: string }> }).content;
+                    if (currentSearchToolUse && Array.isArray(results)) {
+                      currentSearchToolUse.sources = results.slice(0, 5).map(r => ({
+                        title: r.title || r.url || 'source',
+                        url: r.url || '',
+                      }));
+                      collectedToolUses.push(currentSearchToolUse);
+                      currentSearchToolUse = null;
+                    }
                   }
+                  break;
                 }
-                break;
-              }
-              case 'content_block_delta': {
-                const delta = event.delta;
-                if (delta.type === 'text_delta') {
-                  controller.enqueue(encoder.encode(delta.text));
-                } else if (delta.type === 'thinking_delta') {
-                  collectedThinking.push(delta.thinking);
-                } else if (delta.type === 'input_json_delta' && currentToolUse) {
-                  // web_search query arrives as JSON delta — accumulate
-                  currentToolUse.query = (currentToolUse.query || '') + delta.partial_json;
+                case 'content_block_delta': {
+                  const delta = event.delta;
+                  const buf = blockBuffers.get(event.index);
+                  if (delta.type === 'text_delta') {
+                    controller.enqueue(encoder.encode(delta.text));
+                    if (buf) buf.text += delta.text;
+                  } else if (delta.type === 'thinking_delta') {
+                    collectedThinking.push(delta.thinking);
+                  } else if (delta.type === 'input_json_delta') {
+                    // Only accumulate the web_search query here; client-tool inputs
+                    // come from finalMessage().content (canonical, fully-parsed).
+                    if (currentSearchToolUse) {
+                      currentSearchToolUse.query = (currentSearchToolUse.query || '') + delta.partial_json;
+                    }
+                  }
+                  break;
                 }
-                break;
-              }
-              case 'content_block_stop':
-                // Finalise tool query string if it was a search
-                if (currentToolUse && currentToolUse.tool === 'web_search') {
-                  try {
-                    const parsed = JSON.parse(currentToolUse.query || '{}');
-                    currentToolUse.query = parsed.query || currentToolUse.query;
-                  } catch { /* leave raw */ }
+                case 'content_block_stop': {
+                  if (currentSearchToolUse && currentSearchToolUse.query) {
+                    try {
+                      const parsed = JSON.parse(currentSearchToolUse.query);
+                      currentSearchToolUse.query = parsed.query || currentSearchToolUse.query;
+                    } catch { /* leave raw */ }
+                  }
+                  break;
                 }
-                break;
-              case 'message_stop': {
-                // Flush meta as a single trailing JSON line
-                const meta = {
-                  thinking: collectedThinking.join('').trim() || undefined,
-                  tool_uses: collectedToolUses.length > 0 ? collectedToolUses : undefined,
-                };
-                if (meta.thinking || meta.tool_uses) {
-                  controller.enqueue(encoder.encode('\n\n[[META]]' + JSON.stringify(meta)));
-                }
-                break;
+                case 'message_stop':
+                  // Final assistant message captured below from getFinalMessage()
+                  break;
               }
             }
+
+            // Pull the final assembled assistant message (canonical content blocks)
+            const finalMessage = await stream.finalMessage();
+            assistantBlocks.push(...(finalMessage.content as unknown as Array<Record<string, unknown>>));
+
+            // Append assistant turn to conversation regardless of stop reason
+            conversation.push({ role: 'assistant', content: assistantBlocks });
+
+            // Identify client-tool calls (excluding web_search which is server-tool)
+            const clientToolCalls = assistantBlocks
+              .filter((b) => b.type === 'tool_use')
+              .map((b) => ({
+                id: b.id as string,
+                name: b.name as string,
+                input: b.input as unknown,
+              }));
+
+            if (clientToolCalls.length === 0) {
+              // Terminal turn — no client-side tools to execute
+              break;
+            }
+
+            // Cap protection: this turn's tool_use blocks would need ANOTHER
+            // turn to round-trip. If we've reached the cap we cannot honor
+            // them — surface that to the user instead of silently dropping.
+            if (turn === MAX_TOOL_TURNS - 1) {
+              toolCapHitWithPendingTools = true;
+              break;
+            }
+
+            // Execute each client tool, build tool_result blocks
+            const toolResultsBlock: Array<Record<string, unknown>> = [];
+            for (const call of clientToolCalls) {
+              const result = await executeCoachTool(userId, call.name, call.input);
+              if (result.ok) stateInvalidated = true;
+
+              collectedToolUses.push({
+                tool: call.name,
+                input: call.input,
+                result: result.ok ? result.result : undefined,
+                ok: result.ok,
+              });
+
+              toolResultsBlock.push({
+                type: 'tool_result',
+                tool_use_id: call.id,
+                content: JSON.stringify(result.ok ? result.result : { error: result.error }),
+                is_error: !result.ok,
+              });
+            }
+
+            conversation.push({ role: 'user', content: toolResultsBlock });
+            // Loop continues — model will reply with confirmation text (or another tool_use)
           }
+
+          // Surface the cap-hit case so the user knows the model wanted to
+          // do something but ran out of turns.
+          if (toolCapHitWithPendingTools) {
+            controller.enqueue(encoder.encode(
+              '\n\n_(I hit the action cap for this turn — please re-state which change you want and I\'ll prioritise it.)_',
+            ));
+          }
+
+          // Flush meta as a single trailing JSON line
+          const meta = {
+            thinking: collectedThinking.join('').trim() || undefined,
+            tool_uses: collectedToolUses.length > 0 ? collectedToolUses : undefined,
+            state_invalidated: stateInvalidated || undefined,
+          };
+          if (meta.thinking || meta.tool_uses || meta.state_invalidated) {
+            controller.enqueue(encoder.encode('\n\n[[META]]' + JSON.stringify(meta)));
+          }
+
           controller.close();
         } catch (e) {
           const errMsg = e instanceof Error ? e.message : 'stream error';
