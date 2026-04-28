@@ -16,6 +16,7 @@ const TABS = [
   { name: 'Home', href: '/', icon: LayoutDashboard },
   { name: 'Fitness', href: '/lhfitness', icon: Dumbbell },
   { name: 'Cerebro', href: '/cerebro', icon: Bot, isBrand: true },
+  { name: 'Planner', href: '/planner', icon: CalendarDays },
   { name: 'Tasks', href: '/todos', icon: CheckSquare },
   { name: 'More', href: '#more', icon: MoreHorizontal },
 ];
@@ -23,7 +24,6 @@ const TABS = [
 const MORE_GRID = [
   { name: 'Today', href: '/today', icon: Sparkles },
   { name: 'Cerebro Brain', href: '/cerebro/brain', icon: Brain },
-  { name: 'Planner', href: '/planner', icon: CalendarDays },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Docs', href: '/documents', icon: FileText },
   { name: 'Email', href: '/email', icon: Mail },
