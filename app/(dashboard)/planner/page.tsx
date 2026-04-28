@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   Calendar, CheckSquare, Focus, Coffee, Lock, Zap,
   RefreshCw, Loader2, GripVertical, ChevronLeft, ChevronRight,
-  AlertTriangle, CalendarDays, CalendarRange, Check,
+  AlertTriangle, CalendarDays, CalendarRange, Check, X, ExternalLink, Trash2,
 } from 'lucide-react';
 import {
   DndContext,
@@ -41,6 +41,18 @@ interface DailyPlan {
   blocks: PlanBlock[];
   locked: boolean;
   created_at: string;
+}
+
+interface Todo {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  due_date: string | null;
+  bucket?: string | null;
+  tags?: string[] | null;
+  recurrence?: string | null;
 }
 
 const TYPE_CONFIG: Record<string, { icon: typeof Calendar; color: string; bg: string; border: string }> = {
@@ -115,6 +127,11 @@ export default function PlannerPage() {
   const [saving, setSaving] = useState(false);
   // Local optimistic-state cache: ids of tasks marked complete this session.
   const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
+  // Click-to-edit popout state — task block click loads the underlying todo
+  // into a small dialog where Lew can edit / mark complete / open in Tasks.
+  const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
+  const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
+  const [editingLoading, setEditingLoading] = useState(false);
   // Drives the "Plan a training session" pointer — only render for users
   // who've actually onboarded into LH Fitness.
   const [lhfitnessActive, setLhfitnessActive] = useState(false);
@@ -233,27 +250,109 @@ export default function PlannerPage() {
     if (!res.ok) throw new Error(`Save failed (${res.status})`);
   };
 
-  // Click-to-complete a task block. Optimistic — strikes through locally,
-  // PATCHes the underlying todo, reverts on failure.
-  const completeTask = async (block: PlanBlock) => {
+  // Click on a task block → load the underlying todo + open the edit popout.
+  const openTodo = async (block: PlanBlock) => {
     if (block.type !== 'task' || !block.refId) return;
-    if (completedTaskIds.has(block.refId)) return;
-    setCompletedTaskIds(prev => new Set(prev).add(block.refId!));
+    if (completedTaskIds.has(block.refId)) return;  // already done
+    setEditingTodoId(block.refId);
+    setEditingTodo(null);
+    setEditingLoading(true);
     try {
-      const res = await fetch(`/api/todos/${block.refId}`, {
+      const res = await fetch(`/api/todos/${block.refId}`);
+      if (!res.ok) throw new Error('not found');
+      const data = await res.json();
+      setEditingTodo(data.todo);
+    } catch {
+      toast.error('Could not load task');
+      setEditingTodoId(null);
+    } finally {
+      setEditingLoading(false);
+    }
+  };
+
+  const closeTodoEditor = () => {
+    setEditingTodoId(null);
+    setEditingTodo(null);
+  };
+
+  // Mark complete from inside the popout. Optimistic strike-through on the
+  // block, PATCH the todo, reverts on failure.
+  const markTodoComplete = async () => {
+    if (!editingTodoId) return;
+    const id = editingTodoId;
+    setCompletedTaskIds(prev => new Set(prev).add(id));
+    closeTodoEditor();
+    try {
+      const res = await fetch(`/api/todos/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'done' }),
       });
       if (!res.ok) throw new Error('failed');
-      toast.success(`Done: ${block.title}`);
+      toast.success('Task marked done');
     } catch {
       setCompletedTaskIds(prev => {
         const next = new Set(prev);
-        next.delete(block.refId!);
+        next.delete(id);
         return next;
       });
       toast.error('Could not mark task done');
+    }
+  };
+
+  // Save edits from the popout. PATCHes the todo + updates the matching
+  // block titles in any plan that references it (Day or Week).
+  const saveTodoEdits = async (patch: Partial<Todo>) => {
+    if (!editingTodoId || !editingTodo) return;
+    const id = editingTodoId;
+    const optimistic = { ...editingTodo, ...patch };
+    setEditingTodo(optimistic);
+    try {
+      const res = await fetch(`/api/todos/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error('failed');
+      // Reflect the new title across any block currently rendered.
+      if (typeof patch.title === 'string') {
+        const newTitle = patch.title;
+        if (plan) {
+          setPlan({ ...plan, blocks: plan.blocks.map(b => b.refId === id ? { ...b, title: newTitle } : b) });
+        }
+        setWeekPlans(prev => {
+          const next: Record<string, DailyPlan | null> = {};
+          for (const [d, p] of Object.entries(prev)) {
+            if (!p) { next[d] = p; continue; }
+            next[d] = { ...p, blocks: p.blocks.map(b => b.refId === id ? { ...b, title: newTitle } : b) };
+          }
+          return next;
+        });
+      }
+      toast.success('Task updated');
+    } catch {
+      setEditingTodo(editingTodo);  // revert
+      toast.error('Could not save task');
+    }
+  };
+
+  const deleteTodo = async () => {
+    if (!editingTodoId) return;
+    if (!confirm('Delete this task? This removes it from your task list.')) return;
+    const id = editingTodoId;
+    closeTodoEditor();
+    setCompletedTaskIds(prev => new Set(prev).add(id));  // visually drop from planner
+    try {
+      const res = await fetch(`/api/todos/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('failed');
+      toast.success('Task deleted');
+    } catch {
+      setCompletedTaskIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      toast.error('Could not delete task');
     }
   };
 
@@ -505,7 +604,7 @@ export default function PlannerPage() {
             showCurrentTime={showCurrentTime}
             sensors={sensors}
             onDragEnd={handleDayDragEnd}
-            onCompleteTask={completeTask}
+            onOpenTodo={openTodo}
             completedTaskIds={completedTaskIds}
             getBlockTop={getBlockTop}
             getBlockPxHeight={getBlockPxHeight}
@@ -522,13 +621,201 @@ export default function PlannerPage() {
             showCurrentTime={showCurrentTime}
             sensors={sensors}
             onDragEnd={handleWeekDragEnd}
-            onCompleteTask={completeTask}
+            onOpenTodo={openTodo}
             completedTaskIds={completedTaskIds}
             getBlockTop={getBlockTop}
             getBlockPxHeight={getBlockPxHeight}
           />
         )}
       </div>
+
+      {/* Edit-todo popout */}
+      {editingTodoId && (
+        <TodoEditor
+          todoId={editingTodoId}
+          todo={editingTodo}
+          loading={editingLoading}
+          onClose={closeTodoEditor}
+          onMarkComplete={markTodoComplete}
+          onSave={saveTodoEdits}
+          onDelete={deleteTodo}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Todo editor popout ────────────────────────────────────────────────
+
+interface TodoEditorProps {
+  todoId: string;
+  todo: Todo | null;
+  loading: boolean;
+  onClose: () => void;
+  onMarkComplete: () => void;
+  onSave: (patch: Partial<Todo>) => void;
+  onDelete: () => void;
+}
+
+function TodoEditor({ todoId, todo, loading, onClose, onMarkComplete, onSave, onDelete }: TodoEditorProps) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [priority, setPriority] = useState('medium');
+  const [dueDate, setDueDate] = useState('');
+
+  // Populate form when the todo loads (or changes).
+  useEffect(() => {
+    if (todo) {
+      setTitle(todo.title);
+      setDescription(todo.description ?? '');
+      setPriority(todo.priority);
+      setDueDate(todo.due_date ?? '');
+    }
+  }, [todo]);
+
+  // ESC to close
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const dirty = todo && (
+    title !== todo.title ||
+    description !== (todo.description ?? '') ||
+    priority !== todo.priority ||
+    dueDate !== (todo.due_date ?? '')
+  );
+
+  const handleSave = () => {
+    if (!todo || !dirty) return;
+    const patch: Partial<Todo> = {};
+    if (title !== todo.title) patch.title = title;
+    if (description !== (todo.description ?? '')) patch.description = description || null;
+    if (priority !== todo.priority) patch.priority = priority;
+    if (dueDate !== (todo.due_date ?? '')) patch.due_date = dueDate || null;
+    onSave(patch);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/70 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {loading || !todo ? (
+          <div className="p-8 flex items-center justify-center">
+            <Loader2 size={20} className="animate-spin text-primary" />
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+              <div className="flex items-center gap-2">
+                <CheckSquare size={14} className="text-orange-400" />
+                <h3 className="text-foreground font-semibold text-sm">Task</h3>
+              </div>
+              <button
+                onClick={onClose}
+                className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors"
+                title="Close (Esc)"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-muted-foreground text-[10px] uppercase tracking-wider">Title</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary/50"
+                  placeholder="Task title"
+                />
+              </div>
+
+              <div>
+                <label className="text-muted-foreground text-[10px] uppercase tracking-wider">Description</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary/50 resize-none"
+                  placeholder="Add details (optional)"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-muted-foreground text-[10px] uppercase tracking-wider">Priority</label>
+                  <select
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value)}
+                    className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary/50"
+                  >
+                    <option value="urgent">Urgent</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-muted-foreground text-[10px] uppercase tracking-wider">Due date</label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary/50"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-border bg-background/40">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onDelete}
+                  className="text-muted-foreground hover:text-red-400 p-1.5 rounded transition-colors"
+                  title="Delete task"
+                >
+                  <Trash2 size={14} />
+                </button>
+                <a
+                  href="/todos"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-foreground text-xs flex items-center gap-1 transition-colors"
+                  title="Open in Tasks"
+                >
+                  <ExternalLink size={11} /> Tasks
+                </a>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onMarkComplete}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors"
+                >
+                  <Check size={12} /> Mark complete
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={!dirty}
+                  className="px-3 py-1.5 rounded-lg text-xs bg-primary text-foreground font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Save changes
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+      {/* todoId reserved for future use (e.g., showing the id in a debug footer) */}
+      <span className="sr-only">{todoId}</span>
     </div>
   );
 }
@@ -543,7 +830,7 @@ interface DayViewProps {
   showCurrentTime: boolean;
   sensors: ReturnType<typeof useSensors>;
   onDragEnd: (e: DragEndEvent) => void;
-  onCompleteTask: (b: PlanBlock) => void;
+  onOpenTodo: (b: PlanBlock) => void;
   completedTaskIds: Set<string>;
   getBlockTop: (time: string) => number;
   getBlockPxHeight: (duration: number) => number;
@@ -553,7 +840,7 @@ interface DayViewProps {
 }
 
 function DayView(props: DayViewProps) {
-  const { plan, isToday, currentPositionPx, showCurrentTime, sensors, onDragEnd, onCompleteTask, completedTaskIds, getBlockTop, getBlockPxHeight, lhfitnessActive, onRegenerate, generating } = props;
+  const { plan, isToday, currentPositionPx, showCurrentTime, sensors, onDragEnd, onOpenTodo, completedTaskIds, getBlockTop, getBlockPxHeight, lhfitnessActive, onRegenerate, generating } = props;
 
   if (!plan || plan.blocks.length === 0) {
     return (
@@ -671,7 +958,7 @@ function DayView(props: DayViewProps) {
               topPx={getBlockTop(block.time)}
               heightPx={getBlockPxHeight(block.duration)}
               done={block.refId ? completedTaskIds.has(block.refId) : false}
-              onCompleteTask={onCompleteTask}
+              onOpenTodo={onOpenTodo}
             />
           ))}
         </div>
@@ -690,14 +977,14 @@ interface WeekViewProps {
   showCurrentTime: boolean;
   sensors: ReturnType<typeof useSensors>;
   onDragEnd: (e: DragEndEvent) => void;
-  onCompleteTask: (b: PlanBlock) => void;
+  onOpenTodo: (b: PlanBlock) => void;
   completedTaskIds: Set<string>;
   getBlockTop: (time: string) => number;
   getBlockPxHeight: (duration: number) => number;
 }
 
 function WeekView(props: WeekViewProps) {
-  const { weekDates, weekPlans, todayDateStr, currentPositionPx, showCurrentTime, sensors, onDragEnd, onCompleteTask, completedTaskIds, getBlockTop, getBlockPxHeight } = props;
+  const { weekDates, weekPlans, todayDateStr, currentPositionPx, showCurrentTime, sensors, onDragEnd, onOpenTodo, completedTaskIds, getBlockTop, getBlockPxHeight } = props;
 
   const totalBlocks = Object.values(weekPlans).reduce((sum, p) => sum + (p?.blocks.length ?? 0), 0);
   const totalHours = Math.round(
@@ -767,7 +1054,7 @@ function WeekView(props: WeekViewProps) {
                       isToday={isCurrent}
                       currentPositionPx={currentPositionPx}
                       showCurrentTime={showCurrentTime}
-                      onCompleteTask={onCompleteTask}
+                      onOpenTodo={onOpenTodo}
                       completedTaskIds={completedTaskIds}
                       getBlockTop={getBlockTop}
                       getBlockPxHeight={getBlockPxHeight}
@@ -789,14 +1076,14 @@ interface DayColumnProps {
   isToday: boolean;
   currentPositionPx: number;
   showCurrentTime: boolean;
-  onCompleteTask: (b: PlanBlock) => void;
+  onOpenTodo: (b: PlanBlock) => void;
   completedTaskIds: Set<string>;
   getBlockTop: (time: string) => number;
   getBlockPxHeight: (duration: number) => number;
 }
 
 function DayColumn(props: DayColumnProps) {
-  const { date, plan, isToday, currentPositionPx, showCurrentTime, onCompleteTask, completedTaskIds, getBlockTop, getBlockPxHeight } = props;
+  const { date, plan, isToday, currentPositionPx, showCurrentTime, onOpenTodo, completedTaskIds, getBlockTop, getBlockPxHeight } = props;
   const { setNodeRef, isOver } = useDroppable({ id: date });
 
   return (
@@ -834,7 +1121,7 @@ function DayColumn(props: DayColumnProps) {
           topPx={getBlockTop(block.time)}
           heightPx={getBlockPxHeight(block.duration)}
           done={block.refId ? completedTaskIds.has(block.refId) : false}
-          onCompleteTask={onCompleteTask}
+          onOpenTodo={onOpenTodo}
           compact
         />
       ))}
@@ -850,11 +1137,11 @@ interface BlockRendererProps {
   topPx: number;
   heightPx: number;
   done: boolean;
-  onCompleteTask: (b: PlanBlock) => void;
+  onOpenTodo: (b: PlanBlock) => void;
   compact?: boolean;
 }
 
-function BlockRenderer({ block, dayLocked, topPx, heightPx, done, onCompleteTask, compact }: BlockRendererProps) {
+function BlockRenderer({ block, dayLocked, topPx, heightPx, done, onOpenTodo, compact }: BlockRendererProps) {
   const config = TYPE_CONFIG[block.type] || TYPE_CONFIG.task;
   const Icon = config.icon;
   const isUtility = block.type === 'break' || block.type === 'focus';
@@ -888,7 +1175,7 @@ function BlockRenderer({ block, dayLocked, topPx, heightPx, done, onCompleteTask
       borderClass={config.border}
       iconColor={config.color}
       done={done}
-      onCompleteTask={onCompleteTask}
+      onOpenTodo={onOpenTodo}
     />
   );
 }
@@ -906,10 +1193,10 @@ interface DraggableBlockProps {
   borderClass: string;
   iconColor: string;
   done: boolean;
-  onCompleteTask: (b: PlanBlock) => void;
+  onOpenTodo: (b: PlanBlock) => void;
 }
 
-function DraggablePlanBlock({ block, topPx, heightPx, isCompact, disabled, Icon, bgClass, borderClass, iconColor, done, onCompleteTask }: DraggableBlockProps) {
+function DraggablePlanBlock({ block, topPx, heightPx, isCompact, disabled, Icon, bgClass, borderClass, iconColor, done, onOpenTodo }: DraggableBlockProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: block.id,
     disabled,
@@ -935,7 +1222,7 @@ function DraggablePlanBlock({ block, topPx, heightPx, isCompact, disabled, Icon,
       setTimeout(() => { wasDraggedRef.current = false; }, 0);
       return;
     }
-    if (isClickable) onCompleteTask(block);
+    if (isClickable) onOpenTodo(block);
   };
 
   return (

@@ -1,6 +1,23 @@
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { userId } = await auth();
+  if (!userId) return new Response('Unauthorized', { status: 401 });
+  const { id } = await params;
+
+  const { data, error } = await supabaseAdmin
+    .from('todos')
+    .select('id, title, description, status, priority, due_date, bucket, tags, recurrence, created_at, updated_at')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (!data) return Response.json({ error: 'Not found' }, { status: 404 });
+  return Response.json({ todo: data });
+}
+
 function getNextRecurrenceDate(recurrence: string, fromDate?: string): string | null {
   const now = fromDate ? new Date(fromDate) : new Date();
   switch (recurrence) {
