@@ -115,12 +115,24 @@ async function fetchMicrosoftEvents(
   return items.map((e, idx) => ({
     id: e.id ?? `${accountId}-${idx}`,
     subject: e.subject ?? '(no title)',
-    start: e.start.dateTime,
-    end: e.end.dateTime,
+    // Microsoft Graph with `Prefer: outlook.timezone="Africa/Johannesburg"`
+    // returns the datetime in that timezone WITHOUT an offset suffix (naive).
+    // On a UTC server, `new Date("2026-04-28T07:00:00")` would parse this as
+    // UTC, then `toLocaleTimeString({ timeZone: 'Africa/Johannesburg' })`
+    // would re-shift it +2h. Append the SAST offset explicitly so the string
+    // round-trips correctly anywhere. (SAST has no DST — fixed offset.)
+    start: ensureOffset(e.start.dateTime),
+    end: ensureOffset(e.end.dateTime),
     accountId,
     accountLabel: label,
     provider: (provider === 'microsoft-work' ? 'microsoft-work' : 'microsoft') as 'microsoft' | 'microsoft-work',
   }));
+}
+
+function ensureOffset(iso: string): string {
+  // If it already has a `Z` or `±HH:MM` suffix, leave it. Otherwise tag SAST.
+  if (/[zZ]$|[+-]\d{2}:\d{2}$/.test(iso)) return iso;
+  return iso + '+02:00';
 }
 
 async function fetchGoogleEvents(

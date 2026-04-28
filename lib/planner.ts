@@ -143,7 +143,7 @@ Rules:
 3. Tasks due today come before backlog items
 4. Only add a "Focus Block" if there is a gap of 3+ hours with NO meetings AND no tasks to fill it — maximum 1 per day
 5. Only add a "Break" if the schedule has 3+ consecutive hours of back-to-back work with no gaps — maximum 2 per day, 15 min each
-6. Schedule between 07:00 and 19:00 only
+6. Schedule between 05:00 and 22:00 only (early-bird and late-evening focus blocks are allowed when warranted)
 7. Estimate 30-60 min per task based on complexity (default 45 min)
 8. PRIORITIZE scheduling tasks over adding breaks/focus blocks — fill gaps with tasks first
 9. Do NOT place a break or focus block between two calendar events that are less than 30 min apart
@@ -235,8 +235,8 @@ function resolveOverlaps(calendarBlocks: PlanBlock[], aiBlocks: PlanBlock[]): Pl
   const toHHMM = (min: number) =>
     `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 
-  const DAY_START = 7 * 60;   // 07:00
-  const DAY_END   = 19 * 60;  // 19:00
+  const DAY_START = 5 * 60;   // 05:00
+  const DAY_END   = 22 * 60;  // 22:00
 
   // Build occupied intervals from calendar blocks
   const occupied: Array<{ start: number; end: number }> = calendarBlocks.map(b => ({
@@ -390,12 +390,15 @@ function formatTime(d: Date): string {
 
 async function fetchTodayCalendarEvents(userId: string): Promise<CalendarEvent[]> {
   try {
+    // SAST-anchored day window. The previous server-local-time computation
+    // missed early-morning SAST events on Vercel's UTC servers (their UTC
+    // instant fell in the previous calendar day's window).
     const now = new Date();
-    const startOfDay = new Date(now);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(now);
-    endOfDay.setHours(23, 59, 59, 999);
-    return await fetchCalendarEvents(userId, startOfDay.toISOString(), endOfDay.toISOString());
+    const sastNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    const today = sastNow.toISOString().slice(0, 10);
+    const startIso = new Date(`${today}T00:00:00+02:00`).toISOString();
+    const endIso = new Date(`${today}T23:59:59.999+02:00`).toISOString();
+    return await fetchCalendarEvents(userId, startIso, endIso);
   } catch {
     return [];
   }
