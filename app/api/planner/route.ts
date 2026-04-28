@@ -26,8 +26,10 @@ export async function GET(req: Request) {
     return Response.json({ plan: null, source: 'cached' });
   }
 
-  // Generate new plan via AI
-  const blocks = await generateDailyPlan(userId);
+  // Generate new plan via AI for the target date — gatherPlannerData uses
+  // this both for fetching that date's calendar events AND for excluding
+  // tasks already scheduled on other dates within ±30 days.
+  const blocks = await generateDailyPlan(userId, date);
 
   // Save the generated plan
   const plan = await saveDailyPlan(userId, date, blocks, false);

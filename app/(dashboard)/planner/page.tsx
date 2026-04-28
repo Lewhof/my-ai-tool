@@ -377,19 +377,20 @@ export default function PlannerPage() {
   // Week-view drag: cross-column changes the date (time preserved); same-column
   // changes the time. Source + destination both saved with rollback on failure.
   const handleWeekDragEnd = async (event: DragEndEvent) => {
-    const blockId = String(event.active.id);
+    // Drag ids in Week view are `${date}:${blockId}` so the same blockId on
+    // different days doesn't collide in dnd-kit's draggable registry. Parse
+    // out the source date directly — no need to scan all weekPlans.
+    const dragId = String(event.active.id);
+    const colonIdx = dragId.indexOf(':');
+    if (colonIdx < 0) return;
+    const sourceDate = dragId.slice(0, colonIdx);
+    const blockId = dragId.slice(colonIdx + 1);
     const targetDate = event.over?.id ? String(event.over.id) : null;
 
-    // Find the source plan + block
-    let sourcePlan: DailyPlan | null = null;
-    let sourceDate = '';
-    let block: PlanBlock | null = null;
-    for (const [d, p] of Object.entries(weekPlans)) {
-      if (!p) continue;
-      const found = p.blocks.find(b => b.id === blockId);
-      if (found) { sourcePlan = p; sourceDate = d; block = found; break; }
-    }
-    if (!sourcePlan || !block || sourcePlan.locked || block.locked) return;
+    const sourcePlan = weekPlans[sourceDate] ?? null;
+    if (!sourcePlan) return;
+    const block = sourcePlan.blocks.find(b => b.id === blockId) ?? null;
+    if (!block || sourcePlan.locked || block.locked) return;
 
     const dy = event.delta.y;
     const sameDay = !targetDate || targetDate === sourceDate;
@@ -954,6 +955,7 @@ function DayView(props: DayViewProps) {
             <BlockRenderer
               key={block.id}
               block={block}
+              dragId={block.id}
               dayLocked={plan.locked}
               topPx={getBlockTop(block.time)}
               heightPx={getBlockPxHeight(block.duration)}
@@ -1115,8 +1117,9 @@ function DayColumn(props: DayColumnProps) {
 
       {(plan?.blocks ?? []).map((block) => (
         <BlockRenderer
-          key={block.id}
+          key={`${date}:${block.id}`}
           block={block}
+          dragId={`${date}:${block.id}`}
           dayLocked={plan?.locked ?? false}
           topPx={getBlockTop(block.time)}
           heightPx={getBlockPxHeight(block.duration)}
@@ -1133,6 +1136,13 @@ function DayColumn(props: DayColumnProps) {
 
 interface BlockRendererProps {
   block: PlanBlock;
+  /**
+   * Unique drag id for dnd-kit. In Day view this is just `block.id`; in Week
+   * view it MUST be `${date}:${block.id}` so the same block.id on different
+   * days doesn't collide in dnd-kit's draggable registry (which would cause
+   * "drag one, drag many" — every block sharing the id moves together).
+   */
+  dragId: string;
   dayLocked: boolean;
   topPx: number;
   heightPx: number;
@@ -1141,7 +1151,7 @@ interface BlockRendererProps {
   compact?: boolean;
 }
 
-function BlockRenderer({ block, dayLocked, topPx, heightPx, done, onOpenTodo, compact }: BlockRendererProps) {
+function BlockRenderer({ block, dragId, dayLocked, topPx, heightPx, done, onOpenTodo, compact }: BlockRendererProps) {
   const config = TYPE_CONFIG[block.type] || TYPE_CONFIG.task;
   const Icon = config.icon;
   const isUtility = block.type === 'break' || block.type === 'focus';
@@ -1166,6 +1176,7 @@ function BlockRenderer({ block, dayLocked, topPx, heightPx, done, onOpenTodo, co
   return (
     <DraggablePlanBlock
       block={block}
+      dragId={dragId}
       topPx={topPx}
       heightPx={heightPx}
       isCompact={isCompact}
@@ -1184,6 +1195,7 @@ function BlockRenderer({ block, dayLocked, topPx, heightPx, done, onOpenTodo, co
 
 interface DraggableBlockProps {
   block: PlanBlock;
+  dragId: string;
   topPx: number;
   heightPx: number;
   isCompact: boolean;
@@ -1196,9 +1208,9 @@ interface DraggableBlockProps {
   onOpenTodo: (b: PlanBlock) => void;
 }
 
-function DraggablePlanBlock({ block, topPx, heightPx, isCompact, disabled, Icon, bgClass, borderClass, iconColor, done, onOpenTodo }: DraggableBlockProps) {
+function DraggablePlanBlock({ block, dragId, topPx, heightPx, isCompact, disabled, Icon, bgClass, borderClass, iconColor, done, onOpenTodo }: DraggableBlockProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: block.id,
+    id: dragId,
     disabled,
   });
 
