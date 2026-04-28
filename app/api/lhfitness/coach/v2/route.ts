@@ -204,6 +204,7 @@ export async function POST(req: Request) {
       async start(controller) {
         try {
           let toolCapHitWithPendingTools = false;
+          let totalTextStreamed = 0;
 
           for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
             type CreateParams = Parameters<typeof anthropic.messages.stream>[0];
@@ -212,7 +213,13 @@ export async function POST(req: Request) {
               max_tokens: 8192,
               system: systemWithContext,
               messages: conversation as CreateParams['messages'],
-              thinking: { type: 'enabled', budget_tokens: Math.max(1024, Math.min(16384, thinking_budget)) },
+              // Extended thinking is DISABLED for the tool-use loop. Thinking
+              // blocks must be round-tripped with their encrypted signatures
+              // through every turn of a tool-use chain — the proxy/Helicone
+              // path was almost certainly stripping or mangling them, causing
+              // the second turn to either silently produce no text or to error.
+              // The mutation tools don't need deep reasoning to fire correctly;
+              // dropping thinking removes the failure surface entirely.
             };
             (params as unknown as { tools: typeof tools }).tools = tools;
 
@@ -253,6 +260,7 @@ export async function POST(req: Request) {
                   if (delta.type === 'text_delta') {
                     controller.enqueue(encoder.encode(delta.text));
                     if (buf) buf.text += delta.text;
+                    totalTextStreamed += delta.text.length;
                   } else if (delta.type === 'thinking_delta') {
                     collectedThinking.push(delta.thinking);
                   } else if (delta.type === 'input_json_delta') {
@@ -339,6 +347,46 @@ export async function POST(req: Request) {
             controller.enqueue(encoder.encode(
               '\n\n_(I hit the action cap for this turn — please re-state which change you want and I\'ll prioritise it.)_',
             ));
+          }
+
+          // Hard fallback: if the entire conversation produced zero visible
+          // text, synthesise a confirmation from the tool calls so the user
+          // never sees a blank "disappeared" turn. This catches the case
+          // where the model emits ONLY tool_use blocks (no text) and the
+          // post-tool turn also returns no text.
+          if (totalTextStreamed === 0) {
+            const lines: string[] = [];
+            for (const tu of collectedToolUses) {
+              if (tu.tool === 'web_search') continue;
+              const r = (tu.result ?? {}) as Record<string, unknown>;
+              const i = (tu.input ?? {}) as Record<string, unknown>;
+              if (tu.ok === false) { lines.push(`✗ ${tu.tool} failed`); continue; }
+              if (tu.tool === 'mark_rest_day') {
+                const n = typeof r.skipped_count === 'number' ? r.skipped_count : 0;
+                lines.push(n > 0 ? `✓ Marked ${i.date} as rest day (${n} session${n === 1 ? '' : 's'} skipped)` : `${i.date} was already a rest day`);
+              } else if (tu.tool === 'set_default_training_time') {
+                const t = (r.default_training_time as string | null) ?? '18:00';
+                const aff = typeof r.affected_upcoming_sessions === 'number' ? r.affected_upcoming_sessions : 0;
+                lines.push(`✓ Default training time → ${t}${aff > 0 ? ` (${aff} upcoming session${aff === 1 ? '' : 's'} moved)` : ''}`);
+              } else if (tu.tool === 'set_session_time') {
+                lines.push(`✓ Session time on ${r.date ?? '(unknown)'} → ${r.time ?? 'default'}`);
+              } else if (tu.tool === 'reschedule_session') {
+                lines.push(`✓ Moved session ${r.from_date ?? ''} → ${r.to_date ?? ''}`);
+              } else if (tu.tool === 'skip_session') {
+                lines.push(`✓ Skipped ${r.title ?? 'session'} on ${r.date ?? ''}`);
+              } else if (tu.tool === 'swap_workout') {
+                lines.push(`✓ Swapped workout on ${r.date ?? ''}`);
+              } else if (tu.tool === 'get_schedule') {
+                // read-only, doesn't need a confirmation line
+              } else {
+                lines.push(`✓ ${tu.tool}`);
+              }
+            }
+            const summary = lines.length > 0
+              ? 'Done:\n' + lines.join('\n')
+              : "I didn't end up calling any tools for that. Try rephrasing — e.g. \"mark today as a rest day\" or \"set my training to 5:30 in the mornings\".";
+            controller.enqueue(encoder.encode(summary));
+            console.log(`[coach-v2] hard fallback emitted (totalTextStreamed=0, tool_uses=${collectedToolUses.length})`);
           }
 
           // Flush meta as a single trailing JSON line
