@@ -10,6 +10,9 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const date = url.searchParams.get('date') || new Date().toISOString().split('T')[0];
   const forceRefresh = url.searchParams.get('refresh') === 'true';
+  // cached=true → return null when no plan exists, never trigger AI generation.
+  // Used by Week view to fetch 7 days without spawning 7 parallel AI runs.
+  const cachedOnly = url.searchParams.get('cached') === 'true';
 
   // Check for existing plan
   if (!forceRefresh) {
@@ -17,6 +20,10 @@ export async function GET(req: Request) {
     if (existing) {
       return Response.json({ plan: existing, source: 'cached' });
     }
+  }
+
+  if (cachedOnly) {
+    return Response.json({ plan: null, source: 'cached' });
   }
 
   // Generate new plan via AI
