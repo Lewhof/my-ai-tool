@@ -311,7 +311,9 @@ export async function POST(req: Request) {
             // Execute each client tool, build tool_result blocks
             const toolResultsBlock: Array<Record<string, unknown>> = [];
             for (const call of clientToolCalls) {
+              console.log(`[coach-v2] tool_call turn=${turn} name=${call.name} input=${JSON.stringify(call.input)}`);
               const result = await executeCoachTool(userId, call.name, call.input);
+              console.log(`[coach-v2] tool_result turn=${turn} name=${call.name} ok=${result.ok} ${result.ok ? 'result=' + JSON.stringify(result.result).slice(0, 200) : 'error=' + result.error}`);
               if (result.ok) stateInvalidated = true;
 
               collectedToolUses.push({
@@ -354,6 +356,7 @@ export async function POST(req: Request) {
           controller.close();
         } catch (e) {
           const errMsg = e instanceof Error ? e.message : 'stream error';
+          console.error(`[coach-v2] stream error: ${errMsg}`, e);
           controller.enqueue(encoder.encode(`\n\n[[ERROR]]${errMsg}`));
           controller.close();
         }

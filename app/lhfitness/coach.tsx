@@ -218,10 +218,25 @@ export default function CoachView({ state, dispatch, onPlanCommitted }: Props) {
         toast.error(errMsg.slice(0, 100));
       }
 
+      // Fallback: if the model returned no visible text but DID fire tools
+      // (extended-thinking + tool_use sometimes produces no text turn), render
+      // the tool outcomes as the message body so the user always sees what
+      // actually happened — instead of a blank-looking "disappeared" turn.
+      let visibleTrimmed = visible.trim();
+      if (!visibleTrimmed && toolUses && toolUses.length > 0) {
+        const toolLabels = toolUses
+          .filter(tu => tu.tool !== 'web_search')
+          .map(tu => `✓ ${coachToolLabel(tu)}`)
+          .filter(Boolean);
+        if (toolLabels.length > 0) {
+          visibleTrimmed = toolLabels.join('\n');
+        }
+      }
+
       const coachMsg: CoachMessage = {
         id: 'm-' + Date.now() + '-c',
         role: 'coach',
-        content: visible.trim(),
+        content: visibleTrimmed,
         thinking,
         tool_uses: toolUses,
         created_at: new Date().toISOString(),
