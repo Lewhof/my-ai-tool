@@ -114,16 +114,9 @@ export interface CoachSource {
 }
 
 export interface CoachToolUse {
-  // 'web_search' and 'generate_workout' are legacy / server-tool entries.
-  // Other names are calendar-mutation tools executed server-side.
-  tool: 'web_search' | 'generate_workout' | 'get_schedule' | 'mark_rest_day' | 'skip_session' | 'reschedule_session' | 'swap_workout';
-  // web_search fields
+  tool: 'web_search' | 'generate_workout';
   query?: string;
   sources?: CoachSource[];
-  // mutation-tool fields (other tools)
-  input?: unknown;
-  result?: unknown;
-  ok?: boolean;
 }
 
 export interface CoachMessage {

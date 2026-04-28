@@ -7,10 +7,10 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import type { FitnessState, CoachMessage, CoachThread, CoachMode, TrainingPlan } from './types';
+import type { FitnessState, CoachMessage, CoachThread, CoachMode, TrainingPlan, PlanWeek, MuscleGroup } from './types';
 import {
   newThread, setActiveThread, appendThreadMessage, deleteThread,
-  setThreadPlan, commitPlan, getActivePlan, buildTrainingSummary, applyServerState,
+  setThreadPlan, commitPlan, getActivePlan, buildTrainingSummary,
 } from './store';
 
 interface Props {
@@ -32,42 +32,6 @@ const DEEP_SUGGESTIONS = [
   'I\'m a hybrid athlete — design a week that balances 3 lifting + 3 running sessions without burning out.',
   'I keep getting nagging shoulder pain on bench. What\'s the latest research on cause + fix?',
 ];
-
-// Human-readable label for a calendar-mutation tool call. The tool name
-// + the salient field from the model's input + (when ok) a short outcome
-// from the tool result.
-function coachToolLabel(tu: import('./types').CoachToolUse): string {
-  const input = (tu.input ?? {}) as Record<string, unknown>;
-  const result = (tu.result ?? {}) as Record<string, unknown>;
-  switch (tu.tool) {
-    case 'get_schedule': {
-      const count = typeof result.count === 'number' ? result.count : undefined;
-      return `Read schedule ${input.from ?? ''} → ${input.to ?? ''}${count !== undefined ? ` (${count} session${count === 1 ? '' : 's'})` : ''}`;
-    }
-    case 'mark_rest_day': {
-      if (tu.ok === false) return `Couldn't mark ${input.date ?? ''} as rest day`;
-      const skipped = typeof result.skipped_count === 'number' ? result.skipped_count : 0;
-      return skipped === 0
-        ? `${input.date ?? ''} already a rest day`
-        : `Marked ${input.date ?? ''} as rest day (${skipped} session${skipped === 1 ? '' : 's'} skipped)`;
-    }
-    case 'skip_session':
-      return tu.ok === false
-        ? `Couldn't skip session`
-        : `Skipped: ${(result.title as string) || 'session'} on ${result.date ?? ''}`;
-    case 'reschedule_session':
-      return tu.ok === false
-        ? `Couldn't reschedule`
-        : `Moved ${(result.title as string) || 'session'}: ${result.from_date ?? ''} → ${result.to_date ?? ''}`;
-    case 'swap_workout': {
-      if (tu.ok === false) return `Couldn't swap workout`;
-      const bound = result.bound_to as { kind?: string; name?: string } | undefined;
-      return `Swapped workout on ${result.date ?? ''} → ${bound?.name ?? bound?.kind ?? 'new session'}`;
-    }
-    default:
-      return tu.tool;
-  }
-}
 
 export default function CoachView({ state, dispatch, onPlanCommitted }: Props) {
   const [input, setInput] = useState('');
@@ -180,7 +144,6 @@ export default function CoachView({ state, dispatch, onPlanCommitted }: Props) {
       let visible = full;
       let thinking: string | undefined;
       let toolUses: CoachMessage['tool_uses'] | undefined;
-      let stateInvalidated = false;
       const metaIdx = full.indexOf('\n\n[[META]]');
       if (metaIdx >= 0) {
         visible = full.slice(0, metaIdx);
@@ -189,7 +152,6 @@ export default function CoachView({ state, dispatch, onPlanCommitted }: Props) {
           const meta = JSON.parse(metaJson);
           thinking = meta.thinking;
           toolUses = meta.tool_uses;
-          stateInvalidated = Boolean(meta.state_invalidated);
         } catch { /* ignore malformed meta */ }
       }
       const errorIdx = full.indexOf('\n\n[[ERROR]]');
@@ -210,19 +172,6 @@ export default function CoachView({ state, dispatch, onPlanCommitted }: Props) {
       appendThreadMessage(thread.id, coachMsg, dispatch);
       setStreamText('');
       setStreamThinking('');
-
-      // If server-side mutation tools fired, the lhfitness_state row was
-      // updated server-side — pull the fresh blob and overwrite local so
-      // calendar/today/profile views all reflect the change immediately.
-      if (stateInvalidated) {
-        try {
-          const r = await fetch('/api/lhfitness/state', { cache: 'no-store' });
-          if (r.ok) {
-            const data = await r.json() as { state: FitnessState | null };
-            if (data.state) applyServerState(data.state);
-          }
-        } catch { /* user can refresh manually if sync glitches */ }
-      }
     } catch (e) {
       const errMsg: CoachMessage = {
         id: 'm-' + Date.now() + '-e',
@@ -631,41 +580,26 @@ function MessageBubble({
           </div>
         )}
 
-        {/* Tool uses (web search + calendar mutations) */}
+        {/* Tool uses (web search) */}
         {message.tool_uses && message.tool_uses.length > 0 && !isUser && (
           <div className="bg-card border border-border rounded-lg p-2.5 text-[11px] space-y-1.5">
             {message.tool_uses.map((tu, i) => (
               <div key={i}>
-                {tu.tool === 'web_search' ? (
-                  <>
-                    <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
-                      <Globe size={10} className="text-blue-400" />
-                      Searched: &quot;{tu.query || '...'}&quot;
-                    </div>
-                    {tu.sources && tu.sources.length > 0 && (
-                      <ul className="mt-1 space-y-0.5 pl-4">
-                        {tu.sources.slice(0, 4).map((s, j) => (
-                          <li key={j} className="truncate">
-                            <a href={s.url} target="_blank" rel="noopener noreferrer"
-                              className="text-blue-400 hover:underline truncate text-[10px]">
-                              {s.title || s.url}
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex items-center gap-1.5 font-medium">
-                    {tu.ok === false ? (
-                      <X size={10} className="text-red-400" />
-                    ) : (
-                      <Check size={10} className="text-emerald-400" />
-                    )}
-                    <span className={tu.ok === false ? 'text-red-300' : 'text-emerald-300'}>
-                      {coachToolLabel(tu)}
-                    </span>
-                  </div>
+                <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
+                  <Globe size={10} className="text-blue-400" />
+                  {tu.tool === 'web_search' ? `Searched: "${tu.query || '...'}"` : tu.tool}
+                </div>
+                {tu.sources && tu.sources.length > 0 && (
+                  <ul className="mt-1 space-y-0.5 pl-4">
+                    {tu.sources.slice(0, 4).map((s, j) => (
+                      <li key={j} className="truncate">
+                        <a href={s.url} target="_blank" rel="noopener noreferrer"
+                          className="text-blue-400 hover:underline truncate text-[10px]">
+                          {s.title || s.url}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
             ))}
