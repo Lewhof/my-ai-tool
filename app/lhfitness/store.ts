@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import type {
   FitnessState, Profile, Workout, Session, BodyMetric, PersonalRecord,
   CoachMessage, CoachThread, CoachMode, LoggedExercise, LoggedSet,
@@ -108,6 +108,34 @@ function emitSync() {
   window.dispatchEvent(new Event(SYNC_EVENT));
 }
 
+// Module-level debounce timer so applyServerState() can cancel a pending
+// client PUT before it overwrites a server-side coach mutation.
+let pushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function debouncedPush(state: FitnessState) {
+  if (pushTimer) clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => { pushTimer = null; void pushServerState(state); }, SERVER_SYNC_DEBOUNCE_MS);
+}
+
+function cancelPendingPush() {
+  if (pushTimer) {
+    clearTimeout(pushTimer);
+    pushTimer = null;
+  }
+}
+
+// Adopt a server state snapshot — used after coach mutation tools run
+// server-side (the server wrote to lhfitness_state directly; the client
+// must mirror that into localStorage and notify all subscribers).
+// IMPORTANT: cancel any pending debounced PUT first — it captured an
+// older state in its closure and would clobber the coach's mutation.
+export function applyServerState(serverState: FitnessState) {
+  if (typeof window === 'undefined') return;
+  cancelPendingPush();
+  saveState(serverState);
+  emitSync();
+}
+
 export function useFitnessState() {
   const [state, setState] = useState<FitnessState>(EMPTY_STATE);
   const [hydrated, setHydrated] = useState(false);
@@ -177,18 +205,14 @@ export function useFitnessState() {
     };
   }, []);
 
-  // Debounce server pushes so a flurry of mutations (e.g. an active
-  // session logging set after set) collapses into one PUT.
-  const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  // Debounced server push lives at module scope so applyServerState() can
+  // cancel a pending PUT (see cancelPendingPush above).
   const update = useCallback((mutator: (s: FitnessState) => FitnessState) => {
     setState((prev) => {
       const next = mutator(prev);
       saveState(next);
       setTimeout(emitSync, 0);
-      // Debounced server push.
-      if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
-      pushTimerRef.current = setTimeout(() => { void pushServerState(next); }, SERVER_SYNC_DEBOUNCE_MS);
+      debouncedPush(next);
       return next;
     });
   }, []);
