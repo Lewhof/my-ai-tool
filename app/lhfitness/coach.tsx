@@ -64,6 +64,25 @@ function coachToolLabel(tu: import('./types').CoachToolUse): string {
       const bound = result.bound_to as { kind?: string; name?: string } | undefined;
       return `Swapped workout on ${result.date ?? ''} → ${bound?.name ?? bound?.kind ?? 'new session'}`;
     }
+    case 'set_default_training_time': {
+      if (tu.ok === false) return `Couldn't set default training time`;
+      const t = result.default_training_time as string | null;
+      const affected = typeof result.affected_upcoming_sessions === 'number' ? result.affected_upcoming_sessions : 0;
+      if (result.changed === false) return `Default training time already ${t ?? '(none)'}`;
+      return t === null
+        ? `Cleared default training time (back to 18:00)`
+        : `Default training time → ${t}${affected > 0 ? ` (${affected} upcoming session${affected === 1 ? '' : 's'} moved)` : ''}`;
+    }
+    case 'set_session_time': {
+      if (tu.ok === false) return `Couldn't set session time`;
+      const t = result.time as string | null;
+      const title = (result.title as string) || 'session';
+      const date = result.date ?? '';
+      if (result.changed === false) return `${title} on ${date} already at ${t ?? 'default'}`;
+      return t === null
+        ? `Cleared time on ${title} (${date}) — back to default`
+        : `${title} on ${date} → ${t}`;
+    }
     default:
       return tu.tool;
   }
