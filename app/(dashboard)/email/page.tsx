@@ -52,6 +52,17 @@ interface EmailAccount {
   color: string;
   provider: string;
   is_default: boolean;
+  scopes?: string[];
+}
+
+const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
+
+// An account is mail-capable if it's Microsoft (which always grants mail
+// scopes upfront) or a Google account that has explicitly granted Gmail.
+function isMailAccount(a: EmailAccount): boolean {
+  if (a.provider === 'microsoft' || a.provider === 'microsoft-work') return true;
+  if (a.provider === 'google') return Array.isArray(a.scopes) && a.scopes.includes(GMAIL_READONLY_SCOPE);
+  return false;
 }
 
 const FOLDERS = [
@@ -87,15 +98,16 @@ export default function EmailPage() {
   const [activeAccountId, setActiveAccountId] = useState<string>('all');
   const [showAccountPicker, setShowAccountPicker] = useState(false);
 
-  // Fetch email accounts (Microsoft only — they have Mail.Read scope)
+  // Fetch email accounts — Microsoft always has mail; Google only if it
+  // has granted gmail.readonly via the "Connect Gmail" flow.
   useEffect(() => {
     fetch('/api/calendar/accounts')
       .then(r => r.json())
       .then(data => {
-        const msAccounts = (data.accounts ?? []).filter((a: EmailAccount) => a.provider !== 'google');
-        setAccounts(msAccounts);
+        const mailAccounts = (data.accounts ?? []).filter(isMailAccount);
+        setAccounts(mailAccounts);
         // Default to 'all' if multiple accounts, otherwise the single account
-        if (msAccounts.length === 1) setActiveAccountId(msAccounts[0].id);
+        if (mailAccounts.length === 1) setActiveAccountId(mailAccounts[0].id);
       })
       .catch(() => {});
   }, []);
@@ -184,7 +196,7 @@ export default function EmailPage() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 gap-4">
         <Mail size={48} className="text-muted-foreground/60" />
-        <p className="text-muted-foreground text-lg">Connect your Microsoft account to view emails</p>
+        <p className="text-muted-foreground text-lg">Connect a Microsoft or Google account to view emails</p>
         <a href="/settings/connections" className="bg-primary text-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary transition-colors flex items-center gap-2">
           <ExternalLink size={16} />
           Connect in Settings
