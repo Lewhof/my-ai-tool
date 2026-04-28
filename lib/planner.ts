@@ -26,42 +26,117 @@ export interface DailyPlan {
 /**
  * Gather data needed for plan generation.
  */
-export async function gatherPlannerData(userId: string) {
+// Auto-schedule cutoff: tasks with due_date older than this are NOT pulled
+// into auto-generated plans. They stay in /todos for manual handling so the
+// planner doesn't keep dragging weeks-old "stale" stuff into every regen.
+const STALE_OVERDUE_DAYS = 30;
+
+// How far back/forward we scan other daily_plans to find tasks that are
+// already scheduled on a different day (so we don't double-schedule).
+const SCHEDULED_ELSEWHERE_LOOKBACK_DAYS = 30;
+const SCHEDULED_ELSEWHERE_LOOKAHEAD_DAYS = 30;
+
+export async function gatherPlannerData(userId: string, targetDate: string) {
   const now = new Date();
   const today = now.toISOString().split('T')[0];
 
-  const [todosRes, calendarEvents, habitsRes] = await Promise.all([
+  // Bound for "stale" cutoff — any task with due_date strictly older than
+  // this is considered abandoned and excluded from auto-scheduling.
+  const staleCutoff = new Date(now);
+  staleCutoff.setDate(staleCutoff.getDate() - STALE_OVERDUE_DAYS);
+  const staleCutoffIso = staleCutoff.toISOString().split('T')[0];
+
+  // Range of OTHER daily_plans to scan for already-scheduled task refIds.
+  const lookbackStart = new Date(now);
+  lookbackStart.setDate(lookbackStart.getDate() - SCHEDULED_ELSEWHERE_LOOKBACK_DAYS);
+  const lookaheadEnd = new Date(now);
+  lookaheadEnd.setDate(lookaheadEnd.getDate() + SCHEDULED_ELSEWHERE_LOOKAHEAD_DAYS);
+
+  const [todosRes, calendarEvents, habitsRes, otherPlansRes] = await Promise.all([
     supabaseAdmin
       .from('todos')
       .select('id, title, priority, due_date, status, bucket')
       .eq('user_id', userId)
       .neq('status', 'done')
       .order('priority', { ascending: true })
-      .limit(20),
-    fetchTodayCalendarEvents(userId),
+      .limit(40),
+    fetchTodayCalendarEvents(userId, targetDate),
     supabaseAdmin
       .from('habits')
       .select('id, name, frequency')
       .eq('user_id', userId)
       .eq('active', true),
+    // Scan other daily_plans within ±30 days. We exclude any todo whose
+    // refId is already scheduled there, so regenerating one day doesn't
+    // duplicate tasks already laid down on adjacent days.
+    supabaseAdmin
+      .from('daily_plans')
+      .select('plan_date, blocks')
+      .eq('user_id', userId)
+      .neq('plan_date', targetDate)
+      .gte('plan_date', lookbackStart.toISOString().split('T')[0])
+      .lte('plan_date', lookaheadEnd.toISOString().split('T')[0]),
   ]);
 
-  const todos = todosRes.data ?? [];
+  const allTodos = todosRes.data ?? [];
   const habits = habitsRes.data ?? [];
 
-  // Separate overdue and due-today
-  const overdue = todos.filter(t => t.due_date && t.due_date < today);
-  const dueToday = todos.filter(t => t.due_date === today);
-  const otherTasks = todos.filter(t => !t.due_date || t.due_date > today);
+  // Build the "already scheduled on another day" set from existing plans.
+  const scheduledElsewhere = new Set<string>();
+  const otherPlansData = (otherPlansRes.data ?? []) as Array<{ plan_date: string; blocks: unknown }>;
+  for (const row of otherPlansData) {
+    let blocks: unknown = row.blocks;
+    if (typeof blocks === 'string') {
+      try { blocks = JSON.parse(blocks); } catch { continue; }
+    }
+    if (!Array.isArray(blocks)) continue;
+    for (const b of blocks as Array<{ type?: unknown; refId?: unknown }>) {
+      if (b?.type === 'task' && typeof b.refId === 'string') scheduledElsewhere.add(b.refId);
+    }
+  }
 
-  return { todos, overdue, dueToday, otherTasks, calendarEvents, habits, today };
+  // Filter:
+  //   1. tasks already scheduled on another day in the window → skip
+  //   2. tasks with due_date older than the stale cutoff → skip (handled in /todos UI, not auto-scheduled)
+  const staleSkipped: typeof allTodos = [];
+  const todos = allTodos.filter(t => {
+    if (scheduledElsewhere.has(t.id)) return false;
+    if (t.due_date && t.due_date < staleCutoffIso) {
+      staleSkipped.push(t);
+      return false;
+    }
+    return true;
+  });
+
+  // Separate overdue and due-on-target-date relative to the TARGET date,
+  // not "today" — important for plans generated for tomorrow / next week.
+  const overdue = todos.filter(t => t.due_date && t.due_date < targetDate);
+  const dueToday = todos.filter(t => t.due_date === targetDate);
+  const otherTasks = todos.filter(t => !t.due_date || t.due_date > targetDate);
+
+  return {
+    todos,
+    overdue,
+    dueToday,
+    otherTasks,
+    calendarEvents,
+    habits,
+    today,
+    targetDate,
+    stats: {
+      stale_skipped: staleSkipped.length,
+      already_scheduled_elsewhere: scheduledElsewhere.size,
+    },
+  };
 }
 
 /**
- * Generate an AI-optimized daily plan.
+ * Generate an AI-optimized daily plan for `targetDate` (YYYY-MM-DD).
+ * Defaults to today when the date is omitted (back-compat).
  */
-export async function generateDailyPlan(userId: string): Promise<PlanBlock[]> {
-  const data = await gatherPlannerData(userId);
+export async function generateDailyPlan(userId: string, targetDate?: string): Promise<PlanBlock[]> {
+  const resolvedDate = targetDate || new Date().toISOString().split('T')[0];
+  const data = await gatherPlannerData(userId, resolvedDate);
   const now = new Date();
 
   // Build calendar blocks (locked) — now with account labels.
@@ -114,8 +189,13 @@ export async function generateDailyPlan(userId: string): Promise<PlanBlock[]> {
     ? `Daily habits: ${data.habits.map(h => h.name).join(', ')}`
     : '';
 
-  // Current time for "schedule starting from now"
+  // Current time for "schedule starting from now" — only relevant when the
+  // target date IS today; for future days the AI shouldn't pad gaps from
+  // the current clock time.
   const currentTimeStr = now.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Africa/Johannesburg' });
+  const targetDateObj = new Date(`${data.targetDate}T12:00:00+02:00`);
+  const targetIsToday = data.targetDate === data.today;
+  const targetDateLabel = targetDateObj.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Africa/Johannesburg' });
 
   let aiText = '';
   try {
@@ -126,8 +206,8 @@ export async function generateDailyPlan(userId: string): Promise<PlanBlock[]> {
         role: 'user',
         content: `You are a personal planning AI. Create an optimized daily schedule.
 
-Current time: ${currentTimeStr}
-Today: ${now.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Africa/Johannesburg' })}
+${targetIsToday ? `Current time: ${currentTimeStr}` : `(Planning for a future date — schedule the full day window, don't constrain to "starting now".)`}
+Date being planned: ${targetDateLabel} (${data.targetDate})
 
 LOCKED Calendar Events (cannot be moved, already scheduled):
 ${calendarContext}
@@ -388,16 +468,20 @@ function formatTime(d: Date): string {
   return d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Africa/Johannesburg' });
 }
 
-async function fetchTodayCalendarEvents(userId: string): Promise<CalendarEvent[]> {
+async function fetchTodayCalendarEvents(userId: string, targetDate?: string): Promise<CalendarEvent[]> {
   try {
-    // SAST-anchored day window. The previous server-local-time computation
-    // missed early-morning SAST events on Vercel's UTC servers (their UTC
-    // instant fell in the previous calendar day's window).
-    const now = new Date();
-    const sastNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-    const today = sastNow.toISOString().slice(0, 10);
-    const startIso = new Date(`${today}T00:00:00+02:00`).toISOString();
-    const endIso = new Date(`${today}T23:59:59.999+02:00`).toISOString();
+    // SAST-anchored day window. Fetches events for the requested date (or
+    // today if omitted) — important for plans generated for non-today.
+    let dateStr: string;
+    if (targetDate && /^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+      dateStr = targetDate;
+    } else {
+      const now = new Date();
+      const sastNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+      dateStr = sastNow.toISOString().slice(0, 10);
+    }
+    const startIso = new Date(`${dateStr}T00:00:00+02:00`).toISOString();
+    const endIso = new Date(`${dateStr}T23:59:59.999+02:00`).toISOString();
     return await fetchCalendarEvents(userId, startIso, endIso);
   } catch {
     return [];
