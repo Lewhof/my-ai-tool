@@ -15,7 +15,6 @@ const COMPLETED_LOOKBACK_DAYS = 7;  // show ✓-prefixed completed sessions for 
 interface ScheduledSessionRow {
   id?: unknown;
   date?: unknown;
-  time?: unknown;          // optional HH:MM SAST per-session override
   status?: unknown;
   ai_template?: { name?: unknown; duration_min?: unknown } | null | undefined;
   workout_id?: unknown;
@@ -23,13 +22,10 @@ interface ScheduledSessionRow {
 }
 
 interface FitnessStateBlob {
-  profile?: { default_training_time?: unknown } | null;
   scheduled_sessions?: ScheduledSessionRow[];
   workouts?: Array<{ id?: unknown; name?: unknown; duration_min?: unknown }>;
   sessions?: Array<{ id?: unknown; ended_at?: unknown; workout_name?: unknown }>;
 }
-
-const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /**
  * Read the user's LH Fitness scheduled sessions and project them into the
@@ -66,13 +62,6 @@ export async function fetchFitnessSessions(
     }
   }
 
-  // Profile-level default training time (HH:MM SAST). Falls back to 18:00.
-  // Per-session `time` always wins over this.
-  const profileDefault = typeof state.profile?.default_training_time === 'string'
-    && TIME_RE.test(state.profile.default_training_time)
-    ? state.profile.default_training_time
-    : null;
-
   const startMs = new Date(startIso).getTime();
   const endMs = new Date(endIso).getTime();
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return [];
@@ -89,10 +78,7 @@ export async function fetchFitnessSessions(
     const status = row.status;
     if (status === 'skipped' || status === 'rescheduled') continue;
 
-    // Resolve time-of-day with the per-session → profile default → 18:00 chain.
-    const sessionTime = typeof row.time === 'string' && TIME_RE.test(row.time) ? row.time : null;
-    const resolvedTime = sessionTime ?? profileDefault ?? `${String(DEFAULT_HOUR_SAST).padStart(2, '0')}:00`;
-    const start = sastDateTime(row.date, resolvedTime);
+    const start = sastDateTime(row.date, DEFAULT_HOUR_SAST);
     if (!start) continue;
     const startMsRow = new Date(start).getTime();
 
@@ -202,18 +188,13 @@ export async function fetchCompletedSessionsToday(
 // ── helpers ──
 
 /**
- * Build an ISO datetime in SAST (+02:00) from a YYYY-MM-DD date and an
- * HH:MM time-of-day string. SAST has no DST, so the offset is always +02:00.
- *
- * Accepts the time as either a number (legacy hour-only) or an HH:MM string.
+ * Build an ISO datetime in SAST (+02:00) from a YYYY-MM-DD date.
+ * SAST has no DST, so the offset is always +02:00.
  */
-function sastDateTime(dateOnly: string, time: number | string): string | null {
+function sastDateTime(dateOnly: string, hour: number): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) return null;
-  const hhmm = typeof time === 'number'
-    ? `${String(time).padStart(2, '0')}:00`
-    : time;
-  if (!TIME_RE.test(hhmm)) return null;
-  return `${dateOnly}T${hhmm}:00+02:00`;
+  const hh = String(hour).padStart(2, '0');
+  return `${dateOnly}T${hh}:00:00+02:00`;
 }
 
 function addMinutesIso(iso: string, minutes: number): string {

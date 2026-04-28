@@ -83,7 +83,6 @@ export interface Profile {
   difficulty: Difficulty;
   available_equipment: Equipment[];
   weekly_target: number; // sessions/week
-  default_training_time?: string; // HH:MM SAST — drives where fitness blocks land in the dashboard's calendar/planner. Per-session `time` overrides this. Falls back to 18:00 SAST.
   created_at: string;
 }
 
@@ -117,7 +116,7 @@ export interface CoachSource {
 export interface CoachToolUse {
   // 'web_search' and 'generate_workout' are legacy / server-tool entries.
   // Other names are calendar-mutation tools executed server-side.
-  tool: 'web_search' | 'generate_workout' | 'get_schedule' | 'mark_rest_day' | 'skip_session' | 'reschedule_session' | 'swap_workout' | 'set_default_training_time' | 'set_session_time';
+  tool: 'web_search' | 'generate_workout' | 'get_schedule' | 'mark_rest_day' | 'skip_session' | 'reschedule_session' | 'swap_workout';
   // web_search fields
   query?: string;
   sources?: CoachSource[];
@@ -185,7 +184,6 @@ export type ScheduledStatus = 'scheduled' | 'completed' | 'skipped' | 'reschedul
 export interface ScheduledSession {
   id: string;
   date: string;                  // ISO YYYY-MM-DD
-  time?: string;                 // Optional HH:MM (SAST) — per-session override; trumps profile.default_training_time. Bridge falls back to 18:00 SAST when neither is set.
   plan_id?: string;
   plan_week_num?: number;
   plan_day_offset?: number;
