@@ -7,7 +7,7 @@ export async function GET() {
 
   const { data } = await supabaseAdmin
     .from('calendar_accounts')
-    .select('id, label, alias, email, provider, color, is_default, created_at')
+    .select('id, label, alias, email, provider, color, is_default, created_at, scopes')
     .eq('user_id', userId)
     .order('is_default', { ascending: false });
 

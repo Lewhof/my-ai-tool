@@ -1,29 +1,53 @@
 import { auth } from '@clerk/nextjs/server';
 import { getMicrosoftToken } from '@/lib/microsoft-token';
+import { listInboxMessages } from '@/lib/google-gmail';
 import { supabaseAdmin } from '@/lib/supabase-server';
+
+// MIME parsing for Gmail bodies uses Node Buffer — pin the route to Node
+// runtime so it doesn't accidentally land on Edge.
+export const runtime = 'nodejs';
 
 export async function GET(req: Request) {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
   const url = new URL(req.url);
-  const folder = url.searchParams.get('folder') || 'inbox';
-  const limit = parseInt(url.searchParams.get('limit') || '20', 10);
+  const folder = (url.searchParams.get('folder') || 'inbox') as 'inbox' | 'sent' | 'drafts' | 'archive';
+  // Cap the requested limit so a stray client (or hostile caller) can't
+  // amplify into hundreds of Gmail GET calls per request.
+  const rawLimit = parseInt(url.searchParams.get('limit') || '20', 10);
+  const limit = Math.max(1, Math.min(Number.isFinite(rawLimit) ? rawLimit : 20, 50));
   const accountId = url.searchParams.get('account_id') || undefined;
 
-  const token = await getMicrosoftToken(userId, accountId);
-  if (!token) return Response.json({ connected: false, emails: [] });
-
-  // Get account info for display
-  let accountInfo: { label: string; alias: string; email: string } | null = null;
+  // Look up the account row so we can branch on provider.
+  let account: { id: string; provider: string; label: string; alias: string | null; email: string } | null = null;
   if (accountId) {
     const { data } = await supabaseAdmin
       .from('calendar_accounts')
-      .select('label, alias, email')
+      .select('id, provider, label, alias, email')
       .eq('id', accountId)
-      .single();
-    accountInfo = data;
+      .eq('user_id', userId)
+      .maybeSingle();
+    account = data;
   }
+
+  const provider = account?.provider;
+
+  if (provider === 'google') {
+    const messages = await listInboxMessages(userId, account!.id, { folder, limit });
+    if (messages === null) {
+      return Response.json({ connected: false, emails: [], error: 'Gmail not connected for this account' });
+    }
+    return Response.json({
+      connected: true,
+      emails: messages,
+      account: account ? { label: account.label, alias: account.alias, email: account.email } : null,
+    });
+  }
+
+  // Default + 'microsoft' / 'microsoft-work' branch (existing path).
+  const token = await getMicrosoftToken(userId, accountId);
+  if (!token) return Response.json({ connected: false, emails: [] });
 
   const folderMap: Record<string, string> = {
     inbox: 'inbox',
@@ -31,7 +55,6 @@ export async function GET(req: Request) {
     drafts: 'drafts',
     archive: 'archive',
   };
-
   const graphFolder = folderMap[folder] || 'inbox';
 
   try {
@@ -59,7 +82,11 @@ export async function GET(req: Request) {
       hasAttachments: e.hasAttachments,
     }));
 
-    return Response.json({ connected: true, emails, account: accountInfo });
+    return Response.json({
+      connected: true,
+      emails,
+      account: account ? { label: account.label, alias: account.alias, email: account.email } : null,
+    });
   } catch {
     return Response.json({ connected: true, emails: [], error: 'Failed to fetch emails' });
   }

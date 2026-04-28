@@ -13,6 +13,14 @@ interface CalendarAccount {
   color: string;
   provider: string;
   is_default: boolean;
+  scopes?: string[];
+}
+
+const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
+const CALENDAR_READONLY_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+
+function hasScope(acc: CalendarAccount, scope: string): boolean {
+  return Array.isArray(acc.scopes) && acc.scopes.includes(scope);
 }
 
 interface ConnectionStatus {
@@ -219,38 +227,81 @@ export default function ConnectionsPage() {
             </div>
           </section>
 
-          {/* ── Google Calendar ── */}
+          {/* ── Google (Calendar + Gmail) ── */}
           <section className="bg-card border border-border rounded-lg overflow-hidden">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Calendar size={20} className="text-red-400" />
+                <Mail size={20} className="text-red-400" />
                 <div>
-                  <h3 className="text-foreground font-semibold text-sm">Google Calendar</h3>
-                  <p className="text-muted-foreground text-xs">Gmail / Google Workspace calendars</p>
+                  <h3 className="text-foreground font-semibold text-sm">Google Account</h3>
+                  <p className="text-muted-foreground text-xs">Gmail + Google Calendar</p>
                 </div>
               </div>
               <StatusBadge connected={googleAccounts.length > 0} />
             </div>
-            <div className="p-5">
-              {googleAccounts.map((acc) => (
-                <div key={acc.id} className="flex items-center justify-between bg-background rounded-lg px-4 py-3 mb-3">
-                  <div className="flex items-center gap-3">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: acc.color }} />
-                    <div>
-                      <p className="text-foreground text-sm font-medium">{acc.label}</p>
-                      <p className="text-muted-foreground text-xs">{acc.email}</p>
+            <div className="p-5 space-y-3">
+              {googleAccounts.map((acc) => {
+                const hasGmail = hasScope(acc, GMAIL_READONLY_SCOPE);
+                const hasCalendar = hasScope(acc, CALENDAR_READONLY_SCOPE);
+                return (
+                  <div key={acc.id} className="bg-background rounded-lg px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: acc.color }} />
+                        <div className="min-w-0">
+                          <p className="text-foreground text-sm font-medium truncate">{acc.label}</p>
+                          <p className="text-muted-foreground text-xs truncate">{acc.email}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => removeAccount(acc.id)}
+                        className="text-muted-foreground hover:text-red-400 p-1 transition-colors shrink-0"
+                        title="Disconnect"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      {hasCalendar && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/30">
+                          <Calendar size={10} /> Calendar
+                        </span>
+                      )}
+                      {hasGmail ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                          <Mail size={10} /> Gmail
+                        </span>
+                      ) : (
+                        <a
+                          href={`/api/auth/google?scope_set=gmail&login_hint=${encodeURIComponent(acc.email)}`}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-secondary text-muted-foreground border border-border hover:text-emerald-300 hover:border-emerald-500/30 transition-colors"
+                        >
+                          <Plus size={10} /> Add Gmail
+                        </a>
+                      )}
                     </div>
                   </div>
-                  <button onClick={() => removeAccount(acc.id)} className="text-muted-foreground hover:text-red-400 p-1 transition-colors"><Trash2 size={14} /></button>
-                </div>
-              ))}
-              <a
-                href="/api/auth/google"
-                className="bg-primary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary transition-colors flex items-center gap-2 w-fit"
-              >
-                <Plus size={14} />
-                Connect Google Calendar
-              </a>
+                );
+              })}
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href="/api/auth/google?scope_set=all"
+                  className="bg-primary text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex items-center gap-2 w-fit"
+                >
+                  <Plus size={14} />
+                  {googleAccounts.length === 0 ? 'Connect Google Account' : 'Add another Google Account'}
+                </a>
+                <a
+                  href="/api/auth/google?scope_set=calendar"
+                  className="text-foreground px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-surface-2 transition-colors flex items-center gap-2 w-fit"
+                >
+                  <Plus size={14} />
+                  Calendar only
+                </a>
+              </div>
+              <p className="text-muted-foreground/60 text-[11px]">
+                Google will warn that this app isn&apos;t verified — that&apos;s expected for a personal-use OAuth client. Click <span className="text-foreground/80">Advanced → Continue</span>.
+              </p>
             </div>
           </section>
 
