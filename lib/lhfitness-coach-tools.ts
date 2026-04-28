@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
-import type { FitnessState, ScheduledSession, ScheduledStatus, Workout } from '@/app/lhfitness/types';
+import type { FitnessState, Profile, ScheduledSession, ScheduledStatus, Workout } from '@/app/lhfitness/types';
 
 // Server-side tool registry + dispatcher for the LH Fitness coach.
 //
@@ -94,6 +94,35 @@ export const COACH_TOOLS = [
       required: ['scheduled_id'],
     },
   },
+  {
+    name: 'set_default_training_time',
+    description:
+      "Set the user's default training time-of-day (SAST). Affects ALL scheduled sessions that " +
+      "don't have an explicit per-session time override — i.e. \"all my morning workouts\", " +
+      "\"all sessions at 5:30am\". Use this for bulk time-of-day requests. Pass null/empty to clear.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        time: { type: 'string', description: 'HH:MM in 24h SAST. Use empty string to clear and revert to the 18:00 default.' },
+      },
+      required: ['time'],
+    },
+  },
+  {
+    name: 'set_session_time',
+    description:
+      'Set the time-of-day (SAST) for ONE specific scheduled session, overriding the profile ' +
+      "default. Use this for \"move Tuesday's session to 6am\" — single-session targeted edits. " +
+      'Pass empty time to clear the override and fall back to the default.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        scheduled_id: { type: 'string', description: 'Scheduled session id from get_schedule' },
+        time: { type: 'string', description: 'HH:MM in 24h SAST. Use empty string to clear and fall back to the profile default.' },
+      },
+      required: ['scheduled_id', 'time'],
+    },
+  },
 ] as const;
 
 export type CoachToolName = (typeof COACH_TOOLS)[number]['name'];
@@ -141,9 +170,29 @@ export async function executeCoachTool(
       return rescheduleSession(userId, args);
     case 'swap_workout':
       return swapWorkout(userId, args);
+    case 'set_default_training_time':
+      return setDefaultTrainingTime(userId, args);
+    case 'set_session_time':
+      return setSessionTime(userId, args);
     default:
       return { ok: false, error: `Unknown tool: ${name}` };
   }
+}
+
+// ── Time-of-day validator ──────────────────────────────────────────────
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * Validate HH:MM 24-hour format. Empty string → null (clear). Anything else
+ * unparseable → undefined sentinel for "invalid".
+ */
+function parseTime(s: unknown): { ok: true; value: string | null } | { ok: false; error: string } {
+  if (typeof s !== 'string') return { ok: false, error: '`time` must be a string in HH:MM 24-hour format' };
+  const trimmed = s.trim();
+  if (trimmed === '') return { ok: true, value: null };
+  if (!TIME_RE.test(trimmed)) return { ok: false, error: '`time` must be HH:MM in 24-hour format (e.g. 05:30, 18:00)' };
+  return { ok: true, value: trimmed };
 }
 
 // ── Tool implementations ───────────────────────────────────────────────
@@ -421,6 +470,100 @@ async function swapWorkout(userId: string, args: Record<string, unknown>): Promi
       id: scheduledId,
       date: target.date,
       bound_to: boundTo,
+    },
+  };
+}
+
+async function setDefaultTrainingTime(userId: string, args: Record<string, unknown>): Promise<ToolResult> {
+  const parsed = parseTime(args.time);
+  if (!parsed.ok) return parsed;
+  const newTime = parsed.value;
+
+  const readResult = await readState(userId);
+  if (!readResult) return { ok: false, error: 'No LH Fitness state for this user.' };
+  const { state, updatedAt } = readResult;
+  if (!state.profile) return { ok: false, error: "Profile not found — user hasn't completed onboarding." };
+
+  const previous = state.profile.default_training_time ?? null;
+  if (previous === newTime) {
+    return { ok: true, result: { default_training_time: newTime, note: 'Already set to that time.', changed: false } };
+  }
+
+  const nextProfile: Profile = { ...state.profile };
+  if (newTime === null) delete nextProfile.default_training_time;
+  else nextProfile.default_training_time = newTime;
+
+  // Count how many upcoming sessions will visibly move (no per-session override + status scheduled).
+  const today = new Date().toISOString().slice(0, 10);
+  const affected = (state.scheduled_sessions ?? []).filter(
+    (s) => s.status === 'scheduled' && !s.time && s.date >= today,
+  ).length;
+
+  const updated: FitnessState = { ...state, profile: nextProfile };
+  const writeResult = await writeState(userId, updated, updatedAt);
+  if (!writeResult.ok) return writeResult;
+
+  return {
+    ok: true,
+    result: {
+      default_training_time: newTime,
+      previous,
+      affected_upcoming_sessions: affected,
+      changed: true,
+    },
+  };
+}
+
+async function setSessionTime(userId: string, args: Record<string, unknown>): Promise<ToolResult> {
+  const scheduledId = args.scheduled_id;
+  if (typeof scheduledId !== 'string' || !scheduledId) {
+    return { ok: false, error: '`scheduled_id` is required' };
+  }
+  const parsed = parseTime(args.time);
+  if (!parsed.ok) return parsed;
+  const newTime = parsed.value;
+
+  const readResult = await readState(userId);
+  if (!readResult) return { ok: false, error: 'No LH Fitness state for this user.' };
+  const { state, updatedAt } = readResult;
+
+  const target = (state.scheduled_sessions ?? []).find((s) => s.id === scheduledId);
+  if (!target) return { ok: false, error: 'No scheduled session with that id' };
+  if (target.status === 'completed') {
+    return { ok: false, error: 'Session is already completed — its time cannot be changed retroactively.' };
+  }
+
+  const previous = target.time ?? null;
+  if (previous === newTime) {
+    return { ok: true, result: { id: scheduledId, time: newTime, note: 'Already at that time.', changed: false } };
+  }
+
+  const updated: FitnessState = {
+    ...state,
+    scheduled_sessions: state.scheduled_sessions.map((s) => {
+      if (s.id !== scheduledId) return s;
+      const { time: _omit, ...rest } = s;
+      void _omit;
+      return newTime === null ? rest : { ...rest, time: newTime };
+    }),
+  };
+  const writeResult = await writeState(userId, updated, updatedAt);
+  if (!writeResult.ok) return writeResult;
+
+  const workoutById = new Map<string, string>();
+  for (const w of state.workouts ?? []) {
+    if (w?.id && typeof w.name === 'string') workoutById.set(w.id, w.name);
+  }
+
+  return {
+    ok: true,
+    result: {
+      id: scheduledId,
+      date: target.date,
+      title: describeSession(target, workoutById),
+      time: newTime,
+      previous,
+      profile_default: state.profile?.default_training_time ?? null,
     },
   };
 }
