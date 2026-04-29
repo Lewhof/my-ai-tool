@@ -212,6 +212,19 @@ export function setProfile(profile: Profile, update: (m: (s: FitnessState) => Fi
     }
     return next;
   });
+
+  // Phase 1 of the rebuild: dual-write to the new lhfitness_profiles table.
+  // Local + blob writes happen via the store's normal sync path above; this
+  // additional PUT lands the profile in real relational storage so it
+  // survives localStorage clears and is readable cross-device. Best-effort:
+  // failure here doesn't roll back the local update.
+  if (typeof window !== 'undefined') {
+    void fetch('/api/lhfitness/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile }),
+    }).catch(() => { /* logged server-side; local data is still safe */ });
+  }
 }
 
 export function addWorkout(workout: Workout, update: (m: (s: FitnessState) => FitnessState) => void) {
